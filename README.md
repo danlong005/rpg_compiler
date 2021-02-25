@@ -6,5 +6,5 @@ C program and run the executable.
 
 ### Disclaimer
 This will never be a full replacement for RPG, as I plan only to include 
-the features I want in the language. O-Specs is not planned to ever be supported.
+the features I want in the language. O-Specs are not planned to ever be supported.
 
