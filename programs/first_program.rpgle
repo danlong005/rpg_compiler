@@ -1,3 +1,3 @@
-**FREE
-DCL-F YOUR_FILE;
-DCL-F MY_FILE OPTIONS(*INPUT:*OUTPUT:*UPDATE);
+**free
+dcl-f your_file;
+dcl-f my_file options(*input:*output:*update);

@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+
+PROGRAM_NAME_W_EXT=$1
+PROGRAM_NAME=$(echo $1 | cut -d. -f1)
+
+
+# uppercase the code 
+cat $PROGRAM_NAME_W_EXT | tr '[:lower:]' '[:upper:]' > $PROGRAM_NAME_W_EXT.upper
+
+# translate the program to c
+./rpg < $PROGRAM_NAME_W_EXT.upper
+# ./rpg < $PROGRAM_NAME_W_EXT.upper > $PROGRAM_NAME_W_EXT.c 
+
+# compile the translation
+#gcc -o $PROGRAM_NAME $PROGRAM_NAME_W_EXT.c
+
+# clean up
+rm $PROGRAM_NAME_W_EXT.upper
+# rm $PROGRAM_NAME_W_EXT.c

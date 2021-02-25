@@ -1,0 +1,5 @@
+lex.yy.c
+rpg
+rpg.output
+rpg.tab.c
+rpg.tab.h
