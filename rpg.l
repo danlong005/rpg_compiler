@@ -12,17 +12,28 @@ identifier   [_a-zA-Z0-9]+
 
 %%
 
-"\n"         { program_line_number++; return NEW_LINE; }
+"\n"         { program_line_number = program_line_number + 1; }
 "**FREE"     return FREE;
 ";"          return SEMI_COLON;
-"DCL-F"      return DECLARE_F;
+"DCL-S"      return DECLARE_S;
+"DCL-DS"     return DECLARE_DS;
+"END-DS"     return END_DS;
+"QUALIFIED"  return QUALIFIED;
 "OPTIONS"    return OPTIONS;
+"INT"        return INT;
+"INZ"        return INZ;
+"*ON"        return ON;
+"RETURN"     return RETURN;
+"*INLR"      return INLR;
+"="          return EQUALS;
+"CHAR"       return CHAR;
+"ZONED"      return ZONED;
+"EXEC SQL"   return EXEC_SQL;
+"/*"         return BEG_COMMENT;
+"*/"         return END_COMMENT;
 "("          return LEFT_PARENS;
 ")"          return RIGHT_PARENS;
-"*INPUT"     return INPUT;
-"*OUTPUT"    return OUTPUT;
-"*UPDATE"    return UPDATE;
 ":"          return COLON;
-{blanks}     {}
+[ \t\n]+     {}
 {identifier} return IDENTIFIER;
 %%
