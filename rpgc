@@ -1,0 +1,5 @@
+#!/bin/bash
+
+file_name=$(echo $1 | cut -d"." -f1)
+./rpgcc < examples/$file_name.rpgle > output/$file_name.c
+gcc output/$file_name.c
