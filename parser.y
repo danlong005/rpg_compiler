@@ -5,6 +5,8 @@
     #include <ctype.h>
     #include "lex.yy.c"
 
+    char* hold_message;
+
     void yyerror(const char *s);
     int yylex();
     int yywrap();    
@@ -14,7 +16,10 @@
     char * util_insert_newline(char *);
 %}
 
-%token FREE DISPLAY EQUALS STR ON INLR SEMI_COLON 
+%token ZONED CHAR
+%token FREE DISPLAY EQUALS STR ON INLR DECLARE_STANDALONE 
+%token ID DIGITS
+%token COLON LEFT_PARENTHESIS RIGHT_PARENTHESIS SEMI_COLON
 
 %%
 program: FREE body endpgm
@@ -26,6 +31,29 @@ body:
     util_write(util_replace_quotes(util_insert_newline(message))); 
     util_writeln(");"); } 
   SEMI_COLON 
+| DECLARE_STANDALONE variable_type SEMI_COLON
+    { 
+        util_writeln(";")
+    }
+;
+
+variable_type:
+| identifier
+    {
+        util_write("float ");
+        util_write(message);
+    }
+        ZONED LEFT_PARENTHESIS numerics RIGHT_PARENTHESIS
+;
+
+identifier:
+| ID
+;
+
+numerics:
+| DIGITS
+| COLON numerics
+| DIGITS numerics
 ;
 
 endpgm: 

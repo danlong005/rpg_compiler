@@ -1,0 +1,4 @@
+output/*
+a.out
+lex.yy.c
+parser.*
