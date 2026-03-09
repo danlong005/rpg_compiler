@@ -1,0 +1,9 @@
+**FREE
+DCL-S x INT(10);
+DCL-S y INT(10);
+x = 10;
+INVALID GARBAGE HERE;
+y = 20;
+DSPLY %CHAR(x);
+DSPLY %CHAR(y);
+*INLR = *ON;
