@@ -103,11 +103,17 @@ enum class RPGType {
     INT10,
     PACKED,
     ZONED,
-    IND,      // indicator type (boolean)
-    DATE,     // date type
-    TIME,     // time type
+    IND,       // indicator type (boolean)
+    DATE,      // date type
+    TIME,      // time type
     TIMESTAMP, // timestamp type
-    POINTER   // pointer type
+    POINTER,   // pointer type
+    UNS,       // unsigned integer
+    FLOAT4,    // IEEE float (4 bytes)
+    FLOAT8,    // IEEE double (8 bytes)
+    BINDEC,    // binary decimal (legacy)
+    UCS2,      // Unicode UCS-2
+    OBJECT     // Java object reference (stub)
 };
 
 // File declaration (DCL-F) - stub
@@ -136,8 +142,18 @@ public:
     int digits;
     int decimals;
     bool is_const;
+    bool is_static = false;   // STATIC keyword
+    bool is_template = false; // TEMPLATE keyword
+    bool is_export = false;   // EXPORT keyword
+    bool is_import = false;   // IMPORT keyword
+    std::string based_ptr;    // BASED(ptrname)
     int dim;  // DIM(n), 0 = not an array
     std::string like_var; // LIKE(varname)
+    int sort_order = 0;  // 0=none, 1=ASCEND, -1=DESCEND
+    std::string datfmt;  // per-field DATFMT
+    std::string timfmt;  // per-field TIMFMT
+    std::string nullind; // NULLIND(field)
+    std::string java_class; // OBJECT(*JAVA:'class')
     std::unique_ptr<Expression> inz_value;
     DclS(std::string name, RPGType type, int length, int digits = 0, int decimals = 0,
          bool is_const = false, std::unique_ptr<Expression> inz_value = nullptr, int dim = 0);
@@ -248,6 +264,11 @@ struct ParamDecl {
     int decimals;
     bool by_value;  // VALUE keyword
     std::string likeds; // LIKEDS(dsname)
+    bool nopass = false;  // OPTIONS(*NOPASS)
+    bool omit = false;    // OPTIONS(*OMIT)
+    bool varsize = false; // OPTIONS(*VARSIZE)
+    bool string_opt = false; // OPTIONS(*STRING)
+    bool trim_opt = false;   // OPTIONS(*TRIM)
 };
 
 // Procedure interface (DCL-PI)
@@ -265,6 +286,10 @@ class DclPR : public Statement {
 public:
     std::string name;
     ProcInterface interface;
+    std::string extpgm;   // EXTPGM('name') — external program
+    std::string extproc;  // EXTPROC('name') — external procedure
+    bool rtnparm = false; // RTNPARM keyword
+    bool opdesc = false;  // OPDESC keyword
     DclPR(std::string name, ProcInterface iface);
     void accept(ASTVisitor& visitor) override;
 };
@@ -274,7 +299,9 @@ class DclProc : public Statement {
 public:
     std::string name;
     ProcInterface interface;
+    bool is_export = false; // EXPORT keyword
     std::vector<std::unique_ptr<Statement>> body;
+    std::vector<std::unique_ptr<Statement>> on_exit_body;
     DclProc(std::string name, ProcInterface iface);
     void accept(ASTVisitor& visitor) override;
 };
@@ -343,6 +370,38 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// DEALLOC statement
+class DeallocStmt : public Statement {
+public:
+    std::string var_name;
+    explicit DeallocStmt(std::string name);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// TEST statement (validate date/time)
+class TestStmt : public Statement {
+public:
+    char type; // 'D', 'T', 'Z' for date, time, timestamp
+    std::string var_name;
+    TestStmt(char type, std::string name);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// EVALR statement (right-adjust)
+class EvalRStmt : public Statement {
+public:
+    std::unique_ptr<Expression> target;
+    std::unique_ptr<Expression> value;
+    EvalRStmt(std::unique_ptr<Expression> target, std::unique_ptr<Expression> value);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// LEAVESR statement
+class LeaveSRStmt : public Statement {
+public:
+    void accept(ASTVisitor& visitor) override;
+};
+
 // EVAL-CORR statement
 class EvalCorrStmt : public Statement {
 public:
@@ -360,6 +419,9 @@ struct DSField {
     int length;
     int digits;
     int decimals;
+    std::string overlay_field;
+    int overlay_pos = 0;
+    int pos = 0;
 };
 
 class DclDS : public Statement {
@@ -368,6 +430,10 @@ public:
     bool qualified;
     int dim;  // DIM(n), 0 = not an array
     std::string like_ds; // LIKEDS(name)
+    std::string extname; // EXTNAME(filename)
+    std::string prefix;  // PREFIX(pfx)
+    int prefix_nbr = 0;
+    int occurs = 0;      // OCCURS(n), 0 = not multi-occurrence
     std::vector<DSField> fields;
     DclDS(std::string name);
     void accept(ASTVisitor& visitor) override;
@@ -391,10 +457,33 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// FOR-EACH statement
+class ForEachStmt : public Statement {
+public:
+    std::string var;
+    std::unique_ptr<Expression> collection;
+    std::vector<std::unique_ptr<Statement>> body;
+    ForEachStmt(std::string var, std::unique_ptr<Expression> collection);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// IN operator expression (x IN %LIST(...) or x IN %RANGE(...))
+class InExpr : public Expression {
+public:
+    std::unique_ptr<Expression> value;
+    std::unique_ptr<Expression> collection;
+    InExpr(std::unique_ptr<Expression> value, std::unique_ptr<Expression> collection);
+    void accept(ASTVisitor& visitor) override;
+};
+
 // --- Program ---
 
 class Program : public ASTNode {
 public:
+    bool nomain = false; // CTL-OPT NOMAIN
+    std::string main_proc; // CTL-OPT MAIN(procname)
+    std::string datfmt; // CTL-OPT DATFMT(fmt)
+    std::string timfmt; // CTL-OPT TIMFMT(fmt)
     std::vector<std::unique_ptr<Statement>> statements;
     void accept(ASTVisitor& visitor) override;
 };
@@ -439,6 +528,12 @@ public:
     virtual void visit(ClearStmt& node) = 0;
     virtual void visit(IndicatorExpr& node) = 0;
     virtual void visit(EvalCorrStmt& node) = 0;
+    virtual void visit(EvalRStmt& node) = 0;
+    virtual void visit(LeaveSRStmt& node) = 0;
+    virtual void visit(DeallocStmt& node) = 0;
+    virtual void visit(TestStmt& node) = 0;
+    virtual void visit(ForEachStmt& node) = 0;
+    virtual void visit(InExpr& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 

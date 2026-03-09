@@ -48,6 +48,12 @@ public:
     void visit(ClearStmt& node) override;
     void visit(IndicatorExpr& node) override;
     void visit(EvalCorrStmt& node) override;
+    void visit(EvalRStmt& node) override;
+    void visit(LeaveSRStmt& node) override;
+    void visit(DeallocStmt& node) override;
+    void visit(TestStmt& node) override;
+    void visit(ForEachStmt& node) override;
+    void visit(InExpr& node) override;
     void visit(Program& node) override;
 
 private:
@@ -57,13 +63,20 @@ private:
     bool in_procedure_ = false;
     bool uses_indicators_ = false;
     int current_proc_parm_count_ = 0;
+    bool has_nopass_params_ = false;
+    std::string current_proc_name_;
+    std::string datfmt_; // default date format (e.g., "*ISO", "*USA", "*MDY")
+    std::string timfmt_; // default time format
 
     void emitIndent();
     void emitStatements(std::vector<std::unique_ptr<Statement>>& stmts);
     std::string emitExpr(Expression& expr);
     std::string typeToString(RPGType type, int length = 0);
     std::string paramTypeToString(const ParamDecl& p);
+    std::string paramTypeDefault(const ParamDecl& p);
+    int countRequiredParams(const std::vector<ParamDecl>& params);
     std::string fieldTypeDefault(RPGType type, int length);
+    std::string figConstValue(const std::string& name, RPGType type, const std::string& var_name);
 
     // Track DS definitions for LIKEDS resolution
     std::map<std::string, DclDS*> ds_defs_;
@@ -73,6 +86,9 @@ private:
     std::map<std::string, int> var_lengths_; // for CHAR length
     std::set<std::string> has_inz_; // variables with INZ values
     std::set<std::string> array_vars_; // DIM array variables
+    std::set<std::string> nopass_procs_; // procs with *NOPASS params
+    std::map<std::string, std::vector<ParamDecl>> nopass_proc_params_; // full param info
+    std::map<std::string, std::string> extproc_map_; // RPG name → C++ name (EXTPROC/EXTPGM)
 };
 
 } // namespace rpg

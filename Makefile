@@ -231,6 +231,126 @@ test: $(TARGET)
 	$(CXX) -std=c++17 -Iruntime -o /tmp/test36 /tmp/test36.cpp
 	/tmp/test36
 	@echo ""
+	@echo "=== Test 37: *INZSR ==="
+	./$(TARGET) tests/test37_inzsr.rpgle -o /tmp/test37.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test37 /tmp/test37.cpp
+	/tmp/test37
+	@echo ""
+	@echo "=== Test 38: CTL-OPT ==="
+	./$(TARGET) tests/test38_ctlopt.rpgle -o /tmp/test38.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test38 /tmp/test38.cpp
+	/tmp/test38
+	@echo ""
+	@echo "=== Test 39: Figurative Constants ==="
+	./$(TARGET) tests/test39_figconst.rpgle -o /tmp/test39.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test39 /tmp/test39.cpp
+	/tmp/test39
+	@echo ""
+	@echo "=== Test 40: EVALR/LEAVESR ==="
+	./$(TARGET) tests/test40_evalr_leavesr.rpgle -o /tmp/test40.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test40 /tmp/test40.cpp
+	/tmp/test40
+	@echo ""
+	@echo "=== Test 41: String/Math BIFs ==="
+	./$(TARGET) tests/test41_string_bifs.rpgle -o /tmp/test41.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test41 /tmp/test41.cpp
+	/tmp/test41
+	@echo ""
+	@echo "=== Test 42: ON-EXIT ==="
+	./$(TARGET) tests/test42_onexit.rpgle -o /tmp/test42.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test42 /tmp/test42.cpp
+	/tmp/test42
+	@echo ""
+	@echo "=== Test 43: STATIC ==="
+	./$(TARGET) tests/test43_static.rpgle -o /tmp/test43.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test43 /tmp/test43.cpp
+	/tmp/test43
+	@echo ""
+	@echo "=== Test 44: ALLOC/DEALLOC ==="
+	./$(TARGET) tests/test44_alloc.rpgle -o /tmp/test44.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test44 /tmp/test44.cpp
+	/tmp/test44
+	@echo ""
+	@echo "=== Test 45: Array BIFs ==="
+	./$(TARGET) tests/test45_array_bifs.rpgle -o /tmp/test45.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test45 /tmp/test45.cpp
+	/tmp/test45
+	@echo ""
+	@echo "=== Test 46: OPTIONS(*NOPASS) ==="
+	./$(TARGET) tests/test46_options.rpgle -o /tmp/test46.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test46 /tmp/test46.cpp
+	/tmp/test46
+	@echo ""
+	@echo "=== Test 47: TEST Opcode ==="
+	./$(TARGET) tests/test47_test.rpgle -o /tmp/test47.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test47 /tmp/test47.cpp
+	/tmp/test47
+	@echo ""
+	@echo "=== Test 48: NOMAIN Module ==="
+	./$(TARGET) tests/test48_nomain.rpgle -o /tmp/test48.cpp
+	$(CXX) -std=c++17 -Iruntime -c -o /tmp/test48.o /tmp/test48.cpp
+	@echo "Compiled to .o (no main)"
+	@echo ""
+	@echo "=== Test 49: EXTPROC/IMPORT ==="
+	./$(TARGET) tests/test49_extproc.rpgle -o /tmp/test49.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test49 /tmp/test49.cpp /tmp/test48.o
+	/tmp/test49
+	@echo ""
+	@echo "=== Test 50: Numeric BIFs ==="
+	./$(TARGET) tests/test50_numeric_bifs.rpgle -o /tmp/test50.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test50 /tmp/test50.cpp
+	/tmp/test50
+	@echo ""
+	@echo "=== Test 51: String BIFs ==="
+	./$(TARGET) tests/test51_string_bifs.rpgle -o /tmp/test51.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test51 /tmp/test51.cpp
+	/tmp/test51
+	@echo ""
+	@echo "=== Test 52: Array BIFs ==="
+	./$(TARGET) tests/test52_array_bifs.rpgle -o /tmp/test52.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test52 /tmp/test52.cpp
+	/tmp/test52
+	@echo ""
+	@echo "=== Test 53: Date/Time BIFs ==="
+	./$(TARGET) tests/test53_datetime_bifs.rpgle -o /tmp/test53.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test53 /tmp/test53.cpp
+	/tmp/test53
+	@echo ""
+	@echo "=== Test 54: Memory/Pointer BIFs ==="
+	./$(TARGET) tests/test54_memory_bifs.rpgle -o /tmp/test54.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test54 /tmp/test54.cpp
+	/tmp/test54
+	@echo ""
+	@echo "=== Test 55: Figurative Constants ==="
+	./$(TARGET) tests/test55_figconst.rpgle -o /tmp/test55.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test55 /tmp/test55.cpp
+	/tmp/test55
+	@echo ""
+	@echo "=== Test 56: MAIN(procname) ==="
+	./$(TARGET) tests/test56_ctlopt_main.rpgle -o /tmp/test56.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test56 /tmp/test56.cpp
+	/tmp/test56
+	@echo ""
+	@echo "=== Test 57: DATFMT/TIMFMT ==="
+	./$(TARGET) tests/test57_datfmt.rpgle -o /tmp/test57.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test57 /tmp/test57.cpp
+	/tmp/test57
+	@echo ""
+	@echo "=== Test 58: FOR-EACH and IN ==="
+	./$(TARGET) tests/test58_foreach_in.rpgle -o /tmp/test58.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test58 /tmp/test58.cpp
+	/tmp/test58
+	@echo ""
+	@echo "=== Test 59: %PASSED/%OMITTED ==="
+	./$(TARGET) tests/test59_passed_omitted.rpgle -o /tmp/test59.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test59 /tmp/test59.cpp
+	/tmp/test59
+	@echo ""
+	@echo "=== Test 60: Data Types ==="
+	./$(TARGET) tests/test60_datatypes.rpgle -o /tmp/test60.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test60 /tmp/test60.cpp
+	/tmp/test60
+	@echo ""
 	@echo "All tests passed."
 
 .PHONY: all clean test

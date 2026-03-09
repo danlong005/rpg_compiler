@@ -123,9 +123,29 @@ ArrayAccess::ArrayAccess(std::string name, std::unique_ptr<Expression> index)
     : name(std::move(name)), index(std::move(index)) {}
 void ArrayAccess::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+DeallocStmt::DeallocStmt(std::string name) : var_name(std::move(name)) {}
+void DeallocStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+TestStmt::TestStmt(char type, std::string name) : type(type), var_name(std::move(name)) {}
+void TestStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+EvalRStmt::EvalRStmt(std::unique_ptr<Expression> target, std::unique_ptr<Expression> value)
+    : target(std::move(target)), value(std::move(value)) {}
+void EvalRStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+void LeaveSRStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 EvalCorrStmt::EvalCorrStmt(std::string target, std::string source)
     : target(std::move(target)), source(std::move(source)) {}
 void EvalCorrStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+ForEachStmt::ForEachStmt(std::string var, std::unique_ptr<Expression> collection)
+    : var(std::move(var)), collection(std::move(collection)) {}
+void ForEachStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+InExpr::InExpr(std::unique_ptr<Expression> value, std::unique_ptr<Expression> collection)
+    : value(std::move(value)), collection(std::move(collection)) {}
+void InExpr::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 

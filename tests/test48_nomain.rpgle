@@ -1,0 +1,12 @@
+**FREE
+CTL-OPT NOMAIN;
+
+DCL-S sharedVal INT(10) EXPORT INZ(42);
+
+DCL-PROC add EXPORT;
+  DCL-PI add INT(10);
+    a INT(10) VALUE;
+    b INT(10) VALUE;
+  END-PI;
+  RETURN a + b;
+END-PROC;

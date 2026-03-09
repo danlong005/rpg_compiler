@@ -1,0 +1,9 @@
+**FREE
+CTL-OPT DFTACTGRP(*NO) DATFMT(*ISO) TIMFMT(*ISO);
+
+DCL-S msg VARCHAR(30);
+
+msg = 'CTL-OPT parsed ok';
+DSPLY msg;
+
+*INLR = *ON;

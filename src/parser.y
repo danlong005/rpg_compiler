@@ -47,6 +47,12 @@ static int g_error_count = 0;
 rpg::Program* get_parsed_program();
 int get_parse_error_count();
 
+// CTL-OPT values extracted by lexer
+extern char ctlopt_main_proc[256];
+extern char ctlopt_datfmt[64];
+extern char ctlopt_timfmt[64];
+extern bool ctlopt_nomain;
+
 // Set line number on AST node
 #define SET_LINE(node) do { if (node) (node)->line = yylineno; } while(0)
 
@@ -94,13 +100,16 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_DCL_F KW_DCL_S KW_DCL_C
 %token KW_DISK KW_PRINTER KW_WORKSTN KW_USAGE
 %token KW_CHAR KW_VARCHAR KW_INT KW_PACKED KW_ZONED
-%token KW_DATE KW_TIME KW_TIMESTAMP KW_POINTER KW_NULL
-%token KW_DAYS KW_MONTHS KW_YEARS
+%token KW_DATE KW_TIME KW_TIMESTAMP KW_IND KW_POINTER KW_NULL
+%token KW_DAYS KW_MONTHS KW_YEARS KW_HOURS KW_MINUTES KW_SECONDS KW_MSECONDS
 %token KW_CONST KW_INZ
 %token KW_DSPLY
-%token KW_EVAL KW_EVAL_CORR
+%token KW_EVAL KW_EVAL_CORR KW_EVALR KW_CALLP KW_LEAVESR KW_ON_EXIT KW_DEALLOC KW_TEST
+%token KW_STATIC KW_TEMPLATE KW_BASED KW_OPTIONS KW_NOPASS KW_OMIT
+%token KW_EXPORT KW_IMPORT KW_EXTPGM KW_EXTPROC KW_CTLOPT
 %token KW_RETURN
 %token KW_INLR KW_ON
+%token KW_BLANKS KW_ZEROS KW_HIVAL KW_LOVAL
 %token KW_IF KW_ELSEIF KW_ELSE KW_ENDIF
 %token KW_DOW KW_DOU KW_ENDDO
 %token KW_FOR KW_ENDFOR KW_TO KW_DOWNTO KW_BY
@@ -122,6 +131,21 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token BIF_ABS BIF_DIV BIF_REM BIF_SIZE BIF_ADDR BIF_PARMS BIF_STATUS BIF_ERROR BIF_MAX BIF_MIN BIF_LOOKUP
 %token BIF_DATE BIF_TIME BIF_TIMESTAMP BIF_DIFF BIF_DAYS BIF_MONTHS BIF_YEARS
 %token BIF_EDITC BIF_EDITW BIF_REPLACE BIF_CHECK BIF_CHECKR
+%token BIF_LOWER BIF_UPPER BIF_SUBDT BIF_FLOAT BIF_SQRT
+%token BIF_ALLOC BIF_REALLOC BIF_XFOOT BIF_SUBARR BIF_SPLIT
+%token BIF_UNS BIF_INTH BIF_DECH BIF_DECPOS
+%token BIF_CONCATARR BIF_LEFT BIF_RIGHT BIF_STR
+%token BIF_MAXARR BIF_MINARR BIF_LIST BIF_RANGE
+%token BIF_LOOKUPLT BIF_LOOKUPGE BIF_LOOKUPLE BIF_LOOKUPGT
+%token BIF_HOURS BIF_MINUTES BIF_SECONDS BIF_MSECONDS
+%token BIF_PADDR BIF_PROC
+%token BIF_PASSED BIF_OMITTED BIF_OCCUR
+%token KW_ALL
+%token KW_UNS KW_FLOAT_TYPE KW_BINDEC KW_UCS2 KW_GRAPH KW_OBJECT KW_JAVA KW_OCCURS
+%token KW_OVERLAY KW_POS KW_PREFIX KW_DATFMT KW_TIMFMT KW_EXTNAME
+%token KW_RTNPARM KW_OPDESC KW_ASCEND KW_DESCEND KW_NULLIND
+%token KW_VARSIZE KW_STRING_OPT KW_TRIM_OPT
+%token KW_FOR_EACH KW_IN
 %token <sval> IDENTIFIER
 %token <ival> INTEGER_LITERAL
 %token <fval> FLOAT_LITERAL
@@ -132,8 +156,8 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token NE LE GE LT GT
 
 %type <program> program
-%type <stmt> statement dcl_f_stmt dcl_s_stmt dcl_c_stmt eval_stmt eval_corr_stmt dsply_stmt inlr_stmt return_stmt expr_stmt reset_stmt clear_stmt sorta_stmt
-%type <stmt> if_stmt dow_stmt dou_stmt for_stmt select_stmt iter_stmt leave_stmt
+%type <stmt> statement dcl_f_stmt dcl_s_stmt dcl_c_stmt eval_stmt eval_corr_stmt evalr_stmt dsply_stmt inlr_stmt return_stmt expr_stmt reset_stmt clear_stmt sorta_stmt callp_stmt leavesr_stmt dealloc_stmt test_stmt
+%type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt
 %type <stmt> monitor_stmt begsr_stmt exsr_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr unary_expr postfix_expr primary_expr eval_target
@@ -149,7 +173,8 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <ds_field> ds_field
 %type <param_list> pi_params pr_params
 %type <param_decl> pi_param pr_param
-%type <ival> pi_return_type
+%type <ival> pi_return_type dcl_s_keywords proc_export
+%type <sval> ident
 
 %start program
 
@@ -167,6 +192,12 @@ statements_opt:
         if ($2) {
             g_program->statements.emplace_back($2);
         }
+    }
+    | statements_opt KW_CTLOPT {
+        if (ctlopt_nomain) g_program->nomain = true;
+        if (ctlopt_main_proc[0]) g_program->main_proc = ctlopt_main_proc;
+        if (ctlopt_datfmt[0]) g_program->datfmt = ctlopt_datfmt;
+        if (ctlopt_timfmt[0]) g_program->timfmt = ctlopt_timfmt;
     }
     ;
 
@@ -195,6 +226,7 @@ statement:
     | dow_stmt    { $$ = $1; SET_LINE($$); }
     | dou_stmt    { $$ = $1; SET_LINE($$); }
     | for_stmt    { $$ = $1; SET_LINE($$); }
+    | for_each_stmt { $$ = $1; SET_LINE($$); }
     | select_stmt { $$ = $1; SET_LINE($$); }
     | iter_stmt   { $$ = $1; SET_LINE($$); }
     | leave_stmt  { $$ = $1; SET_LINE($$); }
@@ -207,6 +239,11 @@ statement:
     | reset_stmt    { $$ = $1; SET_LINE($$); }
     | clear_stmt    { $$ = $1; SET_LINE($$); }
     | sorta_stmt    { $$ = $1; SET_LINE($$); }
+    | evalr_stmt    { $$ = $1; SET_LINE($$); }
+    | callp_stmt    { $$ = $1; SET_LINE($$); }
+    | leavesr_stmt  { $$ = $1; SET_LINE($$); }
+    | dealloc_stmt  { $$ = $1; SET_LINE($$); }
+    | test_stmt     { $$ = $1; SET_LINE($$); }
     | expr_stmt   { $$ = $1; SET_LINE($$); }
     | error SEMICOLON { $$ = nullptr; yyerrok; }
     ;
@@ -234,24 +271,29 @@ dcl_f_stmt:
 /* DCL-S */
 dcl_s_stmt:
     KW_DCL_S IDENTIFIER KW_CHAR LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
-        $$ = new rpg::DclS($2, rpg::RPGType::CHAR, $5);
-        free($2);
+        auto* n = new rpg::DclS($2, rpg::RPGType::CHAR, $5);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
     }
     | KW_DCL_S IDENTIFIER KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
-        $$ = new rpg::DclS($2, rpg::RPGType::VARCHAR, $5);
-        free($2);
+        auto* n = new rpg::DclS($2, rpg::RPGType::VARCHAR, $5);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
     }
     | KW_DCL_S IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
-        $$ = new rpg::DclS($2, rpg::RPGType::INT10, 0);
-        free($2);
+        auto* n = new rpg::DclS($2, rpg::RPGType::INT10, 0);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
     }
     | KW_DCL_S IDENTIFIER KW_PACKED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
-        $$ = new rpg::DclS($2, rpg::RPGType::PACKED, 0, $5, $7);
-        free($2);
+        auto* n = new rpg::DclS($2, rpg::RPGType::PACKED, 0, $5, $7);
+        n->is_static = ($9 & 1); n->is_template = ($9 & 2); n->is_export = ($9 & 4); n->is_import = ($9 & 8);
+        $$ = n; free($2);
     }
     | KW_DCL_S IDENTIFIER KW_ZONED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
-        $$ = new rpg::DclS($2, rpg::RPGType::ZONED, 0, $5, $7);
-        free($2);
+        auto* n = new rpg::DclS($2, rpg::RPGType::ZONED, 0, $5, $7);
+        n->is_static = ($9 & 1); n->is_template = ($9 & 2); n->is_export = ($9 & 4); n->is_import = ($9 & 8);
+        $$ = n; free($2);
     }
     | KW_DCL_S IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN KW_CONST KW_INZ LPAREN expression RPAREN SEMICOLON {
         $$ = new rpg::DclS($2, rpg::RPGType::INT10, 0, 0, 0, true,
@@ -286,6 +328,23 @@ dcl_s_stmt:
     | KW_DCL_S IDENTIFIER KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN KW_INZ LPAREN expression RPAREN SEMICOLON {
         $$ = new rpg::DclS($2, rpg::RPGType::VARCHAR, $5, 0, 0, false,
                            std::unique_ptr<rpg::Expression>($9));
+        free($2);
+    }
+    /* EXPORT INZ variants */
+    | KW_DCL_S IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN KW_EXPORT KW_INZ LPAREN expression RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::INT10, 0, 0, 0, false,
+                           std::unique_ptr<rpg::Expression>($10));
+        n->is_export = true;
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_CHAR LPAREN INTEGER_LITERAL RPAREN KW_EXPORT KW_INZ LPAREN expression RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::CHAR, $5, 0, 0, false,
+                           std::unique_ptr<rpg::Expression>($10));
+        n->is_export = true;
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_IND SEMICOLON {
+        $$ = new rpg::DclS($2, rpg::RPGType::IND, 0);
         free($2);
     }
     | KW_DCL_S IDENTIFIER KW_DATE SEMICOLON {
@@ -327,10 +386,85 @@ dcl_s_stmt:
         free($5);
         $$ = node;
     }
+    | KW_DCL_S IDENTIFIER KW_UNS LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::UNS, $5);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_FLOAT_TYPE LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
+        auto type = ($5 <= 4) ? rpg::RPGType::FLOAT4 : rpg::RPGType::FLOAT8;
+        auto* n = new rpg::DclS($2, type, $5);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_BINDEC LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::BINDEC, $5);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_UCS2 LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::UCS2, $5);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_GRAPH LPAREN INTEGER_LITERAL RPAREN dcl_s_keywords SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::UCS2, $5);
+        n->is_static = ($7 & 1); n->is_template = ($7 & 2); n->is_export = ($7 & 4); n->is_import = ($7 & 8);
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_OBJECT LPAREN KW_JAVA COLON STRING_LITERAL RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::OBJECT, 0);
+        n->java_class = $7;
+        $$ = n; free($2); free($7);
+    }
+    | KW_DCL_S IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN KW_BASED LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::INT10, 0);
+        n->based_ptr = $9;
+        $$ = n; free($2); free($9);
+    }
+    | KW_DCL_S IDENTIFIER KW_CHAR LPAREN INTEGER_LITERAL RPAREN KW_BASED LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::CHAR, $5);
+        n->based_ptr = $9;
+        $$ = n; free($2); free($9);
+    }
+    | KW_DCL_S IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN INTEGER_LITERAL RPAREN KW_ASCEND SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::INT10, 0, 0, 0, false, nullptr, $9);
+        n->sort_order = 1;
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN INTEGER_LITERAL RPAREN KW_DESCEND SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::INT10, 0, 0, 0, false, nullptr, $9);
+        n->sort_order = -1;
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_CHAR LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN INTEGER_LITERAL RPAREN KW_ASCEND SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::CHAR, $5, 0, 0, false, nullptr, $9);
+        n->sort_order = 1;
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_CHAR LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN INTEGER_LITERAL RPAREN KW_DESCEND SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::CHAR, $5, 0, 0, false, nullptr, $9);
+        n->sort_order = -1;
+        $$ = n; free($2);
+    }
+    | KW_DCL_S IDENTIFIER KW_DATE KW_DATFMT LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::DATE, 0);
+        n->datfmt = $6;
+        $$ = n; free($2); free($6);
+    }
+    | KW_DCL_S IDENTIFIER KW_TIME KW_TIMFMT LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::TIME, 0);
+        n->timfmt = $6;
+        $$ = n; free($2); free($6);
+    }
     ;
 
 dcl_s_keywords:
-    /* empty */
+    /* empty */   { $$ = 0; }
+    | KW_STATIC   { $$ = 1; }
+    | KW_TEMPLATE { $$ = 2; }
+    | KW_EXPORT   { $$ = 4; }
+    | KW_IMPORT   { $$ = 8; }
     ;
 
 /* DCL-C: named constants */
@@ -383,10 +517,31 @@ eval_stmt:
     ;
 
 eval_corr_stmt:
-    KW_EVAL_CORR IDENTIFIER EQUALS IDENTIFIER SEMICOLON {
+    KW_EVAL_CORR ident EQUALS ident SEMICOLON {
         $$ = new rpg::EvalCorrStmt(std::string($2), std::string($4));
         free($2);
         free($4);
+    }
+    ;
+
+evalr_stmt:
+    KW_EVALR eval_target EQUALS expression SEMICOLON {
+        $$ = new rpg::EvalRStmt(
+            std::unique_ptr<rpg::Expression>($2),
+            std::unique_ptr<rpg::Expression>($4)
+        );
+    }
+    ;
+
+callp_stmt:
+    KW_CALLP expression SEMICOLON {
+        $$ = new rpg::ExprStmt(std::unique_ptr<rpg::Expression>($2));
+    }
+    ;
+
+leavesr_stmt:
+    KW_LEAVESR SEMICOLON {
+        $$ = new rpg::LeaveSRStmt();
     }
     ;
 
@@ -440,37 +595,95 @@ dcl_pr_stmt:
         $$ = new rpg::DclPR($2, std::move(iface));
         free($2);
     }
-    ;
-
-/* DCL-PROC with embedded DCL-PI */
-dcl_proc_stmt:
-    KW_DCL_PROC IDENTIFIER SEMICOLON
-    KW_DCL_PI pi_return_type SEMICOLON pi_params KW_END_PI SEMICOLON
-    statement_list
-    KW_END_PROC SEMICOLON {
+    /* EXTPROC variant */
+    | KW_DCL_PR IDENTIFIER pi_return_type KW_EXTPROC LPAREN STRING_LITERAL RPAREN SEMICOLON pr_params KW_END_PR SEMICOLON {
         rpg::ProcInterface iface;
-        if ($5 >= 0) {
+        if ($3 >= 0) {
             iface.has_return = true;
-            // Decode type from pi_return_type
-            iface.return_type = static_cast<rpg::RPGType>($5);
+            iface.return_type = static_cast<rpg::RPGType>($3);
             iface.return_length = 0;
             iface.return_digits = 0;
             iface.return_decimals = 0;
         } else {
             iface.has_return = false;
         }
-        iface.params = std::move($7->params);
-        delete $7;
+        iface.params = std::move($9->params);
+        delete $9;
+        auto* pr = new rpg::DclPR($2, std::move(iface));
+        pr->extproc = $6;
+        free($2);
+        free($6);
+        $$ = pr;
+    }
+    /* EXTPGM variant */
+    | KW_DCL_PR IDENTIFIER KW_EXTPGM LPAREN STRING_LITERAL RPAREN SEMICOLON pr_params KW_END_PR SEMICOLON {
+        rpg::ProcInterface iface;
+        iface.has_return = false;
+        iface.params = std::move($8->params);
+        delete $8;
+        auto* pr = new rpg::DclPR($2, std::move(iface));
+        pr->extpgm = $5;
+        free($2);
+        free($5);
+        $$ = pr;
+    }
+    ;
+
+/* DCL-PROC with embedded DCL-PI */
+dcl_proc_stmt:
+    KW_DCL_PROC IDENTIFIER proc_export SEMICOLON
+    KW_DCL_PI pi_return_type SEMICOLON pi_params KW_END_PI SEMICOLON
+    statement_list
+    KW_END_PROC SEMICOLON {
+        rpg::ProcInterface iface;
+        if ($6 >= 0) {
+            iface.has_return = true;
+            iface.return_type = static_cast<rpg::RPGType>($6);
+            iface.return_length = 0;
+            iface.return_digits = 0;
+            iface.return_decimals = 0;
+        } else {
+            iface.has_return = false;
+        }
+        iface.params = std::move($8->params);
+        delete $8;
         auto* proc = new rpg::DclProc($2, std::move(iface));
-        for (auto* s : $10->stmts) proc->body.emplace_back(s);
-        delete $10;
+        proc->is_export = ($3 != 0);
+        for (auto* s : $<stmt_list>11->stmts) proc->body.emplace_back(s);
+        delete $<stmt_list>11;
         free($2);
         $$ = proc;
     }
     /* DCL-PI with explicit name instead of *N */
-    | KW_DCL_PROC IDENTIFIER SEMICOLON
+    | KW_DCL_PROC IDENTIFIER proc_export SEMICOLON
       KW_DCL_PI IDENTIFIER pi_return_type SEMICOLON pi_params KW_END_PI SEMICOLON
       statement_list
+      KW_END_PROC SEMICOLON {
+        rpg::ProcInterface iface;
+        if ($7 >= 0) {
+            iface.has_return = true;
+            iface.return_type = static_cast<rpg::RPGType>($7);
+            iface.return_length = 0;
+            iface.return_digits = 0;
+            iface.return_decimals = 0;
+        } else {
+            iface.has_return = false;
+        }
+        iface.params = std::move($9->params);
+        delete $9;
+        auto* proc = new rpg::DclProc($2, std::move(iface));
+        proc->is_export = ($3 != 0);
+        for (auto* s : $<stmt_list>12->stmts) proc->body.emplace_back(s);
+        delete $<stmt_list>12;
+        free($2);
+        free($6);
+        $$ = proc;
+    }
+    /* With ON-EXIT (anonymous PI) */
+    | KW_DCL_PROC IDENTIFIER proc_export SEMICOLON
+      KW_DCL_PI pi_return_type SEMICOLON pi_params KW_END_PI SEMICOLON
+      statement_list
+      KW_ON_EXIT SEMICOLON statement_list
       KW_END_PROC SEMICOLON {
         rpg::ProcInterface iface;
         if ($6 >= 0) {
@@ -485,12 +698,47 @@ dcl_proc_stmt:
         iface.params = std::move($8->params);
         delete $8;
         auto* proc = new rpg::DclProc($2, std::move(iface));
+        proc->is_export = ($3 != 0);
         for (auto* s : $<stmt_list>11->stmts) proc->body.emplace_back(s);
         delete $<stmt_list>11;
+        for (auto* s : $14->stmts) proc->on_exit_body.emplace_back(s);
+        delete $14;
         free($2);
-        free($5);
         $$ = proc;
     }
+    /* With ON-EXIT (named PI) */
+    | KW_DCL_PROC IDENTIFIER proc_export SEMICOLON
+      KW_DCL_PI IDENTIFIER pi_return_type SEMICOLON pi_params KW_END_PI SEMICOLON
+      statement_list
+      KW_ON_EXIT SEMICOLON statement_list
+      KW_END_PROC SEMICOLON {
+        rpg::ProcInterface iface;
+        if ($7 >= 0) {
+            iface.has_return = true;
+            iface.return_type = static_cast<rpg::RPGType>($7);
+            iface.return_length = 0;
+            iface.return_digits = 0;
+            iface.return_decimals = 0;
+        } else {
+            iface.has_return = false;
+        }
+        iface.params = std::move($9->params);
+        delete $9;
+        auto* proc = new rpg::DclProc($2, std::move(iface));
+        proc->is_export = ($3 != 0);
+        for (auto* s : $<stmt_list>12->stmts) proc->body.emplace_back(s);
+        delete $<stmt_list>12;
+        for (auto* s : $15->stmts) proc->on_exit_body.emplace_back(s);
+        delete $15;
+        free($2);
+        free($6);
+        $$ = proc;
+    }
+    ;
+
+proc_export:
+    /* empty */ { $$ = 0; }
+    | KW_EXPORT { $$ = 1; }
     ;
 
 /* Return type for PI/PR: returns -1 if void, or RPGType enum value */
@@ -585,6 +833,27 @@ pi_param:
         free($1);
         free($4);
     }
+    /* OPTIONS(*NOPASS) variants */
+    | IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::INT10, 0, 0, 0, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
+    | IDENTIFIER KW_CHAR LPAREN INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::CHAR, $4, 0, 0, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
+    | IDENTIFIER KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::VARCHAR, $4, 0, 0, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
+    | IDENTIFIER KW_PACKED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::PACKED, 0, $4, $6, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
     ;
 
 /* Parameters for DCL-PR (same structure) */
@@ -670,6 +939,27 @@ pr_param:
         free($1);
         free($4);
     }
+    /* OPTIONS(*NOPASS) variants */
+    | IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::INT10, 0, 0, 0, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
+    | IDENTIFIER KW_CHAR LPAREN INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::CHAR, $4, 0, 0, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
+    | IDENTIFIER KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::VARCHAR, $4, 0, 0, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
+    | IDENTIFIER KW_PACKED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN KW_VALUE KW_OPTIONS LPAREN KW_NOPASS RPAREN SEMICOLON {
+        auto* p = new rpg::ParamDecl{$1, rpg::RPGType::PACKED, 0, $4, $6, true};
+        p->nopass = true;
+        $$ = p; free($1);
+    }
     ;
 
 /* --- Monitor / Subroutines --- */
@@ -696,7 +986,7 @@ begsr_stmt:
     ;
 
 exsr_stmt:
-    KW_EXSR IDENTIFIER SEMICOLON {
+    KW_EXSR ident SEMICOLON {
         $$ = new rpg::ExSR($2);
         free($2);
     }
@@ -704,7 +994,7 @@ exsr_stmt:
 
 /* SORTA */
 sorta_stmt:
-    KW_SORTA IDENTIFIER SEMICOLON {
+    KW_SORTA ident SEMICOLON {
         $$ = new rpg::SortAStmt($2);
         free($2);
     }
@@ -712,16 +1002,34 @@ sorta_stmt:
 
 /* RESET and CLEAR */
 reset_stmt:
-    KW_RESET IDENTIFIER SEMICOLON {
+    KW_RESET ident SEMICOLON {
         $$ = new rpg::ResetStmt($2);
         free($2);
     }
     ;
 
 clear_stmt:
-    KW_CLEAR IDENTIFIER SEMICOLON {
+    KW_CLEAR ident SEMICOLON {
         $$ = new rpg::ClearStmt($2);
         free($2);
+    }
+    ;
+
+/* DEALLOC */
+dealloc_stmt:
+    KW_DEALLOC ident SEMICOLON {
+        $$ = new rpg::DeallocStmt($2);
+        free($2);
+    }
+    ;
+
+/* TEST */
+test_stmt:
+    KW_TEST LPAREN ident RPAREN ident SEMICOLON {
+        char type = toupper($3[0]);
+        $$ = new rpg::TestStmt(type, std::string($5));
+        free($3);
+        free($5);
     }
     ;
 
@@ -901,7 +1209,7 @@ dou_stmt:
     ;
 
 for_stmt:
-    KW_FOR IDENTIFIER EQUALS expression KW_TO expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
+    KW_FOR ident EQUALS expression KW_TO expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
         auto* node = new rpg::ForStmt($2,
             std::unique_ptr<rpg::Expression>($4),
             std::unique_ptr<rpg::Expression>($6),
@@ -911,7 +1219,7 @@ for_stmt:
         free($2);
         $$ = node;
     }
-    | KW_FOR IDENTIFIER EQUALS expression KW_TO expression KW_BY expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
+    | KW_FOR ident EQUALS expression KW_TO expression KW_BY expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
         auto* node = new rpg::ForStmt($2,
             std::unique_ptr<rpg::Expression>($4),
             std::unique_ptr<rpg::Expression>($6),
@@ -921,7 +1229,7 @@ for_stmt:
         free($2);
         $$ = node;
     }
-    | KW_FOR IDENTIFIER EQUALS expression KW_DOWNTO expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
+    | KW_FOR ident EQUALS expression KW_DOWNTO expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
         auto* node = new rpg::ForStmt($2,
             std::unique_ptr<rpg::Expression>($4),
             std::unique_ptr<rpg::Expression>($6),
@@ -931,13 +1239,23 @@ for_stmt:
         free($2);
         $$ = node;
     }
-    | KW_FOR IDENTIFIER EQUALS expression KW_DOWNTO expression KW_BY expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
+    | KW_FOR ident EQUALS expression KW_DOWNTO expression KW_BY expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
         auto* node = new rpg::ForStmt($2,
             std::unique_ptr<rpg::Expression>($4),
             std::unique_ptr<rpg::Expression>($6),
             std::unique_ptr<rpg::Expression>($8), true);
         for (auto* s : $10->stmts) node->body.emplace_back(s);
         delete $10;
+        free($2);
+        $$ = node;
+    }
+    ;
+
+for_each_stmt:
+    KW_FOR_EACH ident KW_IN expression SEMICOLON statement_list KW_ENDFOR SEMICOLON {
+        auto* node = new rpg::ForEachStmt($2, std::unique_ptr<rpg::Expression>($4));
+        for (auto* s : $6->stmts) node->body.emplace_back(s);
+        delete $6;
         free($2);
         $$ = node;
     }
@@ -1060,6 +1378,11 @@ comparison_expr:
             std::unique_ptr<rpg::Expression>($1),
             std::unique_ptr<rpg::Expression>($3));
     }
+    | additive_expr KW_IN additive_expr {
+        $$ = new rpg::InExpr(
+            std::unique_ptr<rpg::Expression>($1),
+            std::unique_ptr<rpg::Expression>($3));
+    }
     ;
 
 additive_expr:
@@ -1107,11 +1430,40 @@ postfix_expr:
     }
     ;
 
+ident:
+    IDENTIFIER { $$ = $1; }
+    | KW_UNS { $$ = strdup("UNS"); }
+    | KW_FLOAT_TYPE { $$ = strdup("FLOAT"); }
+    | KW_GRAPH { $$ = strdup("GRAPH"); }
+    | KW_OCCURS { $$ = strdup("OCCURS"); }
+    | KW_ASCEND { $$ = strdup("ASCEND"); }
+    | KW_DESCEND { $$ = strdup("DESCEND"); }
+    | KW_IN { $$ = strdup("IN"); }
+    | KW_RTNPARM { $$ = strdup("RTNPARM"); }
+    | KW_OPDESC { $$ = strdup("OPDESC"); }
+    | KW_NULLIND { $$ = strdup("NULLIND"); }
+    | KW_DATFMT { $$ = strdup("DATFMT"); }
+    | KW_TIMFMT { $$ = strdup("TIMFMT"); }
+    | KW_EXTNAME { $$ = strdup("EXTNAME"); }
+    ;
+
 primary_expr:
     IDENTIFIER {
         $$ = new rpg::Identifier($1);
         free($1);
     }
+    | KW_UNS { $$ = new rpg::Identifier("UNS"); }
+    | KW_FLOAT_TYPE { $$ = new rpg::Identifier("FLOAT"); }
+    | KW_GRAPH { $$ = new rpg::Identifier("GRAPH"); }
+    | KW_OCCURS { $$ = new rpg::Identifier("OCCURS"); }
+    | KW_ASCEND { $$ = new rpg::Identifier("ASCEND"); }
+    | KW_DESCEND { $$ = new rpg::Identifier("DESCEND"); }
+    | KW_RTNPARM { $$ = new rpg::Identifier("RTNPARM"); }
+    | KW_OPDESC { $$ = new rpg::Identifier("OPDESC"); }
+    | KW_NULLIND { $$ = new rpg::Identifier("NULLIND"); }
+    | KW_DATFMT { $$ = new rpg::Identifier("DATFMT"); }
+    | KW_TIMFMT { $$ = new rpg::Identifier("TIMFMT"); }
+    | KW_EXTNAME { $$ = new rpg::Identifier("EXTNAME"); }
     | INTEGER_LITERAL {
         $$ = new rpg::IntLiteral($1);
     }
@@ -1183,6 +1535,54 @@ primary_expr:
     }
     | BIF_CHECKR LPAREN arg_list RPAREN {
         $$ = make_bif("CHECKR", $3);
+    }
+    | BIF_LOWER LPAREN arg_list RPAREN {
+        $$ = make_bif("LOWER", $3);
+    }
+    | BIF_UPPER LPAREN arg_list RPAREN {
+        $$ = make_bif("UPPER", $3);
+    }
+    | BIF_SUBDT LPAREN expression COLON KW_YEARS RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back(new rpg::StringLiteral("YEARS"));
+        $$ = make_bif("SUBDT", args);
+    }
+    | BIF_SUBDT LPAREN expression COLON KW_MONTHS RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back(new rpg::StringLiteral("MONTHS"));
+        $$ = make_bif("SUBDT", args);
+    }
+    | BIF_SUBDT LPAREN expression COLON KW_DAYS RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back(new rpg::StringLiteral("DAYS"));
+        $$ = make_bif("SUBDT", args);
+    }
+    | BIF_SUBDT LPAREN expression COLON KW_HOURS RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back(new rpg::StringLiteral("HOURS"));
+        $$ = make_bif("SUBDT", args);
+    }
+    | BIF_SUBDT LPAREN expression COLON KW_MINUTES RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back(new rpg::StringLiteral("MINUTES"));
+        $$ = make_bif("SUBDT", args);
+    }
+    | BIF_SUBDT LPAREN expression COLON KW_SECONDS RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back(new rpg::StringLiteral("SECONDS"));
+        $$ = make_bif("SUBDT", args);
+    }
+    | BIF_FLOAT LPAREN arg_list RPAREN {
+        $$ = make_bif("FLOAT", $3);
+    }
+    | BIF_SQRT LPAREN arg_list RPAREN {
+        $$ = make_bif("SQRT", $3);
     }
     | BIF_MAX LPAREN arg_list RPAREN {
         $$ = make_bif("MAX", $3);
@@ -1278,6 +1678,145 @@ primary_expr:
         auto* empty = new std::vector<rpg::Expression*>();
         $$ = make_bif("EOF", empty);
     }
+    | BIF_ALLOC LPAREN arg_list RPAREN {
+        $$ = make_bif("ALLOC", $3);
+    }
+    | BIF_REALLOC LPAREN arg_list RPAREN {
+        $$ = make_bif("REALLOC", $3);
+    }
+    | BIF_XFOOT LPAREN arg_list RPAREN {
+        $$ = make_bif("XFOOT", $3);
+    }
+    | BIF_UNS LPAREN arg_list RPAREN {
+        $$ = make_bif("UNS", $3);
+    }
+    | BIF_INTH LPAREN arg_list RPAREN {
+        $$ = make_bif("INTH", $3);
+    }
+    | BIF_DECH LPAREN arg_list RPAREN {
+        $$ = make_bif("DECH", $3);
+    }
+    | BIF_DECPOS LPAREN arg_list RPAREN {
+        $$ = make_bif("DECPOS", $3);
+    }
+    | BIF_SPLIT LPAREN arg_list RPAREN {
+        $$ = make_bif("SPLIT", $3);
+    }
+    | BIF_CONCATARR LPAREN arg_list RPAREN {
+        $$ = make_bif("CONCATARR", $3);
+    }
+    | BIF_LEFT LPAREN arg_list RPAREN {
+        $$ = make_bif("LEFT", $3);
+    }
+    | BIF_RIGHT LPAREN arg_list RPAREN {
+        $$ = make_bif("RIGHT", $3);
+    }
+    | BIF_STR LPAREN arg_list RPAREN {
+        $$ = make_bif("STR", $3);
+    }
+    | BIF_SUBARR LPAREN arg_list RPAREN {
+        $$ = make_bif("SUBARR", $3);
+    }
+    | BIF_MAXARR LPAREN arg_list RPAREN {
+        $$ = make_bif("MAXARR", $3);
+    }
+    | BIF_MINARR LPAREN arg_list RPAREN {
+        $$ = make_bif("MINARR", $3);
+    }
+    | BIF_LIST LPAREN arg_list RPAREN {
+        $$ = make_bif("LIST", $3);
+    }
+    | BIF_RANGE LPAREN arg_list RPAREN {
+        $$ = make_bif("RANGE", $3);
+    }
+    | BIF_LOOKUPLT LPAREN arg_list RPAREN {
+        $$ = make_bif("LOOKUPLT", $3);
+    }
+    | BIF_LOOKUPGE LPAREN arg_list RPAREN {
+        $$ = make_bif("LOOKUPGE", $3);
+    }
+    | BIF_LOOKUPLE LPAREN arg_list RPAREN {
+        $$ = make_bif("LOOKUPLE", $3);
+    }
+    | BIF_LOOKUPGT LPAREN arg_list RPAREN {
+        $$ = make_bif("LOOKUPGT", $3);
+    }
+    | BIF_HOURS LPAREN expression RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        $$ = make_bif("HOURS", args);
+    }
+    | BIF_MINUTES LPAREN expression RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        $$ = make_bif("MINUTES", args);
+    }
+    | BIF_SECONDS LPAREN expression RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        $$ = make_bif("SECONDS", args);
+    }
+    | BIF_MSECONDS LPAREN expression RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        $$ = make_bif("MSECONDS", args);
+    }
+    | BIF_PADDR LPAREN IDENTIFIER RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back(new rpg::StringLiteral($3));
+        free($3);
+        $$ = make_bif("PADDR", args);
+    }
+    | BIF_PROC LPAREN RPAREN {
+        auto* empty = new std::vector<rpg::Expression*>();
+        $$ = make_bif("PROC", empty);
+    }
+    | BIF_PROC {
+        auto* empty = new std::vector<rpg::Expression*>();
+        $$ = make_bif("PROC", empty);
+    }
+    | BIF_DIFF LPAREN expression COLON expression COLON KW_HOURS RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back($5);
+        args->push_back(new rpg::StringLiteral("HOURS"));
+        $$ = make_bif("DIFF", args);
+    }
+    | BIF_DIFF LPAREN expression COLON expression COLON KW_MINUTES RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back($5);
+        args->push_back(new rpg::StringLiteral("MINUTES"));
+        $$ = make_bif("DIFF", args);
+    }
+    | BIF_DIFF LPAREN expression COLON expression COLON KW_SECONDS RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back($3);
+        args->push_back($5);
+        args->push_back(new rpg::StringLiteral("SECONDS"));
+        $$ = make_bif("DIFF", args);
+    }
+    | KW_ALL STRING_LITERAL {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back(new rpg::StringLiteral($2));
+        free($2);
+        $$ = make_bif("ALL", args);
+    }
+    | BIF_PASSED LPAREN ident RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back(new rpg::Identifier($3));
+        free($3);
+        $$ = make_bif("PASSED", args);
+    }
+    | BIF_OMITTED LPAREN ident RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back(new rpg::Identifier($3));
+        free($3);
+        $$ = make_bif("OMITTED", args);
+    }
+    | BIF_OCCUR LPAREN arg_list RPAREN {
+        $$ = make_bif("OCCUR", $3);
+    }
     | INDICATOR {
         $$ = new rpg::IndicatorExpr($1);
     }
@@ -1289,6 +1828,18 @@ primary_expr:
     }
     | KW_NULL {
         $$ = new rpg::Identifier("nullptr");
+    }
+    | KW_BLANKS {
+        $$ = new rpg::Identifier("RPG_BLANKS");
+    }
+    | KW_ZEROS {
+        $$ = new rpg::Identifier("RPG_ZEROS");
+    }
+    | KW_HIVAL {
+        $$ = new rpg::Identifier("RPG_HIVAL");
+    }
+    | KW_LOVAL {
+        $$ = new rpg::Identifier("RPG_LOVAL");
     }
     | LPAREN expression RPAREN {
         $$ = $2;

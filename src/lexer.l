@@ -61,6 +61,72 @@ static std::string cond_toupper(const std::string& s) {
     for (auto& c : r) c = toupper(c);
     return r;
 }
+
+// CTL-OPT keyword extraction helpers
+char ctlopt_main_proc[256] = {0};
+char ctlopt_datfmt[64] = {0};
+char ctlopt_timfmt[64] = {0};
+bool ctlopt_nomain = false;
+
+static void parse_ctlopt(const char* text) {
+    ctlopt_nomain = false;
+    ctlopt_main_proc[0] = '\0';
+    ctlopt_datfmt[0] = '\0';
+    ctlopt_timfmt[0] = '\0';
+
+    std::string s(text);
+    // Uppercase for matching
+    std::string upper = s;
+    for (auto& c : upper) c = toupper(c);
+
+    // Check NOMAIN
+    if (upper.find("NOMAIN") != std::string::npos) {
+        ctlopt_nomain = true;
+    }
+
+    // Extract MAIN(procname)
+    auto pos = upper.find("MAIN(");
+    if (pos != std::string::npos && (pos == 0 || upper[pos-1] != 'O')) {
+        // Make sure it's not NOMAIN
+        if (pos < 2 || upper.substr(pos-2, 2) != "NO") {
+            size_t start = pos + 5;
+            size_t end = upper.find(')', start);
+            if (end != std::string::npos) {
+                std::string name = s.substr(start, end - start);
+                // Trim whitespace
+                while (!name.empty() && name.front() == ' ') name.erase(name.begin());
+                while (!name.empty() && name.back() == ' ') name.pop_back();
+                strncpy(ctlopt_main_proc, name.c_str(), sizeof(ctlopt_main_proc) - 1);
+            }
+        }
+    }
+
+    // Extract DATFMT(fmt)
+    pos = upper.find("DATFMT(");
+    if (pos != std::string::npos) {
+        size_t start = pos + 7;
+        size_t end = upper.find(')', start);
+        if (end != std::string::npos) {
+            std::string fmt = upper.substr(start, end - start);
+            while (!fmt.empty() && fmt.front() == ' ') fmt.erase(fmt.begin());
+            while (!fmt.empty() && fmt.back() == ' ') fmt.pop_back();
+            strncpy(ctlopt_datfmt, fmt.c_str(), sizeof(ctlopt_datfmt) - 1);
+        }
+    }
+
+    // Extract TIMFMT(fmt)
+    pos = upper.find("TIMFMT(");
+    if (pos != std::string::npos) {
+        size_t start = pos + 7;
+        size_t end = upper.find(')', start);
+        if (end != std::string::npos) {
+            std::string fmt = upper.substr(start, end - start);
+            while (!fmt.empty() && fmt.front() == ' ') fmt.erase(fmt.begin());
+            while (!fmt.empty() && fmt.back() == ' ') fmt.pop_back();
+            strncpy(ctlopt_timfmt, fmt.c_str(), sizeof(ctlopt_timfmt) - 1);
+        }
+    }
+}
 %}
 
 %option noyywrap
@@ -72,6 +138,7 @@ static std::string cond_toupper(const std::string& s) {
 %%
 
 "**FREE"            { return KW_FREE; }
+"CTL-OPT"[^;]*";"  { parse_ctlopt(yytext); return KW_CTLOPT; }
 "DCL-F"             { return KW_DCL_F; }
 "DCL-S"             { return KW_DCL_S; }
 "DCL-C"             { return KW_DCL_C; }
@@ -84,6 +151,7 @@ static std::string cond_toupper(const std::string& s) {
 "DATE"              { return KW_DATE; }
 "TIME"              { return KW_TIME; }
 "TIMESTAMP"         { return KW_TIMESTAMP; }
+"IND"               { return KW_IND; }
 "POINTER"           { return KW_POINTER; }
 "DISK"              { return KW_DISK; }
 "PRINTER"           { return KW_PRINTER; }
@@ -92,7 +160,23 @@ static std::string cond_toupper(const std::string& s) {
 "INZ"               { return KW_INZ; }
 "DSPLY"             { return KW_DSPLY; }
 "EVAL-CORR"         { return KW_EVAL_CORR; }
+"EVALR"             { return KW_EVALR; }
 "EVAL"              { return KW_EVAL; }
+"CALLP"             { return KW_CALLP; }
+"LEAVESR"           { return KW_LEAVESR; }
+"ON-EXIT"           { return KW_ON_EXIT; }
+"STATIC"            { return KW_STATIC; }
+"TEMPLATE"          { return KW_TEMPLATE; }
+"BASED"             { return KW_BASED; }
+"EXPORT"            { return KW_EXPORT; }
+"IMPORT"            { return KW_IMPORT; }
+"EXTPGM"            { return KW_EXTPGM; }
+"EXTPROC"           { return KW_EXTPROC; }
+"DEALLOC"           { return KW_DEALLOC; }
+"OPTIONS"           { return KW_OPTIONS; }
+"*NOPASS"           { return KW_NOPASS; }
+"*OMIT"             { return KW_OMIT; }
+"TEST"              { return KW_TEST; }
 "RETURN"            { return KW_RETURN; }
 "DCL-PROC"          { return KW_DCL_PROC; }
 "END-PROC"          { return KW_END_PROC; }
@@ -109,6 +193,27 @@ static std::string cond_toupper(const std::string& s) {
 "DIM"               { return KW_DIM; }
 "LIKEDS"            { return KW_LIKEDS; }
 "LIKE"              { return KW_LIKE; }
+"UNS"               { return KW_UNS; }
+"FLOAT"             { return KW_FLOAT_TYPE; }
+"BINDEC"            { return KW_BINDEC; }
+"UCS2"              { return KW_UCS2; }
+"GRAPH"             { return KW_GRAPH; }
+"OBJECT"            { return KW_OBJECT; }
+"*JAVA"             { return KW_JAVA; }
+"OCCURS"            { return KW_OCCURS; }
+"DATFMT"            { return KW_DATFMT; }
+"TIMFMT"            { return KW_TIMFMT; }
+"EXTNAME"           { return KW_EXTNAME; }
+"RTNPARM"           { return KW_RTNPARM; }
+"OPDESC"            { return KW_OPDESC; }
+"ASCEND"            { return KW_ASCEND; }
+"DESCEND"           { return KW_DESCEND; }
+"NULLIND"           { return KW_NULLIND; }
+"*VARSIZE"          { return KW_VARSIZE; }
+"*STRING"           { return KW_STRING_OPT; }
+"*TRIM"             { return KW_TRIM_OPT; }
+"FOR-EACH"          { return KW_FOR_EACH; }
+"IN"                { return KW_IN; }
 
 "IF"                { return KW_IF; }
 "ELSEIF"            { return KW_ELSEIF; }
@@ -170,6 +275,41 @@ static std::string cond_toupper(const std::string& s) {
 "%REPLACE"          { return BIF_REPLACE; }
 "%CHECK"            { return BIF_CHECK; }
 "%CHECKR"           { return BIF_CHECKR; }
+"%LOWER"            { return BIF_LOWER; }
+"%UPPER"            { return BIF_UPPER; }
+"%SUBDT"            { return BIF_SUBDT; }
+"%FLOAT"            { return BIF_FLOAT; }
+"%SQRT"             { return BIF_SQRT; }
+"%ALLOC"            { return BIF_ALLOC; }
+"%REALLOC"          { return BIF_REALLOC; }
+"%XFOOT"            { return BIF_XFOOT; }
+"%SUBARR"           { return BIF_SUBARR; }
+"%SPLIT"            { return BIF_SPLIT; }
+"%UNS"              { return BIF_UNS; }
+"%INTH"             { return BIF_INTH; }
+"%DECH"             { return BIF_DECH; }
+"%DECPOS"           { return BIF_DECPOS; }
+"%CONCATARR"        { return BIF_CONCATARR; }
+"%LEFT"             { return BIF_LEFT; }
+"%RIGHT"            { return BIF_RIGHT; }
+"%STR"              { return BIF_STR; }
+"%MAXARR"           { return BIF_MAXARR; }
+"%MINARR"           { return BIF_MINARR; }
+"%LIST"             { return BIF_LIST; }
+"%RANGE"            { return BIF_RANGE; }
+"%LOOKUPLT"         { return BIF_LOOKUPLT; }
+"%LOOKUPGE"         { return BIF_LOOKUPGE; }
+"%LOOKUPLE"         { return BIF_LOOKUPLE; }
+"%LOOKUPGT"         { return BIF_LOOKUPGT; }
+"%HOURS"            { return BIF_HOURS; }
+"%MINUTES"          { return BIF_MINUTES; }
+"%SECONDS"          { return BIF_SECONDS; }
+"%MSECONDS"         { return BIF_MSECONDS; }
+"%PADDR"            { return BIF_PADDR; }
+"%PROC"             { return BIF_PROC; }
+"%PASSED"           { return BIF_PASSED; }
+"%OMITTED"          { return BIF_OMITTED; }
+"%OCCUR"            { return BIF_OCCUR; }
 "%EOF"              { return BIF_EOF; }
 "%DATE"             { return BIF_DATE; }
 "%TIME"             { return BIF_TIME; }
@@ -178,13 +318,26 @@ static std::string cond_toupper(const std::string& s) {
 "%DAYS"             { return BIF_DAYS; }
 "%MONTHS"           { return BIF_MONTHS; }
 "%YEARS"            { return BIF_YEARS; }
+"*INZSR"            { yylval.sval = strdup("*INZSR"); return IDENTIFIER; }
+"*PSSR"             { yylval.sval = strdup("*PSSR"); return IDENTIFIER; }
 "*INLR"             { return KW_INLR; }
 "*ON"               { return KW_ON; }
 "*OFF"              { return KW_OFF; }
 "*NULL"             { return KW_NULL; }
+"*BLANKS"           { return KW_BLANKS; }
+"*BLANK"            { return KW_BLANKS; }
+"*ZEROS"            { return KW_ZEROS; }
+"*ZERO"             { return KW_ZEROS; }
+"*HIVAL"            { return KW_HIVAL; }
+"*LOVAL"            { return KW_LOVAL; }
+"*ALL"              { return KW_ALL; }
 "*DAYS"             { return KW_DAYS; }
 "*MONTHS"           { return KW_MONTHS; }
 "*YEARS"            { return KW_YEARS; }
+"*HOURS"            { return KW_HOURS; }
+"*MINUTES"          { return KW_MINUTES; }
+"*SECONDS"          { return KW_SECONDS; }
+"*MSECONDS"         { return KW_MSECONDS; }
 "*IN"[0-9][0-9]     { yylval.ival = atoi(yytext + 3); return INDICATOR; }
 
 ";"                 { return SEMICOLON; }
@@ -254,6 +407,36 @@ static std::string cond_toupper(const std::string& s) {
     else BEGIN(INITIAL);
 }
 
+<INITIAL,SKIPPING>^[ \t]*"/"[Ee][Ll][Ss][Ee][Ii][Ff][ \t]+[Dd][Ee][Ff][Ii][Nn][Ee][Dd][ \t]*"("[^)]*")" {
+    if (cond_depth > 0) {
+        if (cond_done[cond_depth]) {
+            cond_active[cond_depth] = false;
+        } else {
+            std::string sym = cond_extract_symbol(yytext);
+            bool defined = cond_defines.count(sym) > 0;
+            cond_active[cond_depth] = defined;
+            cond_done[cond_depth] = defined;
+        }
+    }
+    if (!cond_is_active()) BEGIN(SKIPPING);
+    else BEGIN(INITIAL);
+}
+
+<INITIAL,SKIPPING>^[ \t]*"/"[Ee][Ll][Ss][Ee][Ii][Ff][ \t]+[Nn][Oo][Tt][ \t]+[Dd][Ee][Ff][Ii][Nn][Ee][Dd][ \t]*"("[^)]*")" {
+    if (cond_depth > 0) {
+        if (cond_done[cond_depth]) {
+            cond_active[cond_depth] = false;
+        } else {
+            std::string sym = cond_extract_symbol(yytext);
+            bool defined = cond_defines.count(sym) > 0;
+            cond_active[cond_depth] = !defined;
+            cond_done[cond_depth] = !defined;
+        }
+    }
+    if (!cond_is_active()) BEGIN(SKIPPING);
+    else BEGIN(INITIAL);
+}
+
 <INITIAL,SKIPPING>^[ \t]*"/"[Ee][Ll][Ss][Ee][ \t]*$ {
     if (cond_depth > 0) {
         cond_active[cond_depth] = !cond_done[cond_depth];
@@ -273,6 +456,15 @@ static std::string cond_toupper(const std::string& s) {
 
 <SKIPPING>[^\n]*\n   { /* skip lines in inactive conditional blocks */ }
 <SKIPPING>[^\n]*     { /* skip last line without newline */ }
+
+ /* /EOF - force end of source */
+^[ \t]*"/"[Ee][Oo][Ff][ \t]*    { yyterminate(); }
+
+ /* Listing directives - ignored */
+^[ \t]*"/"[Ee][Jj][Ee][Cc][Tt][ \t]*     { /* /EJECT: listing, ignore */ }
+^[ \t]*"/"[Ss][Pp][Aa][Cc][Ee][ \t]+[^\n]* { /* /SPACE: listing, ignore */ }
+^[ \t]*"/"[Ss][Ee][Tt][ \t]+[^\n]*       { /* /SET: stub, ignore */ }
+^[ \t]*"/"[Rr][Ee][Ss][Tt][Oo][Rr][Ee][ \t]* { /* /RESTORE: stub, ignore */ }
 
  /* /COPY and /INCLUDE directives */
 ^[ \t]*"/"[Cc][Oo][Pp][Yy][ \t]+[^\n]+ {
