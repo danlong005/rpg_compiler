@@ -27,8 +27,8 @@
 ### 1. CTL-OPT (Control Options)
 - ~~`NOMAIN` — No main procedure (service program module)~~ ✅ (Test 48)
 - ~~`MAIN(procname)` — Named main procedure~~ ✅ (Test 56)
-- `DFTACTGRP(*NO)` — Default activation group
-- `ACTGRP(name)` — Activation group
+- ~~`DFTACTGRP(*NO)` — Default activation group~~ ✅ (accepted, ignored)
+- ~~`ACTGRP(name)` — Activation group~~ ✅ (accepted, ignored)
 - `BNDDIR(name)` — Binding directory
 - ~~`DATFMT(fmt)` / `TIMFMT(fmt)` — Default date/time formats~~ ✅ (Test 57)
 - `OPTION(...)` — Compiler options
@@ -137,19 +137,20 @@
 - ~~`*HIVAL` — Highest value for type~~ ✅ (Test 39)
 - ~~`*LOVAL` — Lowest value for type~~ ✅ (Test 39)
 - ~~`*ALL'x'` — Fill with repeated character(s)~~ ✅ (Test 55)
-- `*OMIT` — Omit optional parameter
+- ~~`*OMIT` — Omit optional parameter~~ ✅ (Test 64)
 
 ### 15. Declaration Keywords Missing
 - ~~`TEMPLATE` — Template only (no storage, for LIKE/LIKEDS reference)~~ ✅ (Test 43)
 - ~~`BASED(pointer)` — Based variable at pointer location~~ ✅
 - ~~`STATIC` — Static storage in procedure (retains across calls)~~ ✅ (Test 43)
 - ~~`EXTNAME(filename)` — Externally described DS from DB file~~ ✅ (stub)
-- `OVERLAY(field[:pos])` — Overlay fields in DS
-- `POS(n)` — Position within DS
-- `PREFIX(pfx[:n])` — Prefix field names
+- ~~`OVERLAY(field[:pos])` — Overlay fields in DS~~ ✅ (Test 62)
+- ~~`POS(n)` — Position within DS~~ ✅ (Test 62)
+- ~~`PREFIX(pfx[:n])` — Prefix field names~~ ✅ (Test 63)
 - ~~`DATFMT(fmt)` / `TIMFMT(fmt)` — Date/time format on fields~~ ✅
 - ~~`OPTIONS(*NOPASS)` — Optional parameter~~ ✅ (Test 46)
-- `OPTIONS(*OMIT:*VARSIZE:*STRING:*TRIM)` — Other parameter options
+- ~~`OPTIONS(*OMIT)` — Omittable parameter~~ ✅ (Test 64)
+- `OPTIONS(*VARSIZE:*STRING:*TRIM)` — Other parameter options
 - `RTNPARM` — Return value as hidden parameter
 - `OPDESC` — Operational descriptors
 - ~~`ASCEND` / `DESCEND` — Array sort order~~ ✅

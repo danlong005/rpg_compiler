@@ -66,12 +66,13 @@ std::string CodeGen::typeToString(RPGType type, int /*length*/) {
 std::string CodeGen::paramTypeToString(const ParamDecl& p) {
     std::string base;
     if (!p.likeds.empty()) {
-        // LIKEDS parameter: use the struct type name
         base = p.likeds + "_t";
     } else {
         base = typeToString(p.type, p.length);
     }
-    if (p.by_value) {
+    if (p.omit) {
+        return base + "*";  // *OMIT params use pointers (nullptr = omitted)
+    } else if (p.by_value) {
         return base;
     } else {
         return base + "&";
@@ -212,8 +213,12 @@ void CodeGen::visit(Program& node) {
 void CodeGen::visit(DclPR& node) {
     bool has_nopass = std::any_of(node.interface.params.begin(), node.interface.params.end(),
                                   [](const ParamDecl& p) { return p.nopass; });
+    bool has_omit = std::any_of(node.interface.params.begin(), node.interface.params.end(),
+                                 [](const ParamDecl& p) { return p.omit; });
     if (has_nopass) {
         nopass_procs_.insert(node.name);
+    }
+    if (has_nopass || has_omit) {
         nopass_proc_params_[node.name] = node.interface.params;
     }
 
@@ -702,14 +707,47 @@ void CodeGen::visit(DclDS& node) {
         return;
     }
 
+    // Apply PREFIX to field names
+    if (!node.prefix.empty()) {
+        for (auto& f : node.fields) {
+            if (node.prefix_nbr > 0 && static_cast<int>(f.name.size()) > node.prefix_nbr) {
+                f.name = node.prefix + f.name.substr(node.prefix_nbr);
+            } else {
+                f.name = node.prefix + f.name;
+            }
+        }
+    }
+
+    // Collect overlay fields (fields that overlay other fields)
+    std::set<std::string> overlay_fields;
+    for (auto& f : node.fields) {
+        if (!f.overlay_field.empty()) {
+            overlay_fields.insert(f.name);
+        }
+    }
+
     // Emit struct definition at file scope
     out_ << "struct " << node.name << "_t {\n";
     for (auto& f : node.fields) {
-        out_ << "    " << typeToString(f.type, f.length) << " " << f.name;
-        // Default init
-        if (f.type == RPGType::INT10) out_ << " = 0";
-        else if (f.type == RPGType::PACKED || f.type == RPGType::ZONED) out_ << " = 0.0";
-        out_ << ";\n";
+        if (!f.overlay_field.empty()) {
+            out_ << "    " << typeToString(f.type, f.length) << " " << f.name;
+            if (f.type == RPGType::INT10) out_ << " = 0";
+            else if (f.type == RPGType::PACKED || f.type == RPGType::ZONED) out_ << " = 0.0";
+            out_ << "; // OVERLAY(" << f.overlay_field;
+            if (f.overlay_pos > 0) out_ << ":" << f.overlay_pos;
+            out_ << ")\n";
+        } else if (f.pos > 0) {
+            // POS field: emit with comment showing position
+            out_ << "    " << typeToString(f.type, f.length) << " " << f.name;
+            if (f.type == RPGType::INT10) out_ << " = 0";
+            else if (f.type == RPGType::PACKED || f.type == RPGType::ZONED) out_ << " = 0.0";
+            out_ << "; // POS(" << f.pos << ")\n";
+        } else {
+            out_ << "    " << typeToString(f.type, f.length) << " " << f.name;
+            if (f.type == RPGType::INT10) out_ << " = 0";
+            else if (f.type == RPGType::PACKED || f.type == RPGType::ZONED) out_ << " = 0.0";
+            out_ << ";\n";
+        }
     }
     out_ << "};\n";
 }
@@ -810,6 +848,18 @@ void CodeGen::visit(IndicatorExpr& node) {
 }
 
 void CodeGen::visit(Identifier& node) {
+    // Check if this identifier is an *OMIT parameter (pointer type) — dereference it
+    if (!current_proc_name_.empty()) {
+        auto pit = nopass_proc_params_.find(current_proc_name_);
+        if (pit != nopass_proc_params_.end()) {
+            for (auto& p : pit->second) {
+                if (p.name == node.name && p.omit) {
+                    expr_ << "(*" << node.name << ")";
+                    return;
+                }
+            }
+        }
+    }
     expr_ << node.name;
 }
 
@@ -1355,19 +1405,21 @@ void CodeGen::visit(BIFCall& node) {
         }
     } else if (node.name == "PASSED") {
         // %PASSED(parmname) — check if optional param was passed
-        // Find the param position in the current proc's param list
         auto* arg_id = dynamic_cast<Identifier*>(node.args[0].get());
         if (arg_id && !current_proc_name_.empty()) {
             auto pit = nopass_proc_params_.find(current_proc_name_);
             if (pit != nopass_proc_params_.end()) {
-                int pos = 0;
+                // Check if param has *OMIT — use nullptr check
                 for (size_t i = 0; i < pit->second.size(); i++) {
                     if (pit->second[i].name == arg_id->name) {
-                        pos = static_cast<int>(i) + 1;
+                        if (pit->second[i].omit) {
+                            expr_ << "(" << arg_id->name << " != nullptr)";
+                        } else {
+                            expr_ << "(_rpg_parms >= " << (i + 1) << ")";
+                        }
                         break;
                     }
                 }
-                expr_ << "(_rpg_parms >= " << pos << ")";
             } else {
                 expr_ << "true";
             }
@@ -1375,19 +1427,21 @@ void CodeGen::visit(BIFCall& node) {
             expr_ << "true";
         }
     } else if (node.name == "OMITTED") {
-        // %OMITTED(parmname) — opposite of %PASSED
+        // %OMITTED(parmname) — check if param was omitted
         auto* arg_id = dynamic_cast<Identifier*>(node.args[0].get());
         if (arg_id && !current_proc_name_.empty()) {
             auto pit = nopass_proc_params_.find(current_proc_name_);
             if (pit != nopass_proc_params_.end()) {
-                int pos = 0;
                 for (size_t i = 0; i < pit->second.size(); i++) {
                     if (pit->second[i].name == arg_id->name) {
-                        pos = static_cast<int>(i) + 1;
+                        if (pit->second[i].omit) {
+                            expr_ << "(" << arg_id->name << " == nullptr)";
+                        } else {
+                            expr_ << "(_rpg_parms < " << (i + 1) << ")";
+                        }
                         break;
                     }
                 }
-                expr_ << "(_rpg_parms < " << pos << ")";
             } else {
                 expr_ << "false";
             }
@@ -1475,6 +1529,7 @@ void CodeGen::visit(TestStmt& node) {
 }
 
 std::string CodeGen::paramTypeDefault(const ParamDecl& p) {
+    if (p.omit) return "nullptr";  // *OMIT defaults to omitted
     if (!p.likeds.empty()) return p.likeds + "_t{}";
     switch (p.type) {
         case RPGType::CHAR:

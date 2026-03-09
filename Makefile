@@ -362,6 +362,26 @@ test: $(TARGET)
 	$(CXX) -std=c++17 -Iruntime -o /tmp/test61 /tmp/test61.cpp
 	/tmp/test61
 	@echo ""
+	@echo "=== Test 62: OVERLAY/POS ==="
+	./$(TARGET) tests/test62_overlay_pos.rpgle -o /tmp/test62.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test62 /tmp/test62.cpp
+	/tmp/test62
+	@echo ""
+	@echo "=== Test 63: PREFIX ==="
+	./$(TARGET) tests/test63_prefix.rpgle -o /tmp/test63.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test63 /tmp/test63.cpp
+	/tmp/test63
+	@echo ""
+	@echo "=== Test 64: OPTIONS(*OMIT) ==="
+	./$(TARGET) tests/test64_omit.rpgle -o /tmp/test64.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test64 /tmp/test64.cpp
+	/tmp/test64
+	@echo ""
+	@echo "=== Test 65: DFTACTGRP/ACTGRP ==="
+	./$(TARGET) tests/test65_actgrp.rpgle -o /tmp/test65.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test65 /tmp/test65.cpp
+	/tmp/test65
+	@echo ""
 	@echo "All tests passed."
 
 .PHONY: all clean test

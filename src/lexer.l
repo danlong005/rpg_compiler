@@ -211,6 +211,9 @@ static void parse_ctlopt(const char* text) {
 "OCCURS"            { return KW_OCCURS; }
 "DATFMT"            { return KW_DATFMT; }
 "TIMFMT"            { return KW_TIMFMT; }
+"OVERLAY"           { return KW_OVERLAY; }
+"POS"               { return KW_POS; }
+"PREFIX"            { return KW_PREFIX; }
 "EXTNAME"           { return KW_EXTNAME; }
 "RTNPARM"           { return KW_RTNPARM; }
 "OPDESC"            { return KW_OPDESC; }
