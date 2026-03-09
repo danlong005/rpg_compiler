@@ -184,6 +184,9 @@ program:
     KW_FREE statements_opt {
         $$ = g_program;
     }
+    | statements_opt {
+        $$ = g_program;
+    }
     ;
 
 statements_opt:
@@ -1879,7 +1882,12 @@ arg_list:
 
 void yyerror(const char* s) {
     g_error_count++;
-    fprintf(stderr, "Error at line %d: %s (near '%s')\n", yylineno, s, yytext);
+    const char* token = yytext;
+    if (token == NULL || token[0] == '\0') {
+        fprintf(stderr, "Error at line %d: %s (unexpected end of file)\n", yylineno, s);
+    } else {
+        fprintf(stderr, "Error at line %d: %s (near '%s')\n", yylineno, s, token);
+    }
 }
 
 rpg::Program* get_parsed_program() {

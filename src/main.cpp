@@ -36,7 +36,9 @@ int main(int argc, char* argv[]) {
 
     int errors = get_parse_error_count();
     if (errors > 0) {
-        std::cerr << errors << " error(s) found. Transpilation may be incomplete.\n";
+        std::cerr << errors << " error(s) found. Compilation failed.\n";
+        delete program;
+        return 1;
     }
 
     rpg::CodeGen codegen;

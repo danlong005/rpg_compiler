@@ -102,9 +102,15 @@ test: $(TARGET)
 	$(CXX) -std=c++17 -Iruntime -o /tmp/test10 /tmp/test10.cpp
 	/tmp/test10
 	@echo ""
-	@echo "=== Test 11: Error Recovery ==="
-	./$(TARGET) tests/test11_errors.rpgle -o /tmp/test11.cpp 2>/dev/null; \
-	$(CXX) -std=c++17 -Iruntime -o /tmp/test11 /tmp/test11.cpp && /tmp/test11
+	@echo "=== Test 11: Error Reporting ==="
+	@for errfile in tests/test11*.rpgle; do \
+		name=$$(basename $$errfile .rpgle); \
+		if ./$(TARGET) $$errfile -o /dev/null 2>/tmp/$${name}_err.txt; then \
+			echo "FAIL: $$name should have failed"; exit 1; \
+		else \
+			echo "$$name: $$(head -1 /tmp/$${name}_err.txt)"; \
+		fi; \
+	done
 	@echo ""
 	@echo "=== Test 12: Monitor ==="
 	./$(TARGET) tests/test12_monitor.rpgle -o /tmp/test12.cpp
@@ -350,6 +356,11 @@ test: $(TARGET)
 	./$(TARGET) tests/test60_datatypes.rpgle -o /tmp/test60.cpp
 	$(CXX) -std=c++17 -Iruntime -o /tmp/test60 /tmp/test60.cpp
 	/tmp/test60
+	@echo ""
+	@echo "=== Test 61: No **FREE ==="
+	./$(TARGET) tests/test61_no_free.rpgle -o /tmp/test61.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test61 /tmp/test61.cpp
+	/tmp/test61
 	@echo ""
 	@echo "All tests passed."
 
