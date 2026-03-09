@@ -29,10 +29,10 @@
 - ~~`MAIN(procname)` — Named main procedure~~ ✅ (Test 56)
 - ~~`DFTACTGRP(*NO)` — Default activation group~~ ✅ (accepted, ignored)
 - ~~`ACTGRP(name)` — Activation group~~ ✅ (accepted, ignored)
-- `BNDDIR(name)` — Binding directory
+- `BNDDIR(name)` — Binding directory (accepted, not yet used)
 - ~~`DATFMT(fmt)` / `TIMFMT(fmt)` — Default date/time formats~~ ✅ (Test 57)
-- `OPTION(...)` — Compiler options
-- `DEBUG`, `DECEDIT`, `CCSID`, `TEXT`, `THREAD`, etc.
+- ~~`OPTION(...)` — Compiler options~~ ✅ (accepted, ignored)
+- ~~`DEBUG`, `DECEDIT`, `CCSID`, `TEXT`, `THREAD`, etc.~~ ✅ (accepted, ignored)
 
 ### 2. File I/O Operations
 - `CHAIN` — Random read by key/RRN
