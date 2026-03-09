@@ -4,26 +4,27 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int i = 0;
-    int sum = 0;
-    i = 1; // line 6
-    sum = 0; // line 7
+    int I = 0;
+    int SUM = 0;
+    I = 1; // line 6
+    SUM = 0; // line 7
     do {
-        sum = (sum + i); // line 9
-        i = (i + 1); // line 10
-    } while (!(i > 5));
-    std::cout << rpg_to_char(sum) << std::endl;
-    i = 10; // line 15
-    sum = 0; // line 16
+        SUM = (SUM + I); // line 9
+        I = (I + 1); // line 10
+    } while (!(I > 5));
+    std::cout << rpg_to_char(SUM) << std::endl;
+    I = 10; // line 15
+    SUM = 0; // line 16
     do {
-        sum = (sum + i); // line 18
-        i = (i + 1); // line 19
-        if (i > 12) {
+        SUM = (SUM + I); // line 18
+        I = (I + 1); // line 19
+        if (I > 12) {
             break;
         }
-    } while (!(i > 5));
-    std::cout << rpg_to_char(sum) << std::endl;
+    } while (!(I > 5));
+    std::cout << rpg_to_char(SUM) << std::endl;
     return 0;
 }

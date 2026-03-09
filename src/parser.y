@@ -94,6 +94,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
     rpg::ParamDecl* param_decl;
     DSFieldList* ds_field_list;
     rpg::DSField* ds_field;
+    std::vector<rpg::EnumConstant>* enum_const_list;
 }
 
 %token KW_FREE
@@ -134,17 +135,23 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token BIF_LOWER BIF_UPPER BIF_SUBDT BIF_FLOAT BIF_SQRT
 %token BIF_ALLOC BIF_REALLOC BIF_XFOOT BIF_SUBARR BIF_SPLIT
 %token BIF_UNS BIF_INTH BIF_DECH BIF_DECPOS
-%token BIF_CONCATARR BIF_LEFT BIF_RIGHT BIF_STR
+%token BIF_CONCAT BIF_CONCATARR BIF_LEFT BIF_RIGHT BIF_STR
 %token BIF_MAXARR BIF_MINARR BIF_LIST BIF_RANGE
 %token BIF_LOOKUPLT BIF_LOOKUPGE BIF_LOOKUPLE BIF_LOOKUPGT
+%token BIF_TLOOKUP BIF_TLOOKUPLT BIF_TLOOKUPGT BIF_TLOOKUPLE BIF_TLOOKUPGE
 %token BIF_HOURS BIF_MINUTES BIF_SECONDS BIF_MSECONDS
 %token BIF_PADDR BIF_PROC
-%token BIF_PASSED BIF_OMITTED BIF_OCCUR
+%token BIF_PASSED BIF_OMITTED
+%token BIF_BITAND BIF_BITNOT BIF_BITOR BIF_BITXOR
+%token BIF_SCANR BIF_EDITFLT BIF_UNSH BIF_PARMNUM
 %token KW_ALL
-%token KW_UNS KW_FLOAT_TYPE KW_BINDEC KW_UCS2 KW_GRAPH KW_OBJECT KW_JAVA KW_OCCURS
+%token KW_UNS KW_FLOAT_TYPE KW_BINDEC KW_UCS2 KW_GRAPH KW_OBJECT KW_JAVA
 %token KW_OVERLAY KW_POS KW_PREFIX KW_DATFMT KW_TIMFMT KW_EXTNAME
 %token KW_RTNPARM KW_OPDESC KW_ASCEND KW_DESCEND KW_NULLIND
 %token KW_VARSIZE KW_STRING_OPT KW_TRIM_OPT
+%token KW_DCL_ENUM KW_END_ENUM KW_BOOLEAN
+%token POWER
+%token KW_DIM_VAR KW_DIM_AUTO
 %token KW_FOR_EACH KW_IN
 %token <sval> IDENTIFIER
 %token <ival> INTEGER_LITERAL
@@ -158,9 +165,9 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <program> program
 %type <stmt> statement dcl_f_stmt dcl_s_stmt dcl_c_stmt eval_stmt eval_corr_stmt evalr_stmt dsply_stmt inlr_stmt return_stmt expr_stmt reset_stmt clear_stmt sorta_stmt callp_stmt leavesr_stmt dealloc_stmt test_stmt
 %type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
-%type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt
+%type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
 %type <stmt> monitor_stmt begsr_stmt exsr_stmt
-%type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr unary_expr postfix_expr primary_expr eval_target
+%type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
 %type <expr_list> arg_list call_arg_list call_args_opt
 %type <stmt_list> statement_list
 %type <elseif_list> elseif_clauses
@@ -175,6 +182,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <param_decl> pi_param pr_param
 %type <ival> pi_return_type dcl_s_keywords proc_export
 %type <sval> ident
+%type <enum_const_list> enum_constants enum_constant
 
 %start program
 
@@ -236,6 +244,7 @@ statement:
     | dcl_proc_stmt { $$ = $1; SET_LINE($$); }
     | dcl_pr_stmt   { $$ = $1; SET_LINE($$); }
     | dcl_ds_stmt   { $$ = $1; SET_LINE($$); }
+    | dcl_enum_stmt { $$ = $1; SET_LINE($$); }
     | monitor_stmt  { $$ = $1; SET_LINE($$); }
     | begsr_stmt    { $$ = $1; SET_LINE($$); }
     | exsr_stmt     { $$ = $1; SET_LINE($$); }
@@ -350,6 +359,10 @@ dcl_s_stmt:
         $$ = new rpg::DclS($2, rpg::RPGType::IND, 0);
         free($2);
     }
+    | KW_DCL_S ident KW_BOOLEAN SEMICOLON {
+        $$ = new rpg::DclS($2, rpg::RPGType::IND, 0);
+        free($2);
+    }
     | KW_DCL_S ident KW_DATE SEMICOLON {
         $$ = new rpg::DclS($2, rpg::RPGType::DATE, 0);
         free($2);
@@ -381,6 +394,30 @@ dcl_s_stmt:
     | KW_DCL_S ident KW_PACKED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN KW_DIM LPAREN INTEGER_LITERAL RPAREN SEMICOLON {
         $$ = new rpg::DclS($2, rpg::RPGType::PACKED, 0, $5, $7, false, nullptr, $<ival>11);
         free($2);
+    }
+    | KW_DCL_S ident KW_INT LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN KW_DIM_VAR COLON INTEGER_LITERAL RPAREN SEMICOLON {
+        auto* node = new rpg::DclS($2, rpg::RPGType::INT10, 0, 0, 0, false, nullptr, $11);
+        node->dim_type = 1;
+        free($2);
+        $$ = node;
+    }
+    | KW_DCL_S ident KW_INT LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN KW_DIM_AUTO COLON INTEGER_LITERAL RPAREN SEMICOLON {
+        auto* node = new rpg::DclS($2, rpg::RPGType::INT10, 0, 0, 0, false, nullptr, $11);
+        node->dim_type = 2;
+        free($2);
+        $$ = node;
+    }
+    | KW_DCL_S ident KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN KW_DIM_VAR COLON INTEGER_LITERAL RPAREN SEMICOLON {
+        auto* node = new rpg::DclS($2, rpg::RPGType::VARCHAR, $5, 0, 0, false, nullptr, $11);
+        node->dim_type = 1;
+        free($2);
+        $$ = node;
+    }
+    | KW_DCL_S ident KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN KW_DIM LPAREN KW_DIM_AUTO COLON INTEGER_LITERAL RPAREN SEMICOLON {
+        auto* node = new rpg::DclS($2, rpg::RPGType::VARCHAR, $5, 0, 0, false, nullptr, $11);
+        node->dim_type = 2;
+        free($2);
+        $$ = node;
     }
     | KW_DCL_S ident KW_LIKE LPAREN IDENTIFIER RPAREN SEMICOLON {
         auto* node = new rpg::DclS($2, rpg::RPGType::INT10, 0);
@@ -489,7 +526,6 @@ eval_target:
     | KW_UNS { $$ = new rpg::Identifier("UNS"); }
     | KW_FLOAT_TYPE { $$ = new rpg::Identifier("FLOAT"); }
     | KW_GRAPH { $$ = new rpg::Identifier("GRAPH"); }
-    | KW_OCCURS { $$ = new rpg::Identifier("OCCURS"); }
     | KW_ASCEND { $$ = new rpg::Identifier("ASCEND"); }
     | KW_DESCEND { $$ = new rpg::Identifier("DESCEND"); }
     | KW_RTNPARM { $$ = new rpg::Identifier("RTNPARM"); }
@@ -516,6 +552,9 @@ eval_target:
         $$ = new rpg::DotExpr(std::unique_ptr<rpg::Expression>(arr), $6);
         free($1);
         free($6);
+    }
+    | BIF_ELEM LPAREN arg_list RPAREN {
+        $$ = make_bif("ELEM", $3);
     }
     ;
 
@@ -1125,6 +1164,58 @@ test_stmt:
     }
     ;
 
+/* --- Enumerations --- */
+
+dcl_enum_stmt:
+    KW_DCL_ENUM IDENTIFIER KW_QUALIFIED SEMICOLON enum_constants KW_END_ENUM SEMICOLON {
+        auto* e = new rpg::DclEnum($2);
+        e->qualified = true;
+        e->constants = std::move(*$5);
+        delete $5;
+        free($2);
+        $$ = e;
+    }
+    | KW_DCL_ENUM IDENTIFIER SEMICOLON enum_constants KW_END_ENUM SEMICOLON {
+        auto* e = new rpg::DclEnum($2);
+        e->qualified = false;
+        e->constants = std::move(*$4);
+        delete $4;
+        free($2);
+        $$ = e;
+    }
+    ;
+
+enum_constants:
+    enum_constant {
+        $$ = $1;
+    }
+    | enum_constants enum_constant {
+        $1->insert($1->end(), std::make_move_iterator($2->begin()), std::make_move_iterator($2->end()));
+        delete $2;
+        $$ = $1;
+    }
+    ;
+
+enum_constant:
+    IDENTIFIER SEMICOLON {
+        auto* v = new std::vector<rpg::EnumConstant>();
+        rpg::EnumConstant ec;
+        ec.name = $1;
+        free($1);
+        v->push_back(std::move(ec));
+        $$ = v;
+    }
+    | IDENTIFIER EQUALS expression SEMICOLON {
+        auto* v = new std::vector<rpg::EnumConstant>();
+        rpg::EnumConstant ec;
+        ec.name = $1;
+        ec.value.reset($3);
+        free($1);
+        v->push_back(std::move(ec));
+        $$ = v;
+    }
+    ;
+
 /* --- Data Structures --- */
 
 dcl_ds_stmt:
@@ -1163,6 +1254,50 @@ dcl_ds_stmt:
         ds->qualified = true;
         ds->fields = std::move($9->fields);
         delete $9;
+        free($2);
+        $$ = ds;
+    }
+    /* DCL-DS name DIM(*VAR:n) QUALIFIED; fields END-DS; */
+    | KW_DCL_DS IDENTIFIER KW_DIM LPAREN KW_DIM_VAR COLON INTEGER_LITERAL RPAREN KW_QUALIFIED SEMICOLON ds_fields KW_END_DS SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->dim = $7;
+        ds->dim_type = 1;
+        ds->qualified = true;
+        ds->fields = std::move($11->fields);
+        delete $11;
+        free($2);
+        $$ = ds;
+    }
+    /* DCL-DS name QUALIFIED DIM(*VAR:n); fields END-DS; */
+    | KW_DCL_DS IDENTIFIER KW_QUALIFIED KW_DIM LPAREN KW_DIM_VAR COLON INTEGER_LITERAL RPAREN SEMICOLON ds_fields KW_END_DS SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->dim = $8;
+        ds->dim_type = 1;
+        ds->qualified = true;
+        ds->fields = std::move($11->fields);
+        delete $11;
+        free($2);
+        $$ = ds;
+    }
+    /* DCL-DS name DIM(*AUTO:n) QUALIFIED; fields END-DS; */
+    | KW_DCL_DS IDENTIFIER KW_DIM LPAREN KW_DIM_AUTO COLON INTEGER_LITERAL RPAREN KW_QUALIFIED SEMICOLON ds_fields KW_END_DS SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->dim = $7;
+        ds->dim_type = 2;
+        ds->qualified = true;
+        ds->fields = std::move($11->fields);
+        delete $11;
+        free($2);
+        $$ = ds;
+    }
+    /* DCL-DS name QUALIFIED DIM(*AUTO:n); fields END-DS; */
+    | KW_DCL_DS IDENTIFIER KW_QUALIFIED KW_DIM LPAREN KW_DIM_AUTO COLON INTEGER_LITERAL RPAREN SEMICOLON ds_fields KW_END_DS SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->dim = $8;
+        ds->dim_type = 2;
+        ds->qualified = true;
+        ds->fields = std::move($11->fields);
+        delete $11;
         free($2);
         $$ = ds;
     }
@@ -1581,14 +1716,23 @@ additive_expr:
     ;
 
 multiplicative_expr:
-    unary_expr { $$ = $1; }
-    | multiplicative_expr STAR unary_expr {
+    power_expr { $$ = $1; }
+    | multiplicative_expr STAR power_expr {
         $$ = new rpg::BinaryExpr(rpg::BinOp::MUL,
             std::unique_ptr<rpg::Expression>($1),
             std::unique_ptr<rpg::Expression>($3));
     }
-    | multiplicative_expr SLASH unary_expr {
+    | multiplicative_expr SLASH power_expr {
         $$ = new rpg::BinaryExpr(rpg::BinOp::DIV,
+            std::unique_ptr<rpg::Expression>($1),
+            std::unique_ptr<rpg::Expression>($3));
+    }
+    ;
+
+power_expr:
+    unary_expr { $$ = $1; }
+    | unary_expr POWER power_expr {
+        $$ = new rpg::BinaryExpr(rpg::BinOp::POWER,
             std::unique_ptr<rpg::Expression>($1),
             std::unique_ptr<rpg::Expression>($3));
     }
@@ -1616,7 +1760,6 @@ ident:
     | KW_UNS { $$ = strdup("UNS"); }
     | KW_FLOAT_TYPE { $$ = strdup("FLOAT"); }
     | KW_GRAPH { $$ = strdup("GRAPH"); }
-    | KW_OCCURS { $$ = strdup("OCCURS"); }
     | KW_ASCEND { $$ = strdup("ASCEND"); }
     | KW_DESCEND { $$ = strdup("DESCEND"); }
     | KW_IN { $$ = strdup("IN"); }
@@ -1639,7 +1782,6 @@ primary_expr:
     | KW_UNS { $$ = new rpg::Identifier("UNS"); }
     | KW_FLOAT_TYPE { $$ = new rpg::Identifier("FLOAT"); }
     | KW_GRAPH { $$ = new rpg::Identifier("GRAPH"); }
-    | KW_OCCURS { $$ = new rpg::Identifier("OCCURS"); }
     | KW_ASCEND { $$ = new rpg::Identifier("ASCEND"); }
     | KW_DESCEND { $$ = new rpg::Identifier("DESCEND"); }
     | KW_RTNPARM { $$ = new rpg::Identifier("RTNPARM"); }
@@ -1889,6 +2031,9 @@ primary_expr:
     | BIF_SPLIT LPAREN arg_list RPAREN {
         $$ = make_bif("SPLIT", $3);
     }
+    | BIF_CONCAT LPAREN arg_list RPAREN {
+        $$ = make_bif("CONCAT", $3);
+    }
     | BIF_CONCATARR LPAREN arg_list RPAREN {
         $$ = make_bif("CONCATARR", $3);
     }
@@ -1927,6 +2072,21 @@ primary_expr:
     }
     | BIF_LOOKUPGT LPAREN arg_list RPAREN {
         $$ = make_bif("LOOKUPGT", $3);
+    }
+    | BIF_TLOOKUP LPAREN arg_list RPAREN {
+        $$ = make_bif("TLOOKUP", $3);
+    }
+    | BIF_TLOOKUPLT LPAREN arg_list RPAREN {
+        $$ = make_bif("TLOOKUPLT", $3);
+    }
+    | BIF_TLOOKUPGT LPAREN arg_list RPAREN {
+        $$ = make_bif("TLOOKUPGT", $3);
+    }
+    | BIF_TLOOKUPLE LPAREN arg_list RPAREN {
+        $$ = make_bif("TLOOKUPLE", $3);
+    }
+    | BIF_TLOOKUPGE LPAREN arg_list RPAREN {
+        $$ = make_bif("TLOOKUPGE", $3);
     }
     | BIF_HOURS LPAREN expression RPAREN {
         auto* args = new std::vector<rpg::Expression*>();
@@ -2001,8 +2161,32 @@ primary_expr:
         free($3);
         $$ = make_bif("OMITTED", args);
     }
-    | BIF_OCCUR LPAREN arg_list RPAREN {
-        $$ = make_bif("OCCUR", $3);
+    | BIF_BITAND LPAREN arg_list RPAREN {
+        $$ = make_bif("BITAND", $3);
+    }
+    | BIF_BITNOT LPAREN arg_list RPAREN {
+        $$ = make_bif("BITNOT", $3);
+    }
+    | BIF_BITOR LPAREN arg_list RPAREN {
+        $$ = make_bif("BITOR", $3);
+    }
+    | BIF_BITXOR LPAREN arg_list RPAREN {
+        $$ = make_bif("BITXOR", $3);
+    }
+    | BIF_SCANR LPAREN arg_list RPAREN {
+        $$ = make_bif("SCANR", $3);
+    }
+    | BIF_EDITFLT LPAREN arg_list RPAREN {
+        $$ = make_bif("EDITFLT", $3);
+    }
+    | BIF_UNSH LPAREN arg_list RPAREN {
+        $$ = make_bif("UNSH", $3);
+    }
+    | BIF_PARMNUM LPAREN ident RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back(new rpg::Identifier($3));
+        free($3);
+        $$ = make_bif("PARMNUM", args);
     }
     | INDICATOR {
         $$ = new rpg::IndicatorExpr($1);

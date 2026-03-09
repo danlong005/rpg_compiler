@@ -1,0 +1,14 @@
+#include "rpg_runtime.h"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <iostream>
+#include <string>
+#include <vector>
+int main() {
+    bool rpg_indicators[100] = {};
+    std::string SHARED_MSG = "From copybook";
+    const auto _init_SHARED_MSG = SHARED_MSG;
+    int SHARED_VAL = 99;
+    const auto _init_SHARED_VAL = SHARED_VAL;
+}

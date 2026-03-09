@@ -4,17 +4,18 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-std::string greet(std::string name, std::string title = std::string(), int _rpg_parms = 1);
-std::string greet(std::string name, std::string title, int _rpg_parms) {
+#include <vector>
+std::string GREET(std::string NAME, std::string TITLE = std::string(), int _rpg_parms = 1);
+std::string GREET(std::string NAME, std::string TITLE, int _rpg_parms) {
     if (_rpg_parms >= 2) {
-        return ((title + " ") + name);
+        return ((TITLE + " ") + NAME);
     } else {
-        return ("Hello " + name);
+        return ("Hello " + NAME);
     }
 }
 int main() {
     bool rpg_indicators[100] = {};
-    std::cout << greet("Alice", std::string(), 1) << std::endl;
-    std::cout << greet("Bob", "Mr.", 2) << std::endl;
+    std::cout << GREET("Alice", std::string(), 1) << std::endl;
+    std::cout << GREET("Bob", "Mr.", 2) << std::endl;
     return 0;
 }

@@ -57,7 +57,7 @@ public:
 };
 
 enum class BinOp {
-    ADD, SUB, MUL, DIV,
+    ADD, SUB, MUL, DIV, POWER,
     EQ, NE, LT, GT, LE, GE,
     AND, OR
 };
@@ -148,6 +148,7 @@ public:
     bool is_import = false;   // IMPORT keyword
     std::string based_ptr;    // BASED(ptrname)
     int dim;  // DIM(n), 0 = not an array
+    int dim_type = 0;  // 0=fixed, 1=*VAR, 2=*AUTO
     std::string like_var; // LIKE(varname)
     int sort_order = 0;  // 0=none, 1=ASCEND, -1=DESCEND
     std::string datfmt;  // per-field DATFMT
@@ -429,6 +430,7 @@ public:
     std::string name;
     bool qualified;
     int dim;  // DIM(n), 0 = not an array
+    int dim_type = 0;  // 0=fixed, 1=*VAR, 2=*AUTO
     std::string like_ds; // LIKEDS(name)
     std::string extname; // EXTNAME(filename)
     std::string prefix;  // PREFIX(pfx)
@@ -488,6 +490,21 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// DCL-ENUM / END-ENUM
+struct EnumConstant {
+    std::string name;
+    std::unique_ptr<Expression> value; // optional explicit value
+};
+
+class DclEnum : public Statement {
+public:
+    std::string name;
+    bool qualified = false;
+    std::vector<EnumConstant> constants;
+    DclEnum(std::string name) : name(std::move(name)) {}
+    void accept(ASTVisitor& visitor) override;
+};
+
 // --- Visitor ---
 
 class ASTVisitor {
@@ -534,6 +551,7 @@ public:
     virtual void visit(TestStmt& node) = 0;
     virtual void visit(ForEachStmt& node) = 0;
     virtual void visit(InExpr& node) = 0;
+    virtual void visit(DclEnum& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 

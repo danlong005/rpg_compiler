@@ -4,29 +4,30 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    std::string text;
-    int pos = 0;
-    std::string result;
-    std::string upper;
-    double num = 0.0;
-    int whole = 0;
-    text = "Hello World"; // line 10
-    pos = rpg_scan("World", text); // line 11
-    std::cout << rpg_to_char(pos) << std::endl;
-    pos = rpg_scan("xyz", text); // line 14
-    std::cout << rpg_to_char(pos) << std::endl;
-    result = rpg_scanrpl("World", "RPG", text); // line 18
-    std::cout << result << std::endl;
-    upper = rpg_xlate("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", text); // line 22
-    std::cout << upper << std::endl;
-    num = 42.75; // line 26
-    whole = static_cast<int>(num); // line 27
-    std::cout << rpg_to_char(whole) << std::endl;
-    num = static_cast<double>(whole); // line 30
-    std::cout << rpg_to_char(num) << std::endl;
-    result = text.substr(1 - 1, 5); // line 34
-    std::cout << result << std::endl;
+    std::string TEXT;
+    int POS = 0;
+    std::string RESULT;
+    std::string UPPER;
+    double NUM = 0.0;
+    int WHOLE = 0;
+    TEXT = "Hello World"; // line 10
+    POS = rpg_scan("World", TEXT); // line 11
+    std::cout << rpg_to_char(POS) << std::endl;
+    POS = rpg_scan("xyz", TEXT); // line 14
+    std::cout << rpg_to_char(POS) << std::endl;
+    RESULT = rpg_scanrpl("World", "RPG", TEXT); // line 18
+    std::cout << RESULT << std::endl;
+    UPPER = rpg_xlate("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", TEXT); // line 22
+    std::cout << UPPER << std::endl;
+    NUM = 42.75; // line 26
+    WHOLE = static_cast<int>(NUM); // line 27
+    std::cout << rpg_to_char(WHOLE) << std::endl;
+    NUM = static_cast<double>(WHOLE); // line 30
+    std::cout << rpg_to_char(NUM) << std::endl;
+    RESULT = TEXT.substr(1 - 1, 5); // line 34
+    std::cout << RESULT << std::endl;
     return 0;
 }

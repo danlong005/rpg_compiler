@@ -4,20 +4,21 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-struct result_t {
-    int sum = 0;
-    int product = 0;
+#include <vector>
+struct RESULT_t {
+    int SUM = 0;
+    int PRODUCT = 0;
 };
-void calcBoth(int a, int b, result_t& res);
-void calcBoth(int a, int b, result_t& res) {
-    res.sum = (a + b); // line 19
-    res.product = (a * b); // line 20
+void CALCBOTH(int A, int B, RESULT_t& RES);
+void CALCBOTH(int A, int B, RESULT_t& RES) {
+    RES.SUM = (A + B); // line 19
+    RES.PRODUCT = (A * B); // line 20
 }
 int main() {
     bool rpg_indicators[100] = {};
-    result_t result;
-    calcBoth(5, 7, result);
-    std::cout << rpg_to_char(result.sum) << std::endl;
-    std::cout << rpg_to_char(result.product) << std::endl;
+    RESULT_t RESULT;
+    CALCBOTH(5, 7, RESULT);
+    std::cout << rpg_to_char(RESULT.SUM) << std::endl;
+    std::cout << rpg_to_char(RESULT.PRODUCT) << std::endl;
     return 0;
 }

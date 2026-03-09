@@ -4,8 +4,9 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-int sharedVal = 42;
-const auto _init_sharedVal = sharedVal;
-int add(int a, int b) {
-    return (a + b);
+#include <vector>
+int SHAREDVAL = 42;
+const auto _init_SHAREDVAL = SHAREDVAL;
+int ADD(int A, int B) {
+    return (A + B);
 }

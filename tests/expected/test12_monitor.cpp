@@ -4,19 +4,20 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int result = 0;
-    std::string text;
+    int RESULT = 0;
+    std::string TEXT;
     try {
-        result = 42; // line 7
-        std::cout << rpg_to_char(result) << std::endl;
+        RESULT = 42; // line 7
+        std::cout << rpg_to_char(RESULT) << std::endl;
     } catch (...) {
         std::cout << "Error occurred" << std::endl;
     }
     try {
-        text = "Success"; // line 15
-        std::cout << text << std::endl;
+        TEXT = "Success"; // line 15
+        std::cout << TEXT << std::endl;
     } catch (...) {
         std::cout << "Nested error" << std::endl;
     }

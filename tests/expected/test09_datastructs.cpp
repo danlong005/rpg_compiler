@@ -4,38 +4,39 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-struct employee_t {
-    std::string name;
-    int age = 0;
-    double salary = 0.0;
+#include <vector>
+struct EMPLOYEE_t {
+    std::string NAME;
+    int AGE = 0;
+    double SALARY = 0.0;
 };
-struct items_t {
-    std::string desc;
-    int qty = 0;
+struct ITEMS_t {
+    std::string DESC;
+    int QTY = 0;
 };
 int main() {
     bool rpg_indicators[100] = {};
-    employee_t employee;
-    std::array<items_t, 3> items;
-    int i = 0;
-    int total = 0;
-    employee.name = "Alice"; // line 9
-    employee.age = 30; // line 10
-    employee.salary = 75000.5; // line 11
-    std::cout << employee.name << std::endl;
-    std::cout << rpg_to_char(employee.age) << std::endl;
-    std::cout << rpg_to_char(employee.salary) << std::endl;
-    items[1 - 1].desc = "Widget"; // line 23
-    items[1 - 1].qty = 10; // line 24
-    items[2 - 1].desc = "Gadget"; // line 25
-    items[2 - 1].qty = 20; // line 26
-    items[3 - 1].desc = "Doohickey"; // line 27
-    items[3 - 1].qty = 5; // line 28
-    total = 0; // line 32
-    for (i = 1; i <= 3; i += 1) {
-        std::cout << items[i - 1].desc << std::endl;
-        total = (total + items[i - 1].qty); // line 35
+    EMPLOYEE_t EMPLOYEE;
+    std::array<ITEMS_t, 3> ITEMS;
+    int I = 0;
+    int TOTAL = 0;
+    EMPLOYEE.NAME = "Alice"; // line 9
+    EMPLOYEE.AGE = 30; // line 10
+    EMPLOYEE.SALARY = 75000.5; // line 11
+    std::cout << EMPLOYEE.NAME << std::endl;
+    std::cout << rpg_to_char(EMPLOYEE.AGE) << std::endl;
+    std::cout << rpg_to_char(EMPLOYEE.SALARY) << std::endl;
+    ITEMS[1 - 1].DESC = "Widget"; // line 23
+    ITEMS[1 - 1].QTY = 10; // line 24
+    ITEMS[2 - 1].DESC = "Gadget"; // line 25
+    ITEMS[2 - 1].QTY = 20; // line 26
+    ITEMS[3 - 1].DESC = "Doohickey"; // line 27
+    ITEMS[3 - 1].QTY = 5; // line 28
+    TOTAL = 0; // line 32
+    for (I = 1; I <= 3; I += 1) {
+        std::cout << ITEMS[I - 1].DESC << std::endl;
+        TOTAL = (TOTAL + ITEMS[I - 1].QTY); // line 35
     }
-    std::cout << rpg_to_char(total) << std::endl;
+    std::cout << rpg_to_char(TOTAL) << std::endl;
     return 0;
 }

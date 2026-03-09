@@ -4,13 +4,14 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-void myMain() {
-    std::string msg;
-    msg = "Hello from MAIN proc"; // line 9
-    std::cout << msg << std::endl;
+#include <vector>
+void MYMAIN() {
+    std::string MSG;
+    MSG = "Hello from MAIN proc"; // line 9
+    std::cout << MSG << std::endl;
     std::cout << "Done" << std::endl;
 }
 int main() {
-    myMain();
+    MYMAIN();
     return 0;
 }

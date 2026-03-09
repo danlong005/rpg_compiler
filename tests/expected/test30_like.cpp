@@ -4,22 +4,23 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int baseInt = 0;
-    std::string baseStr;
-    double baseDec = 0.0;
-    int copyInt = 0;
-    std::string copyStr;
-    double copyDec = 0.0;
-    baseInt = 42; // line 11
-    copyInt = baseInt; // line 12
-    std::cout << rpg_to_char(copyInt) << std::endl;
-    baseStr = "Hello LIKE"; // line 15
-    copyStr = baseStr; // line 16
-    std::cout << copyStr << std::endl;
-    baseDec = 3.14; // line 19
-    copyDec = baseDec; // line 20
-    std::cout << rpg_to_char(copyDec) << std::endl;
+    int BASEINT = 0;
+    std::string BASESTR;
+    double BASEDEC = 0.0;
+    int COPYINT = 0;
+    std::string COPYSTR;
+    double COPYDEC = 0.0;
+    BASEINT = 42; // line 11
+    COPYINT = BASEINT; // line 12
+    std::cout << rpg_to_char(COPYINT) << std::endl;
+    BASESTR = "Hello LIKE"; // line 15
+    COPYSTR = BASESTR; // line 16
+    std::cout << COPYSTR << std::endl;
+    BASEDEC = 3.14; // line 19
+    COPYDEC = BASEDEC; // line 20
+    std::cout << rpg_to_char(COPYDEC) << std::endl;
     return 0;
 }

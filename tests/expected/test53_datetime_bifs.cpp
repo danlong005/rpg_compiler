@@ -4,24 +4,25 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    RpgTime t1;
-    RpgTime t2;
-    int diff = 0;
-    int hr = 0;
-    int mn = 0;
-    t1 = rpg_make_time("14:30:00"); // line 9
-    t2 = rpg_make_time("10:15:00"); // line 10
-    diff = rpg_diff_hours(t1, t2); // line 13
-    std::cout << rpg_to_char(diff) << std::endl;
-    diff = rpg_diff_minutes(t1, t2); // line 17
-    std::cout << rpg_to_char(diff) << std::endl;
-    hr = rpg_subdt_hours(t1); // line 21
-    std::cout << rpg_to_char(hr) << std::endl;
-    mn = rpg_subdt_minutes(t1); // line 25
-    std::cout << rpg_to_char(mn) << std::endl;
-    t2 = (t1 + RpgDuration{2, 'H'}); // line 29
-    std::cout << rpg_to_char(t2) << std::endl;
+    RpgTime T1;
+    RpgTime T2;
+    int DIFF = 0;
+    int HR = 0;
+    int MN = 0;
+    T1 = rpg_make_time("14:30:00"); // line 9
+    T2 = rpg_make_time("10:15:00"); // line 10
+    DIFF = rpg_diff_hours(T1, T2); // line 13
+    std::cout << rpg_to_char(DIFF) << std::endl;
+    DIFF = rpg_diff_minutes(T1, T2); // line 17
+    std::cout << rpg_to_char(DIFF) << std::endl;
+    HR = rpg_subdt_hours(T1); // line 21
+    std::cout << rpg_to_char(HR) << std::endl;
+    MN = rpg_subdt_minutes(T1); // line 25
+    std::cout << rpg_to_char(MN) << std::endl;
+    T2 = (T1 + RpgDuration{2, 'H'}); // line 29
+    std::cout << rpg_to_char(T2) << std::endl;
     return 0;
 }

@@ -4,16 +4,17 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-int getCount();
-int getCount() {
-    static int counter = 0;
-    counter = (counter + 1); // line 9
-    return counter;
+#include <vector>
+int GETCOUNT();
+int GETCOUNT() {
+    static int COUNTER = 0;
+    COUNTER = (COUNTER + 1); // line 9
+    return COUNTER;
 }
 int main() {
     bool rpg_indicators[100] = {};
-    std::cout << rpg_to_char(getCount()) << std::endl;
-    std::cout << rpg_to_char(getCount()) << std::endl;
-    std::cout << rpg_to_char(getCount()) << std::endl;
+    std::cout << rpg_to_char(GETCOUNT()) << std::endl;
+    std::cout << rpg_to_char(GETCOUNT()) << std::endl;
+    std::cout << rpg_to_char(GETCOUNT()) << std::endl;
     return 0;
 }

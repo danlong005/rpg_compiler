@@ -54,6 +54,7 @@ public:
     void visit(TestStmt& node) override;
     void visit(ForEachStmt& node) override;
     void visit(InExpr& node) override;
+    void visit(DclEnum& node) override;
     void visit(Program& node) override;
 
 private:

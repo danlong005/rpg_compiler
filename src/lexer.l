@@ -150,6 +150,9 @@ static void parse_ctlopt(const char* text) {
 "DCL-F"             { return KW_DCL_F; }
 "DCL-S"             { return KW_DCL_S; }
 "DCL-C"             { return KW_DCL_C; }
+"DCL-ENUM"          { return KW_DCL_ENUM; }
+"END-ENUM"          { return KW_END_ENUM; }
+"BOOLEAN"           { return KW_BOOLEAN; }
 "CHAR"              { return KW_CHAR; }
 "VARCHAR"           { return KW_VARCHAR; }
 "INT"               { return KW_INT; }
@@ -208,7 +211,6 @@ static void parse_ctlopt(const char* text) {
 "GRAPH"             { return KW_GRAPH; }
 "OBJECT"            { return KW_OBJECT; }
 "*JAVA"             { return KW_JAVA; }
-"OCCURS"            { return KW_OCCURS; }
 "DATFMT"            { return KW_DATFMT; }
 "TIMFMT"            { return KW_TIMFMT; }
 "OVERLAY"           { return KW_OVERLAY; }
@@ -220,6 +222,8 @@ static void parse_ctlopt(const char* text) {
 "ASCEND"            { return KW_ASCEND; }
 "DESCEND"           { return KW_DESCEND; }
 "NULLIND"           { return KW_NULLIND; }
+"*VAR"              { return KW_DIM_VAR; }
+"*AUTO"             { return KW_DIM_AUTO; }
 "*VARSIZE"          { return KW_VARSIZE; }
 "*STRING"           { return KW_STRING_OPT; }
 "*TRIM"             { return KW_TRIM_OPT; }
@@ -300,6 +304,7 @@ static void parse_ctlopt(const char* text) {
 "%INTH"             { return BIF_INTH; }
 "%DECH"             { return BIF_DECH; }
 "%DECPOS"           { return BIF_DECPOS; }
+"%CONCAT"           { return BIF_CONCAT; }
 "%CONCATARR"        { return BIF_CONCATARR; }
 "%LEFT"             { return BIF_LEFT; }
 "%RIGHT"            { return BIF_RIGHT; }
@@ -312,6 +317,11 @@ static void parse_ctlopt(const char* text) {
 "%LOOKUPGE"         { return BIF_LOOKUPGE; }
 "%LOOKUPLE"         { return BIF_LOOKUPLE; }
 "%LOOKUPGT"         { return BIF_LOOKUPGT; }
+"%TLOOKUP"          { return BIF_TLOOKUP; }
+"%TLOOKUPLT"        { return BIF_TLOOKUPLT; }
+"%TLOOKUPGT"        { return BIF_TLOOKUPGT; }
+"%TLOOKUPLE"        { return BIF_TLOOKUPLE; }
+"%TLOOKUPGE"        { return BIF_TLOOKUPGE; }
 "%HOURS"            { return BIF_HOURS; }
 "%MINUTES"          { return BIF_MINUTES; }
 "%SECONDS"          { return BIF_SECONDS; }
@@ -320,7 +330,14 @@ static void parse_ctlopt(const char* text) {
 "%PROC"             { return BIF_PROC; }
 "%PASSED"           { return BIF_PASSED; }
 "%OMITTED"          { return BIF_OMITTED; }
-"%OCCUR"            { return BIF_OCCUR; }
+"%BITAND"           { return BIF_BITAND; }
+"%BITNOT"           { return BIF_BITNOT; }
+"%BITOR"            { return BIF_BITOR; }
+"%BITXOR"           { return BIF_BITXOR; }
+"%SCANR"            { return BIF_SCANR; }
+"%EDITFLT"          { return BIF_EDITFLT; }
+"%UNSH"             { return BIF_UNSH; }
+"%PARMNUM"          { return BIF_PARMNUM; }
 "%EOF"              { return BIF_EOF; }
 "%DATE"             { return BIF_DATE; }
 "%TIME"             { return BIF_TIME; }
@@ -358,6 +375,7 @@ static void parse_ctlopt(const char* text) {
 ":"                 { return COLON; }
 "+"                 { return PLUS; }
 "-"                 { return MINUS; }
+"**"                { return POWER; }
 "*"                 { return STAR; }
 "/"                 { return SLASH; }
 "<>"                { return NE; }
@@ -474,6 +492,7 @@ static void parse_ctlopt(const char* text) {
  /* Listing directives - ignored */
 ^[ \t]*"/"[Ee][Jj][Ee][Cc][Tt][ \t]*     { /* /EJECT: listing, ignore */ }
 ^[ \t]*"/"[Ss][Pp][Aa][Cc][Ee][ \t]+[^\n]* { /* /SPACE: listing, ignore */ }
+^[ \t]*"/"[Tt][Ii][Tt][Ll][Ee][ \t]+[^\n]* { /* /TITLE: listing title, ignore */ }
 ^[ \t]*"/"[Ss][Ee][Tt][ \t]+[^\n]*       { /* /SET: stub, ignore */ }
 ^[ \t]*"/"[Rr][Ee][Ss][Tt][Oo][Rr][Ee][ \t]* { /* /RESTORE: stub, ignore */ }
 

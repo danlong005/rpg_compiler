@@ -4,23 +4,24 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    void* ptr = nullptr;
-    void* numPtr = nullptr;
-    ptr = std::malloc(100); // line 6
-    if (ptr != nullptr) {
+    void* PTR = nullptr;
+    void* NUMPTR = nullptr;
+    PTR = std::malloc(100); // line 6
+    if (PTR != nullptr) {
         std::cout << "Allocated" << std::endl;
     }
-    std::free(ptr);
-    ptr = nullptr;
+    std::free(PTR);
+    PTR = nullptr;
     std::cout << "Deallocated" << std::endl;
-    numPtr = std::malloc(10); // line 16
-    numPtr = std::realloc(numPtr, 200); // line 17
-    if (numPtr != nullptr) {
+    NUMPTR = std::malloc(10); // line 16
+    NUMPTR = std::realloc(NUMPTR, 200); // line 17
+    if (NUMPTR != nullptr) {
         std::cout << "Reallocated" << std::endl;
     }
-    std::free(numPtr);
-    numPtr = nullptr;
+    std::free(NUMPTR);
+    NUMPTR = nullptr;
     return 0;
 }

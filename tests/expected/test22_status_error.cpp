@@ -4,16 +4,17 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int statusCode = 0;
-    int errFlag = 0;
-    statusCode = rpg_status(); // line 6
-    std::cout << rpg_to_char(statusCode) << std::endl;
-    errFlag = rpg_error(); // line 10
-    std::cout << rpg_to_char(errFlag) << std::endl;
-    statusCode = 42; // line 14
-    statusCode = rpg_status(); // line 15
-    std::cout << rpg_to_char(statusCode) << std::endl;
+    int STATUSCODE = 0;
+    int ERRFLAG = 0;
+    STATUSCODE = rpg_status(); // line 6
+    std::cout << rpg_to_char(STATUSCODE) << std::endl;
+    ERRFLAG = rpg_error(); // line 10
+    std::cout << rpg_to_char(ERRFLAG) << std::endl;
+    STATUSCODE = 42; // line 14
+    STATUSCODE = rpg_status(); // line 15
+    std::cout << rpg_to_char(STATUSCODE) << std::endl;
     return 0;
 }

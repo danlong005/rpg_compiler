@@ -4,16 +4,17 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    std::string str;
-    std::string result;
-    str = "Hello World"; // line 5
-    result = rpg_replace("RPG", str, 7, 5); // line 8
-    std::cout << result << std::endl;
-    result = rpg_replace("Beautiful ", str, 7); // line 12
-    std::cout << result << std::endl;
-    result = rpg_replace("Goodbye", str, 1, 5); // line 16
-    std::cout << result << std::endl;
+    std::string STR;
+    std::string RESULT;
+    STR = "Hello World"; // line 5
+    RESULT = rpg_replace("RPG", STR, 7, 5); // line 8
+    std::cout << RESULT << std::endl;
+    RESULT = rpg_replace("Beautiful ", STR, 7); // line 12
+    std::cout << RESULT << std::endl;
+    RESULT = rpg_replace("Goodbye", STR, 1, 5); // line 16
+    std::cout << RESULT << std::endl;
     return 0;
 }

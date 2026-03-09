@@ -90,6 +90,7 @@ void CodeGen::visit(Program& node) {
     out_ << "#include <cmath>\n";
     out_ << "#include <iostream>\n";
     out_ << "#include <string>\n";
+    out_ << "#include <vector>\n";
 
     // Emit date/time format configuration if non-default
     if (!datfmt_.empty()) {
@@ -161,7 +162,12 @@ void CodeGen::visit(Program& node) {
         auto* ds = dynamic_cast<DclDS*>(s);
         std::string type_name = ds->like_ds.empty() ? ds->name + "_t" : ds->like_ds + "_t";
         emitIndent();
-        if (ds->dim > 0) {
+        if (ds->dim > 0 && (ds->dim_type == 1 || ds->dim_type == 2)) {
+            // DIM(*VAR:max) or DIM(*AUTO:max) — use std::vector
+            out_ << "std::vector<" << type_name << "> " << ds->name << ";\n";
+            emitIndent();
+            out_ << ds->name << ".reserve(" << ds->dim << ");\n";
+        } else if (ds->dim > 0) {
             out_ << "std::array<" << type_name << ", " << ds->dim << "> " << ds->name << ";\n";
         } else {
             out_ << type_name << " " << ds->name << ";\n";
@@ -173,10 +179,13 @@ void CodeGen::visit(Program& node) {
     std::vector<Statement*> sr_stmts;   // subroutines (lambdas, emit before use)
     std::vector<Statement*> exec_stmts;
     Statement* inzsr_stmt = nullptr;
+    Statement* pssr_stmt = nullptr;
     for (auto* s : main_stmts) {
         auto* bsr = dynamic_cast<BegSR*>(s);
         if (bsr && bsr->name == "*INZSR") {
             inzsr_stmt = s;
+        } else if (bsr && bsr->name == "*PSSR") {
+            pssr_stmt = s;
         } else if (bsr) {
             sr_stmts.push_back(s);
         } else if (dynamic_cast<DclS*>(s) || dynamic_cast<DclC*>(s) || dynamic_cast<DclF*>(s)) {
@@ -196,6 +205,11 @@ void CodeGen::visit(Program& node) {
         s->accept(*this);
     }
 
+    // 2.5 Emit *PSSR lambda
+    if (pssr_stmt) {
+        pssr_stmt->accept(*this);
+    }
+
     // 3. Emit *INZSR and auto-call it
     if (inzsr_stmt) {
         inzsr_stmt->accept(*this);
@@ -203,9 +217,17 @@ void CodeGen::visit(Program& node) {
         out_ << "sr__INZSR();\n";
     }
 
-    // 4. Emit remaining executable statements
+    // 4. Emit remaining executable statements — wrap in try/catch if *PSSR exists
+    if (pssr_stmt) {
+        emitIndent(); out_ << "try {\n"; indent_++;
+    }
     for (auto* s : exec_stmts) {
         s->accept(*this);
+    }
+    if (pssr_stmt) {
+        indent_--; emitIndent(); out_ << "} catch (...) {\n";
+        indent_++; emitIndent(); out_ << "sr__PSSR();\n";
+        indent_--; emitIndent(); out_ << "}\n";
     }
     out_ << "}\n";
 }
@@ -280,12 +302,26 @@ void CodeGen::visit(DclProc& node) {
         nopass_procs_.insert(node.name);
     }
 
+    // Detect *PSSR in procedure body
+    Statement* proc_pssr_stmt = nullptr;
+    for (auto& s : node.body) {
+        auto* bsr = dynamic_cast<BegSR*>(s.get());
+        if (bsr && bsr->name == "*PSSR") {
+            proc_pssr_stmt = s.get();
+            break;
+        }
+    }
+
     if (!node.on_exit_body.empty()) {
         // Emit declarations first, then scope guard, then executable statements
         for (auto& s : node.body) {
             if (dynamic_cast<DclS*>(s.get()) || dynamic_cast<DclC*>(s.get()) || dynamic_cast<DclDS*>(s.get())) {
                 s->accept(*this);
             }
+        }
+        // Emit *PSSR lambda before scope guard
+        if (proc_pssr_stmt) {
+            proc_pssr_stmt->accept(*this);
         }
         emitIndent();
         out_ << "auto _on_exit_fn = rpg_make_scope_guard([&]() {\n";
@@ -294,13 +330,48 @@ void CodeGen::visit(DclProc& node) {
         indent_--;
         emitIndent();
         out_ << "});\n";
+        if (proc_pssr_stmt) {
+            emitIndent(); out_ << "try {\n"; indent_++;
+        }
         for (auto& s : node.body) {
-            if (!dynamic_cast<DclS*>(s.get()) && !dynamic_cast<DclC*>(s.get()) && !dynamic_cast<DclDS*>(s.get())) {
+            if (!dynamic_cast<DclS*>(s.get()) && !dynamic_cast<DclC*>(s.get()) && !dynamic_cast<DclDS*>(s.get()) && s.get() != proc_pssr_stmt) {
                 s->accept(*this);
             }
         }
+        if (proc_pssr_stmt) {
+            indent_--; emitIndent(); out_ << "} catch (...) {\n";
+            indent_++; emitIndent(); out_ << "sr__PSSR();\n";
+            indent_--; emitIndent(); out_ << "}\n";
+        }
     } else {
-        emitStatements(node.body);
+        // Separate declarations, *PSSR, subroutines, and executable statements
+        if (proc_pssr_stmt) {
+            // Need to emit declarations first, then *PSSR lambda, then try/catch around the rest
+            for (auto& s : node.body) {
+                if (dynamic_cast<DclS*>(s.get()) || dynamic_cast<DclC*>(s.get()) || dynamic_cast<DclDS*>(s.get())) {
+                    s->accept(*this);
+                }
+            }
+            // Emit subroutines (non-*PSSR)
+            for (auto& s : node.body) {
+                auto* bsr = dynamic_cast<BegSR*>(s.get());
+                if (bsr && s.get() != proc_pssr_stmt) {
+                    s->accept(*this);
+                }
+            }
+            proc_pssr_stmt->accept(*this);
+            emitIndent(); out_ << "try {\n"; indent_++;
+            for (auto& s : node.body) {
+                if (!dynamic_cast<DclS*>(s.get()) && !dynamic_cast<DclC*>(s.get()) && !dynamic_cast<DclDS*>(s.get()) && !dynamic_cast<BegSR*>(s.get())) {
+                    s->accept(*this);
+                }
+            }
+            indent_--; emitIndent(); out_ << "} catch (...) {\n";
+            indent_++; emitIndent(); out_ << "sr__PSSR();\n";
+            indent_--; emitIndent(); out_ << "}\n";
+        } else {
+            emitStatements(node.body);
+        }
     }
     in_procedure_ = false;
     current_proc_parm_count_ = 0;
@@ -382,7 +453,15 @@ void CodeGen::visit(DclS& node) {
     if (node.is_static) out_ << "static ";
     // Handle DIM arrays
     if (node.dim > 0) {
-        out_ << "std::array<" << typeToString(node.type, node.length) << ", " << node.dim << "> " << node.name << ";\n";
+        if (node.dim_type == 1 || node.dim_type == 2) {
+            // DIM(*VAR:max) or DIM(*AUTO:max) — use std::vector
+            out_ << "std::vector<" << typeToString(node.type, node.length) << "> " << node.name << ";\n";
+            // Reserve capacity for max elements
+            emitIndent();
+            out_ << node.name << ".reserve(" << node.dim << ");\n";
+        } else {
+            out_ << "std::array<" << typeToString(node.type, node.length) << ", " << node.dim << "> " << node.name << ";\n";
+        }
         return;
     }
     switch (node.type) {
@@ -509,6 +588,18 @@ std::string CodeGen::figConstValue(const std::string& name, RPGType type, const 
 }
 
 void CodeGen::visit(EvalStmt& node) {
+    // Check for %ELEM(array) = n (resize varying array)
+    auto* lhs_bif = dynamic_cast<BIFCall*>(node.target.get());
+    if (lhs_bif && lhs_bif->name == "ELEM" && !lhs_bif->args.empty()) {
+        emitIndent();
+        std::string arr = emitExpr(*lhs_bif->args[0]);
+        std::string val = emitExpr(*node.value);
+        out_ << arr << ".resize(" << val << ");";
+        if (node.line > 0) out_ << " // line " << node.line;
+        out_ << "\n";
+        return;
+    }
+
     emitIndent();
     std::string target_str = emitExpr(*node.target);
 
@@ -752,6 +843,50 @@ void CodeGen::visit(DclDS& node) {
     out_ << "};\n";
 }
 
+void CodeGen::visit(DclEnum& node) {
+    // For QUALIFIED enums, we need RPG's dot-access (COLORS.RED) to work.
+    // C++ enum class uses ::, so we register as a "DS-like" to make DotExpr
+    // emit the right field access. We use a simple struct with non-static members
+    // and create an instance.
+    if (node.qualified) {
+        // Emit a local struct + instance to support dot-qualified access
+        emitIndent();
+        out_ << "struct " << node.name << "_t {\n";
+        indent_++;
+        int auto_val = 0;
+        for (size_t i = 0; i < node.constants.size(); i++) {
+            emitIndent();
+            out_ << "const int " << node.constants[i].name << " = ";
+            if (node.constants[i].value) {
+                out_ << emitExpr(*node.constants[i].value);
+            } else {
+                out_ << auto_val;
+            }
+            out_ << ";\n";
+            auto_val++;
+        }
+        indent_--;
+        emitIndent();
+        out_ << "};\n";
+        emitIndent();
+        out_ << node.name << "_t " << node.name << ";\n";
+    } else {
+        // Non-qualified: emit as plain constants
+        int auto_val = 0;
+        for (size_t i = 0; i < node.constants.size(); i++) {
+            emitIndent();
+            out_ << "const int " << node.constants[i].name << " = ";
+            if (node.constants[i].value) {
+                out_ << emitExpr(*node.constants[i].value);
+            } else {
+                out_ << auto_val;
+            }
+            out_ << ";\n";
+            auto_val++;
+        }
+    }
+}
+
 void CodeGen::visit(DotExpr& node) {
     // Check if object is a FuncCall — treat as array(idx).field
     auto* fc = dynamic_cast<FuncCall*>(node.object.get());
@@ -887,6 +1022,14 @@ void CodeGen::visit(StringLiteral& node) {
 }
 
 void CodeGen::visit(BinaryExpr& node) {
+    if (node.op == BinOp::POWER) {
+        expr_ << "std::pow(";
+        node.left->accept(*this);
+        expr_ << ", ";
+        node.right->accept(*this);
+        expr_ << ")";
+        return;
+    }
     expr_ << "(";
     node.left->accept(*this);
     switch (node.op) {
@@ -902,6 +1045,7 @@ void CodeGen::visit(BinaryExpr& node) {
         case BinOp::GE:  expr_ << " >= "; break;
         case BinOp::AND: expr_ << " && "; break;
         case BinOp::OR:  expr_ << " || "; break;
+        case BinOp::POWER: break; // handled above
     }
     node.right->accept(*this);
     expr_ << ")";
@@ -1281,6 +1425,16 @@ void CodeGen::visit(BIFCall& node) {
             node.args[1]->accept(*this);
         }
         expr_ << ")";
+    } else if (node.name == "CONCAT") {
+        // %CONCAT(separator : str1 : str2 : ...)
+        // First arg is separator, rest are strings to join
+        expr_ << "rpg_concat(";
+        node.args[0]->accept(*this);
+        for (size_t i = 1; i < node.args.size(); i++) {
+            expr_ << ", ";
+            node.args[i]->accept(*this);
+        }
+        expr_ << ")";
     } else if (node.name == "CONCATARR") {
         expr_ << "rpg_concatarr(";
         node.args[0]->accept(*this);
@@ -1361,6 +1515,56 @@ void CodeGen::visit(BIFCall& node) {
         node.args[0]->accept(*this);
         expr_ << ", ";
         node.args[1]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "TLOOKUP") {
+        expr_ << "rpg_tlookup(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "TLOOKUPLT") {
+        expr_ << "rpg_tlookup_lt(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "TLOOKUPGT") {
+        expr_ << "rpg_tlookup_gt(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "TLOOKUPLE") {
+        expr_ << "rpg_tlookup_le(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "TLOOKUPGE") {
+        expr_ << "rpg_tlookup_ge(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
         expr_ << ")";
     } else if (node.name == "HOURS") {
         expr_ << "RpgDuration{";
@@ -1448,24 +1652,68 @@ void CodeGen::visit(BIFCall& node) {
         } else {
             expr_ << "false";
         }
-    } else if (node.name == "OCCUR") {
-        // %OCCUR(dsname) — get/set current occurrence of multiple-occurrence DS
-        if (node.args.size() == 1) {
-            expr_ << "rpg_get_occur(";
-            node.args[0]->accept(*this);
-            expr_ << ")";
-        } else {
-            // Set occurrence: %OCCUR(ds : n)
-            expr_ << "rpg_set_occur(";
-            node.args[0]->accept(*this);
-            expr_ << ", ";
-            node.args[1]->accept(*this);
-            expr_ << ")";
-        }
     } else if (node.name == "FOUND") {
         expr_ << "rpg_found()";
     } else if (node.name == "EOF") {
         expr_ << "rpg_eof()";
+    } else if (node.name == "BITAND") {
+        expr_ << "(static_cast<unsigned int>(";
+        node.args[0]->accept(*this);
+        expr_ << ") & static_cast<unsigned int>(";
+        node.args[1]->accept(*this);
+        expr_ << "))";
+    } else if (node.name == "BITNOT") {
+        expr_ << "(~static_cast<unsigned int>(";
+        node.args[0]->accept(*this);
+        expr_ << "))";
+    } else if (node.name == "BITOR") {
+        expr_ << "(static_cast<unsigned int>(";
+        node.args[0]->accept(*this);
+        expr_ << ") | static_cast<unsigned int>(";
+        node.args[1]->accept(*this);
+        expr_ << "))";
+    } else if (node.name == "BITXOR") {
+        expr_ << "(static_cast<unsigned int>(";
+        node.args[0]->accept(*this);
+        expr_ << ") ^ static_cast<unsigned int>(";
+        node.args[1]->accept(*this);
+        expr_ << "))";
+    } else if (node.name == "SCANR") {
+        expr_ << "rpg_scanr(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "EDITFLT") {
+        expr_ << "rpg_editflt(";
+        node.args[0]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "UNSH") {
+        expr_ << "rpg_unsh(";
+        node.args[0]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "PARMNUM") {
+        // %PARMNUM returns the ordinal position of a parameter (compile-time)
+        auto* id = dynamic_cast<Identifier*>(node.args[0].get());
+        if (id && !current_proc_name_.empty()) {
+            auto pit = nopass_proc_params_.find(current_proc_name_);
+            if (pit != nopass_proc_params_.end()) {
+                for (size_t i = 0; i < pit->second.size(); i++) {
+                    if (pit->second[i].name == id->name) {
+                        expr_ << (i + 1);
+                        break;
+                    }
+                }
+            } else {
+                expr_ << "0 /* %PARMNUM: param not found */";
+            }
+        } else {
+            expr_ << "0 /* %PARMNUM: not in procedure */";
+        }
     } else {
         expr_ << "/* unknown BIF: %" << node.name << " */";
     }

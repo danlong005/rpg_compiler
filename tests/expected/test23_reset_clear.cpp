@@ -4,35 +4,36 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int myInt = 42;
-    const auto _init_myInt = myInt;
-    std::string myStr = "Hello";
-    const auto _init_myStr = myStr;
-    double myDec = 3.14;
-    const auto _init_myDec = myDec;
-    std::string myChar = "RPG";
-    const auto _init_myChar = myChar;
-    std::cout << rpg_to_char(myInt) << std::endl;
-    std::cout << myStr << std::endl;
-    myInt = 100; // line 12
-    myStr = "Changed"; // line 13
-    myDec = 99.99; // line 14
-    myChar = "Modified"; // line 15
-    std::cout << rpg_to_char(myInt) << std::endl;
-    std::cout << myStr << std::endl;
-    myInt = _init_myInt;
-    myStr = _init_myStr;
-    std::cout << rpg_to_char(myInt) << std::endl;
-    std::cout << myStr << std::endl;
-    myInt = 0;
-    myStr = "";
-    myDec = 0.0;
-    myChar = "";
-    std::cout << rpg_to_char(myInt) << std::endl;
-    std::cout << myStr << std::endl;
-    std::cout << rpg_to_char(myDec) << std::endl;
-    std::cout << myChar << std::endl;
+    int MYINT = 42;
+    const auto _init_MYINT = MYINT;
+    std::string MYSTR = "Hello";
+    const auto _init_MYSTR = MYSTR;
+    double MYDEC = 3.14;
+    const auto _init_MYDEC = MYDEC;
+    std::string MYCHAR = "RPG";
+    const auto _init_MYCHAR = MYCHAR;
+    std::cout << rpg_to_char(MYINT) << std::endl;
+    std::cout << MYSTR << std::endl;
+    MYINT = 100; // line 12
+    MYSTR = "Changed"; // line 13
+    MYDEC = 99.99; // line 14
+    MYCHAR = "Modified"; // line 15
+    std::cout << rpg_to_char(MYINT) << std::endl;
+    std::cout << MYSTR << std::endl;
+    MYINT = _init_MYINT;
+    MYSTR = _init_MYSTR;
+    std::cout << rpg_to_char(MYINT) << std::endl;
+    std::cout << MYSTR << std::endl;
+    MYINT = 0;
+    MYSTR = "";
+    MYDEC = 0.0;
+    MYCHAR = "";
+    std::cout << rpg_to_char(MYINT) << std::endl;
+    std::cout << MYSTR << std::endl;
+    std::cout << rpg_to_char(MYDEC) << std::endl;
+    std::cout << MYCHAR << std::endl;
     return 0;
 }

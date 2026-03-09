@@ -4,22 +4,23 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int a = 0;
-    int b = 0;
-    int result = 0;
-    a = 10; // line 5
-    b = 3; // line 6
-    result = (a + b); // line 7
-    std::cout << rpg_to_char(result) << std::endl;
-    result = (a - b); // line 9
-    std::cout << rpg_to_char(result) << std::endl;
-    result = (a * b); // line 11
-    std::cout << rpg_to_char(result) << std::endl;
-    result = (a / b); // line 13
-    std::cout << rpg_to_char(result) << std::endl;
-    result = ((a + b) * 2); // line 15
-    std::cout << rpg_to_char(result) << std::endl;
+    int A = 0;
+    int B = 0;
+    int RESULT = 0;
+    A = 10; // line 5
+    B = 3; // line 6
+    RESULT = (A + B); // line 7
+    std::cout << rpg_to_char(RESULT) << std::endl;
+    RESULT = (A - B); // line 9
+    std::cout << rpg_to_char(RESULT) << std::endl;
+    RESULT = (A * B); // line 11
+    std::cout << rpg_to_char(RESULT) << std::endl;
+    RESULT = (A / B); // line 13
+    std::cout << rpg_to_char(RESULT) << std::endl;
+    RESULT = ((A + B) * 2); // line 15
+    std::cout << rpg_to_char(RESULT) << std::endl;
     return 0;
 }

@@ -4,17 +4,18 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-int myProc(int p1, int p2, int p3);
-int myProc(int p1, int p2, int p3) {
-    int numParms = 0;
-    numParms = 3; // line 24
-    std::cout << rpg_to_char(numParms) << std::endl;
-    return ((p1 + p2) + p3);
+#include <vector>
+int MYPROC(int P1, int P2, int P3);
+int MYPROC(int P1, int P2, int P3) {
+    int NUMPARMS = 0;
+    NUMPARMS = 3; // line 24
+    std::cout << rpg_to_char(NUMPARMS) << std::endl;
+    return ((P1 + P2) + P3);
 }
 int main() {
     bool rpg_indicators[100] = {};
-    int result = 0;
-    result = myProc(10, 20, 30); // line 11
-    std::cout << rpg_to_char(result) << std::endl;
+    int RESULT = 0;
+    RESULT = MYPROC(10, 20, 30); // line 11
+    std::cout << rpg_to_char(RESULT) << std::endl;
     return 0;
 }

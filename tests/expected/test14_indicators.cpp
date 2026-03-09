@@ -4,9 +4,10 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int x = 0;
+    int X = 0;
     rpg_indicators[1] = 1; // line 5
     rpg_indicators[2] = 0; // line 6
     rpg_indicators[50] = 1; // line 7
@@ -16,11 +17,11 @@ int main() {
     if (!(rpg_indicators[2])) {
         std::cout << "IN02 is off" << std::endl;
     }
-    x = 0; // line 19
+    X = 0; // line 19
     if (rpg_indicators[50] && !(rpg_indicators[2])) {
-        x = 100; // line 21
+        X = 100; // line 21
     }
-    std::cout << rpg_to_char(x) << std::endl;
+    std::cout << rpg_to_char(X) << std::endl;
     rpg_indicators[1] = 0; // line 26
     if (!(rpg_indicators[1])) {
         std::cout << "IN01 now off" << std::endl;

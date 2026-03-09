@@ -4,20 +4,21 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-int myFunc(int x);
-int myFunc(int x) {
-    return (x * 2);
+#include <vector>
+int MYFUNC(int X);
+int MYFUNC(int X) {
+    return (X * 2);
 }
-std::string getMyName() {
-    return std::string("getMyName");
+std::string GETMYNAME() {
+    return std::string("GETMYNAME");
 }
 int main() {
     bool rpg_indicators[100] = {};
-    std::string pName;
-    std::string result;
-    pName = std::string("main"); // line 11
-    std::cout << pName << std::endl;
-    result = getMyName(); // line 16
-    std::cout << result << std::endl;
+    std::string PNAME;
+    std::string RESULT;
+    PNAME = std::string("main"); // line 11
+    std::cout << PNAME << std::endl;
+    RESULT = GETMYNAME(); // line 16
+    std::cout << RESULT << std::endl;
     return 0;
 }

@@ -4,27 +4,28 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    int day = 0;
-    std::string name;
-    day = 3; // line 5
-    if (day == 1) {
-        name = "Monday"; // line 8
-    } else if (day == 2) {
-        name = "Tuesday"; // line 10
-    } else if (day == 3) {
-        name = "Wednesday"; // line 12
+    int DAY = 0;
+    std::string NAME;
+    DAY = 3; // line 5
+    if (DAY == 1) {
+        NAME = "Monday"; // line 8
+    } else if (DAY == 2) {
+        NAME = "Tuesday"; // line 10
+    } else if (DAY == 3) {
+        NAME = "Wednesday"; // line 12
     } else {
-        name = "Other"; // line 14
+        NAME = "Other"; // line 14
     }
-    std::cout << name << std::endl;
-    day = 99; // line 18
-    if (day == 1) {
-        name = "Monday"; // line 21
+    std::cout << NAME << std::endl;
+    DAY = 99; // line 18
+    if (DAY == 1) {
+        NAME = "Monday"; // line 21
     } else {
-        name = "Unknown"; // line 23
+        NAME = "Unknown"; // line 23
     }
-    std::cout << name << std::endl;
+    std::cout << NAME << std::endl;
     return 0;
 }

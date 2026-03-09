@@ -4,16 +4,17 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 int main() {
     bool rpg_indicators[100] = {};
-    std::string msg;
-    msg = "Greeting enabled"; // line 8
-    std::cout << msg << std::endl;
-    msg = "Not defined works"; // line 18
-    std::cout << msg << std::endl;
-    msg = "Debug on"; // line 23
-    std::cout << msg << std::endl;
-    msg = "Undef worked"; // line 37
-    std::cout << msg << std::endl;
+    std::string MSG;
+    MSG = "Greeting enabled"; // line 8
+    std::cout << MSG << std::endl;
+    MSG = "Not defined works"; // line 18
+    std::cout << MSG << std::endl;
+    MSG = "Debug on"; // line 23
+    std::cout << MSG << std::endl;
+    MSG = "Undef worked"; // line 37
+    std::cout << MSG << std::endl;
     return 0;
 }

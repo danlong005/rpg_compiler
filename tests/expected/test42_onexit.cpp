@@ -4,8 +4,9 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-void doWork();
-void doWork() {
+#include <vector>
+void DOWORK();
+void DOWORK() {
     auto _on_exit_fn = rpg_make_scope_guard([&]() {
         std::cout << "Cleanup" << std::endl;
     });
@@ -13,7 +14,7 @@ void doWork() {
 }
 int main() {
     bool rpg_indicators[100] = {};
-    doWork();
+    DOWORK();
     std::cout << "Done" << std::endl;
     return 0;
 }

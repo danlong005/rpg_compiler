@@ -382,6 +382,116 @@ test: $(TARGET)
 	$(CXX) -std=c++17 -Iruntime -o /tmp/test65 /tmp/test65.cpp
 	/tmp/test65
 	@echo ""
+	@echo "=== Test 66: *PSSR ==="
+	./$(TARGET) tests/test66_pssr.rpgle -o /tmp/test66.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test66 /tmp/test66.cpp
+	/tmp/test66
+	@echo ""
+	@echo "=== Test 67: *PSSR Error ==="
+	./$(TARGET) tests/test67_pssr_error.rpgle -o /tmp/test67.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test67 /tmp/test67.cpp
+	/tmp/test67
+	@echo ""
+	@echo "=== Test 68: Bitwise & Power ==="
+	./$(TARGET) tests/test68_bitwise_power.rpgle -o /tmp/test68.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test68 /tmp/test68.cpp
+	/tmp/test68
+	@echo ""
+	@echo "=== Test 69: %SCANR ==="
+	./$(TARGET) tests/test69_scanr.rpgle -o /tmp/test69.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test69 /tmp/test69.cpp
+	/tmp/test69
+	@echo ""
+	@echo "=== Test 70: %EDITFLT & %UNSH ==="
+	./$(TARGET) tests/test70_editflt_unsh.rpgle -o /tmp/test70.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test70 /tmp/test70.cpp
+	/tmp/test70
+	@echo ""
+	@echo "=== Test 71: Enum & Boolean ==="
+	./$(TARGET) tests/test71_enum_boolean.rpgle -o /tmp/test71.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test71 /tmp/test71.cpp
+	/tmp/test71
+	@echo ""
+	@echo "=== Test 72: DIM(*VAR) ==="
+	./$(TARGET) tests/test72_dim_var.rpgle -o /tmp/test72.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test72 /tmp/test72.cpp
+	/tmp/test72
+	@echo ""
+	@echo "=== Test 73: Date Formats ==="
+	./$(TARGET) tests/test73_date_formats.rpgle -o /tmp/test73.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test73 /tmp/test73.cpp
+	/tmp/test73
+	@echo ""
+	@echo "=== Test 74: %CONCAT ==="
+	./$(TARGET) tests/test74_concat.rpgle -o /tmp/test74.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test74 /tmp/test74.cpp
+	/tmp/test74
+	@echo ""
+	@echo "=== Test 75: %TLOOKUP & %ELEM ==="
+	./$(TARGET) tests/test75_tlookup_elem.rpgle -o /tmp/test75.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test75 /tmp/test75.cpp
+	/tmp/test75
+	@echo ""
+	@echo "=== Test 76: DS DIM(*VAR) ==="
+	./$(TARGET) tests/test76_ds_dim_var.rpgle -o /tmp/test76.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test76 /tmp/test76.cpp
+	/tmp/test76
+	@echo ""
 	@echo "All tests passed."
 
-.PHONY: all clean test
+test66: $(TARGET)
+	./$(TARGET) tests/test66_pssr.rpgle -o /tmp/test66.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test66 /tmp/test66.cpp
+	/tmp/test66
+
+test67: $(TARGET)
+	./$(TARGET) tests/test67_pssr_error.rpgle -o /tmp/test67.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test67 /tmp/test67.cpp
+	/tmp/test67
+
+test68: $(TARGET)
+	./$(TARGET) tests/test68_bitwise_power.rpgle -o /tmp/test68.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test68 /tmp/test68.cpp
+	/tmp/test68
+
+test69: $(TARGET)
+	./$(TARGET) tests/test69_scanr.rpgle -o /tmp/test69.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test69 /tmp/test69.cpp
+	/tmp/test69
+
+test70: $(TARGET)
+	./$(TARGET) tests/test70_editflt_unsh.rpgle -o /tmp/test70.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test70 /tmp/test70.cpp
+	/tmp/test70
+
+test71: $(TARGET)
+	./$(TARGET) tests/test71_enum_boolean.rpgle -o /tmp/test71.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test71 /tmp/test71.cpp
+	/tmp/test71
+
+test72: $(TARGET)
+	./$(TARGET) tests/test72_dim_var.rpgle -o /tmp/test72.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test72 /tmp/test72.cpp
+	/tmp/test72
+
+test73: $(TARGET)
+	./$(TARGET) tests/test73_date_formats.rpgle -o /tmp/test73.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test73 /tmp/test73.cpp
+	/tmp/test73
+
+test74: $(TARGET)
+	./$(TARGET) tests/test74_concat.rpgle -o /tmp/test74.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test74 /tmp/test74.cpp
+	/tmp/test74
+
+test75: $(TARGET)
+	./$(TARGET) tests/test75_tlookup_elem.rpgle -o /tmp/test75.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test75 /tmp/test75.cpp
+	/tmp/test75
+
+test76: $(TARGET)
+	./$(TARGET) tests/test76_ds_dim_var.rpgle -o /tmp/test76.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test76 /tmp/test76.cpp
+	/tmp/test76
+
+.PHONY: all clean test test66 test67 test68 test69 test70 test71 test72 test73 test74 test75 test76

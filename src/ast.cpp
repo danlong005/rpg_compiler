@@ -147,6 +147,8 @@ InExpr::InExpr(std::unique_ptr<Expression> value, std::unique_ptr<Expression> co
     : value(std::move(value)), collection(std::move(collection)) {}
 void InExpr::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+void DclEnum::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 } // namespace rpg

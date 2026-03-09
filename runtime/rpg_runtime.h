@@ -268,6 +268,31 @@ inline std::string rpg_to_char(const RpgTime& t) { return t.value; }
 inline std::string rpg_to_char(const RpgTimestamp& ts) { return ts.value; }
 
 
+// --- Date/Time format helpers ---
+// Day of year (1-366) from month/day
+inline int rpg_day_of_year(int y, int m, int d) {
+    static const int days_before[] = {0,31,59,90,120,151,181,212,243,273,304,334};
+    int doy = days_before[m - 1] + d;
+    bool leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+    if (leap && m > 2) doy++;
+    return doy;
+}
+
+// Convert day-of-year back to month/day
+inline void rpg_from_day_of_year(int y, int doy, int& m, int& d) {
+    bool leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+    static const int days_in_month[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    m = 1;
+    for (int i = 0; i < 12; i++) {
+        int dim = days_in_month[i];
+        if (i == 1 && leap) dim++;
+        if (doy <= dim) { d = doy; return; }
+        doy -= dim;
+        m++;
+    }
+    d = doy;
+}
+
 // --- Date/Time format parsing ---
 // Parse date from various RPG formats into ISO
 inline std::string rpg_parse_date_fmt(const std::string& s, const std::string& fmt) {
@@ -294,6 +319,32 @@ inline std::string rpg_parse_date_fmt(const std::string& s, const std::string& f
         // YY/MM/DD
         sscanf(s.c_str(), "%d/%d/%d", &y, &m, &d);
         y += (y < 40) ? 2000 : 1900;
+    } else if (fmt == "*JUL") {
+        // YY/DDD
+        int doy;
+        sscanf(s.c_str(), "%d/%d", &y, &doy);
+        y += (y < 40) ? 2000 : 1900;
+        rpg_from_day_of_year(y, doy, m, d);
+    } else if (fmt == "*LONGJUL") {
+        // YYYY/DDD
+        int doy;
+        sscanf(s.c_str(), "%d/%d", &y, &doy);
+        rpg_from_day_of_year(y, doy, m, d);
+    } else if (fmt == "*CYMD") {
+        // C/YY/MM/DD  (C: 0=19xx, 1=20xx)
+        int c;
+        sscanf(s.c_str(), "%d/%d/%d/%d", &c, &y, &m, &d);
+        y += (c == 0) ? 1900 : 2000;
+    } else if (fmt == "*CMDY") {
+        // C/MM/DD/YY
+        int c;
+        sscanf(s.c_str(), "%d/%d/%d/%d", &c, &m, &d, &y);
+        y += (c == 0) ? 1900 : 2000;
+    } else if (fmt == "*CDMY") {
+        // C/DD/MM/YY
+        int c;
+        sscanf(s.c_str(), "%d/%d/%d/%d", &c, &d, &m, &y);
+        y += (c == 0) ? 1900 : 2000;
     } else {
         return s; // unknown format, pass through
     }
@@ -321,6 +372,21 @@ inline std::string rpg_format_date_fmt(const std::string& iso, const std::string
         snprintf(buf, sizeof(buf), "%02d/%02d/%02d", d, m, y % 100);
     } else if (fmt == "*YMD") {
         snprintf(buf, sizeof(buf), "%02d/%02d/%02d", y % 100, m, d);
+    } else if (fmt == "*JUL") {
+        int doy = rpg_day_of_year(y, m, d);
+        snprintf(buf, sizeof(buf), "%02d/%03d", y % 100, doy);
+    } else if (fmt == "*LONGJUL") {
+        int doy = rpg_day_of_year(y, m, d);
+        snprintf(buf, sizeof(buf), "%04d/%03d", y, doy);
+    } else if (fmt == "*CYMD") {
+        int c = (y >= 2000) ? 1 : 0;
+        snprintf(buf, sizeof(buf), "%d/%02d/%02d/%02d", c, y % 100, m, d);
+    } else if (fmt == "*CMDY") {
+        int c = (y >= 2000) ? 1 : 0;
+        snprintf(buf, sizeof(buf), "%d/%02d/%02d/%02d", c, m, d, y % 100);
+    } else if (fmt == "*CDMY") {
+        int c = (y >= 2000) ? 1 : 0;
+        snprintf(buf, sizeof(buf), "%d/%02d/%02d/%02d", c, d, m, y % 100);
     } else {
         return iso;
     }
@@ -564,6 +630,21 @@ inline std::vector<std::string> rpg_split(const std::string& s, const std::strin
     return result;
 }
 
+// --- %CONCAT: concatenate strings with separator ---
+inline std::string rpg_concat(const std::string& sep) {
+    (void)sep;
+    return "";
+}
+
+template<typename... Args>
+inline std::string rpg_concat(const std::string& sep, const std::string& first, const Args&... rest) {
+    if constexpr (sizeof...(rest) == 0) {
+        return first;
+    } else {
+        return first + sep + rpg_concat(sep, rest...);
+    }
+}
+
 // --- %CONCATARR: join array elements with separator ---
 template<typename T, std::size_t N>
 inline std::string rpg_concatarr(const std::array<T, N>& arr, const std::string& sep) {
@@ -668,6 +749,63 @@ inline int rpg_lookup_ge(const T& val, const std::array<T, N>& arr) {
     return 0;
 }
 
+// --- %TLOOKUP: table lookup (returns bool, optionally sets alt table element) ---
+template<typename V, typename T, std::size_t N>
+inline bool rpg_tlookup(const V& val, const std::array<T, N>& table) {
+    for (std::size_t i = 0; i < N; i++) {
+        if (table[i] == val) return true;
+    }
+    return false;
+}
+
+template<typename V, typename T, std::size_t N, typename U, std::size_t M>
+inline bool rpg_tlookup(const V& val, const std::array<T, N>& table, std::array<U, M>& alt) {
+    for (std::size_t i = 0; i < N && i < M; i++) {
+        if (table[i] == val) return true;
+    }
+    return false;
+}
+
+template<typename V, typename T>
+inline bool rpg_tlookup(const V& val, const std::vector<T>& table) {
+    for (std::size_t i = 0; i < table.size(); i++) {
+        if (table[i] == val) return true;
+    }
+    return false;
+}
+
+template<typename V, typename T, std::size_t N>
+inline bool rpg_tlookup_lt(const V& val, const std::array<T, N>& table) {
+    for (std::size_t i = 0; i < N; i++) {
+        if (table[i] < val) return true;
+    }
+    return false;
+}
+
+template<typename V, typename T, std::size_t N>
+inline bool rpg_tlookup_gt(const V& val, const std::array<T, N>& table) {
+    for (std::size_t i = 0; i < N; i++) {
+        if (table[i] > val) return true;
+    }
+    return false;
+}
+
+template<typename V, typename T, std::size_t N>
+inline bool rpg_tlookup_le(const V& val, const std::array<T, N>& table) {
+    for (std::size_t i = 0; i < N; i++) {
+        if (table[i] <= val) return true;
+    }
+    return false;
+}
+
+template<typename V, typename T, std::size_t N>
+inline bool rpg_tlookup_ge(const V& val, const std::array<T, N>& table) {
+    for (std::size_t i = 0; i < N; i++) {
+        if (table[i] >= val) return true;
+    }
+    return false;
+}
+
 // --- %HOURS/%MINUTES/%SECONDS/%MSECONDS duration + time arithmetic ---
 inline RpgTime operator+(const RpgTime& t, const RpgDuration& dur) {
     int h = std::stoi(t.value.substr(0, 2));
@@ -769,6 +907,30 @@ inline bool rpg_in_list(const T& val, const std::vector<T>& list) {
 template<typename T>
 inline bool rpg_in_range(const T& val, const RpgRange<T>& range) {
     return val >= range.low && val <= range.high;
+}
+
+// %SCANR — reverse scan (search right to left)
+inline int rpg_scanr(const std::string& search, const std::string& source) {
+    auto pos = source.rfind(search);
+    return (pos == std::string::npos) ? 0 : static_cast<int>(pos) + 1;
+}
+
+inline int rpg_scanr(const std::string& search, const std::string& source, int start) {
+    if (start < 1 || start > static_cast<int>(source.size())) return 0;
+    auto pos = source.rfind(search, static_cast<size_t>(start) - 1);
+    return (pos == std::string::npos) ? 0 : static_cast<int>(pos) + 1;
+}
+
+// %EDITFLT — external float representation
+inline std::string rpg_editflt(double val) {
+    std::ostringstream oss;
+    oss << std::scientific << std::uppercase << val;
+    return oss.str();
+}
+
+// %UNSH — unsigned integer with half-adjust (rounding)
+inline unsigned int rpg_unsh(double val) {
+    return static_cast<unsigned int>(std::round(val));
 }
 
 #endif // RPG_RUNTIME_H
