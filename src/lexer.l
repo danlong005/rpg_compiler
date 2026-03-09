@@ -26,15 +26,53 @@ static char* process_rpg_string(const char* text) {
 #define MAX_INCLUDE_DEPTH 10
 static YY_BUFFER_STATE include_stack[MAX_INCLUDE_DEPTH];
 static int include_stack_ptr = 0;
+
+// Conditional compilation
+#include <set>
+static std::set<std::string> cond_defines;
+#define MAX_COND_DEPTH 20
+static bool cond_active[MAX_COND_DEPTH]; // is this level active?
+static bool cond_done[MAX_COND_DEPTH];   // has any branch been taken?
+static int cond_depth = 0;
+
+static bool cond_is_active() {
+    // Active if ALL levels in the stack are active
+    for (int i = 1; i <= cond_depth; i++) {
+        if (!cond_active[i]) return false;
+    }
+    return true;
+}
+
+static std::string cond_extract_symbol(const char* text) {
+    // Extract symbol from "DEFINED(SYMBOL)" pattern
+    const char* p = text;
+    while (*p && *p != '(') p++;
+    if (*p == '(') p++;
+    std::string sym;
+    while (*p && *p != ')' && *p != ' ' && *p != '\t') {
+        sym += toupper(*p);
+        p++;
+    }
+    return sym;
+}
+
+static std::string cond_toupper(const std::string& s) {
+    std::string r = s;
+    for (auto& c : r) c = toupper(c);
+    return r;
+}
 %}
 
 %option noyywrap
 %option case-insensitive
 %option yylineno
 
+%x SKIPPING
+
 %%
 
 "**FREE"            { return KW_FREE; }
+"DCL-F"             { return KW_DCL_F; }
 "DCL-S"             { return KW_DCL_S; }
 "DCL-C"             { return KW_DCL_C; }
 "CHAR"              { return KW_CHAR; }
@@ -46,8 +84,14 @@ static int include_stack_ptr = 0;
 "DATE"              { return KW_DATE; }
 "TIME"              { return KW_TIME; }
 "TIMESTAMP"         { return KW_TIMESTAMP; }
+"POINTER"           { return KW_POINTER; }
+"DISK"              { return KW_DISK; }
+"PRINTER"           { return KW_PRINTER; }
+"WORKSTN"           { return KW_WORKSTN; }
+"USAGE"             { return KW_USAGE; }
 "INZ"               { return KW_INZ; }
 "DSPLY"             { return KW_DSPLY; }
+"EVAL-CORR"         { return KW_EVAL_CORR; }
 "EVAL"              { return KW_EVAL; }
 "RETURN"            { return KW_RETURN; }
 "DCL-PROC"          { return KW_DCL_PROC; }
@@ -58,10 +102,13 @@ static int include_stack_ptr = 0;
 "END-PR"            { return KW_END_PR; }
 "VALUE"             { return KW_VALUE; }
 "DCL-DS"            { return KW_DCL_DS; }
+"DCL-SUBF"          { return KW_DCL_SUBF; }
+"DCL-PARM"          { return KW_DCL_PARM; }
 "END-DS"            { return KW_END_DS; }
 "QUALIFIED"         { return KW_QUALIFIED; }
 "DIM"               { return KW_DIM; }
 "LIKEDS"            { return KW_LIKEDS; }
+"LIKE"              { return KW_LIKE; }
 
 "IF"                { return KW_IF; }
 "ELSEIF"            { return KW_ELSEIF; }
@@ -87,6 +134,9 @@ static int include_stack_ptr = 0;
 "BEGSR"             { return KW_BEGSR; }
 "ENDSR"             { return KW_ENDSR; }
 "EXSR"              { return KW_EXSR; }
+"RESET"             { return KW_RESET; }
+"SORTA"             { return KW_SORTA; }
+"CLEAR"             { return KW_CLEAR; }
 "AND"               { return KW_AND; }
 "OR"                { return KW_OR; }
 "NOT"               { return KW_NOT; }
@@ -103,7 +153,23 @@ static int include_stack_ptr = 0;
 "%DEC"              { return BIF_DEC; }
 "%INT"              { return BIF_INT; }
 "%ELEM"             { return BIF_ELEM; }
+"%PARMS"            { return BIF_PARMS; }
+"%STATUS"           { return BIF_STATUS; }
+"%ERROR"            { return BIF_ERROR; }
+"%LOOKUP"           { return BIF_LOOKUP; }
+"%MAX"              { return BIF_MAX; }
+"%MIN"              { return BIF_MIN; }
+"%SIZE"             { return BIF_SIZE; }
+"%ADDR"             { return BIF_ADDR; }
+"%ABS"              { return BIF_ABS; }
+"%DIV"              { return BIF_DIV; }
+"%REM"              { return BIF_REM; }
 "%FOUND"            { return BIF_FOUND; }
+"%EDITC"            { return BIF_EDITC; }
+"%EDITW"            { return BIF_EDITW; }
+"%REPLACE"          { return BIF_REPLACE; }
+"%CHECK"            { return BIF_CHECK; }
+"%CHECKR"           { return BIF_CHECKR; }
 "%EOF"              { return BIF_EOF; }
 "%DATE"             { return BIF_DATE; }
 "%TIME"             { return BIF_TIME; }
@@ -115,6 +181,7 @@ static int include_stack_ptr = 0;
 "*INLR"             { return KW_INLR; }
 "*ON"               { return KW_ON; }
 "*OFF"              { return KW_OFF; }
+"*NULL"             { return KW_NULL; }
 "*DAYS"             { return KW_DAYS; }
 "*MONTHS"           { return KW_MONTHS; }
 "*YEARS"            { return KW_YEARS; }
@@ -135,6 +202,77 @@ static int include_stack_ptr = 0;
 "<"                 { return LT; }
 ">"                 { return GT; }
 "."                 { return DOT; }
+
+ /* Conditional compilation directives - processed in both INITIAL and SKIPPING states */
+<INITIAL,SKIPPING>^[ \t]*"/"[Dd][Ee][Ff][Ii][Nn][Ee][ \t]+[a-zA-Z_][a-zA-Z0-9_]* {
+    if (cond_is_active()) {
+        const char* p = yytext;
+        while (*p == ' ' || *p == '\t') p++;
+        p++;
+        while (*p && *p != ' ' && *p != '\t') p++;
+        while (*p == ' ' || *p == '\t') p++;
+        std::string sym;
+        while (*p && *p != ' ' && *p != '\t' && *p != '\n') {
+            sym += toupper(*p); p++;
+        }
+        cond_defines.insert(sym);
+    }
+}
+
+<INITIAL,SKIPPING>^[ \t]*"/"[Uu][Nn][Dd][Ee][Ff][Ii][Nn][Ee][ \t]+[a-zA-Z_][a-zA-Z0-9_]* {
+    if (cond_is_active()) {
+        const char* p = yytext;
+        while (*p == ' ' || *p == '\t') p++;
+        p++;
+        while (*p && *p != ' ' && *p != '\t') p++;
+        while (*p == ' ' || *p == '\t') p++;
+        std::string sym;
+        while (*p && *p != ' ' && *p != '\t' && *p != '\n') {
+            sym += toupper(*p); p++;
+        }
+        cond_defines.erase(sym);
+    }
+}
+
+<INITIAL,SKIPPING>^[ \t]*"/"[Ii][Ff][ \t]+[Dd][Ee][Ff][Ii][Nn][Ee][Dd][ \t]*"("[^)]*")" {
+    cond_depth++;
+    std::string sym = cond_extract_symbol(yytext);
+    bool defined = cond_defines.count(sym) > 0;
+    cond_active[cond_depth] = defined;
+    cond_done[cond_depth] = defined;
+    if (!cond_is_active()) BEGIN(SKIPPING);
+    else BEGIN(INITIAL);
+}
+
+<INITIAL,SKIPPING>^[ \t]*"/"[Ii][Ff][ \t]+[Nn][Oo][Tt][ \t]+[Dd][Ee][Ff][Ii][Nn][Ee][Dd][ \t]*"("[^)]*")" {
+    cond_depth++;
+    std::string sym = cond_extract_symbol(yytext);
+    bool defined = cond_defines.count(sym) > 0;
+    cond_active[cond_depth] = !defined;
+    cond_done[cond_depth] = !defined;
+    if (!cond_is_active()) BEGIN(SKIPPING);
+    else BEGIN(INITIAL);
+}
+
+<INITIAL,SKIPPING>^[ \t]*"/"[Ee][Ll][Ss][Ee][ \t]*$ {
+    if (cond_depth > 0) {
+        cond_active[cond_depth] = !cond_done[cond_depth];
+        cond_done[cond_depth] = true;
+    }
+    if (!cond_is_active()) BEGIN(SKIPPING);
+    else BEGIN(INITIAL);
+}
+
+<INITIAL,SKIPPING>^[ \t]*"/"[Ee][Nn][Dd][Ii][Ff][ \t]*$ {
+    if (cond_depth > 0) {
+        cond_depth--;
+    }
+    if (!cond_is_active()) BEGIN(SKIPPING);
+    else BEGIN(INITIAL);
+}
+
+<SKIPPING>[^\n]*\n   { /* skip lines in inactive conditional blocks */ }
+<SKIPPING>[^\n]*     { /* skip last line without newline */ }
 
  /* /COPY and /INCLUDE directives */
 ^[ \t]*"/"[Cc][Oo][Pp][Yy][ \t]+[^\n]+ {

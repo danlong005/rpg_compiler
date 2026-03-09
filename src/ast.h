@@ -106,7 +106,17 @@ enum class RPGType {
     IND,      // indicator type (boolean)
     DATE,     // date type
     TIME,     // time type
-    TIMESTAMP // timestamp type
+    TIMESTAMP, // timestamp type
+    POINTER   // pointer type
+};
+
+// File declaration (DCL-F) - stub
+class DclF : public Statement {
+public:
+    std::string name;
+    std::string usage; // DISK, PRINTER, etc.
+    DclF(std::string name, std::string usage);
+    void accept(ASTVisitor& visitor) override;
 };
 
 // Named constant (DCL-C)
@@ -126,9 +136,11 @@ public:
     int digits;
     int decimals;
     bool is_const;
+    int dim;  // DIM(n), 0 = not an array
+    std::string like_var; // LIKE(varname)
     std::unique_ptr<Expression> inz_value;
     DclS(std::string name, RPGType type, int length, int digits = 0, int decimals = 0,
-         bool is_const = false, std::unique_ptr<Expression> inz_value = nullptr);
+         bool is_const = false, std::unique_ptr<Expression> inz_value = nullptr, int dim = 0);
     void accept(ASTVisitor& visitor) override;
 };
 
@@ -235,6 +247,7 @@ struct ParamDecl {
     int digits;
     int decimals;
     bool by_value;  // VALUE keyword
+    std::string likeds; // LIKEDS(dsname)
 };
 
 // Procedure interface (DCL-PI)
@@ -307,6 +320,38 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// SORTA statement
+class SortAStmt : public Statement {
+public:
+    std::string array_name;
+    explicit SortAStmt(std::string name);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// RESET and CLEAR statements
+class ResetStmt : public Statement {
+public:
+    std::string var_name;
+    explicit ResetStmt(std::string name);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class ClearStmt : public Statement {
+public:
+    std::string var_name;
+    explicit ClearStmt(std::string name);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// EVAL-CORR statement
+class EvalCorrStmt : public Statement {
+public:
+    std::string target;
+    std::string source;
+    EvalCorrStmt(std::string target, std::string source);
+    void accept(ASTVisitor& visitor) override;
+};
+
 // --- Data Structures ---
 
 struct DSField {
@@ -367,6 +412,7 @@ public:
     virtual void visit(NotExpr& node) = 0;
     virtual void visit(BIFCall& node) = 0;
     virtual void visit(FuncCall& node) = 0;
+    virtual void visit(DclF& node) = 0;
     virtual void visit(DclC& node) = 0;
     virtual void visit(DclS& node) = 0;
     virtual void visit(EvalStmt& node) = 0;
@@ -388,7 +434,11 @@ public:
     virtual void visit(MonitorStmt& node) = 0;
     virtual void visit(BegSR& node) = 0;
     virtual void visit(ExSR& node) = 0;
+    virtual void visit(SortAStmt& node) = 0;
+    virtual void visit(ResetStmt& node) = 0;
+    virtual void visit(ClearStmt& node) = 0;
     virtual void visit(IndicatorExpr& node) = 0;
+    virtual void visit(EvalCorrStmt& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 

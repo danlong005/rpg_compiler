@@ -29,14 +29,18 @@ FuncCall::FuncCall(std::string name, std::vector<std::unique_ptr<Expression>> ar
     : name(std::move(name)), args(std::move(args)) {}
 void FuncCall::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+DclF::DclF(std::string name, std::string usage)
+    : name(std::move(name)), usage(std::move(usage)) {}
+void DclF::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 DclC::DclC(std::string name, std::unique_ptr<Expression> value)
     : name(std::move(name)), value(std::move(value)) {}
 void DclC::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 DclS::DclS(std::string name, RPGType type, int length, int digits, int decimals,
-           bool is_const, std::unique_ptr<Expression> inz_value)
+           bool is_const, std::unique_ptr<Expression> inz_value, int dim)
     : name(std::move(name)), type(type), length(length), digits(digits), decimals(decimals),
-      is_const(is_const), inz_value(std::move(inz_value)) {}
+      is_const(is_const), dim(dim), inz_value(std::move(inz_value)) {}
 void DclS::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 EvalStmt::EvalStmt(std::unique_ptr<Expression> target, std::unique_ptr<Expression> value)
@@ -95,6 +99,15 @@ void BegSR::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 ExSR::ExSR(std::string name) : name(std::move(name)) {}
 void ExSR::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+SortAStmt::SortAStmt(std::string name) : array_name(std::move(name)) {}
+void SortAStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+ResetStmt::ResetStmt(std::string name) : var_name(std::move(name)) {}
+void ResetStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+ClearStmt::ClearStmt(std::string name) : var_name(std::move(name)) {}
+void ClearStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 IndicatorExpr::IndicatorExpr(int number) : number(number) {}
 void IndicatorExpr::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
@@ -109,6 +122,10 @@ void DotExpr::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 ArrayAccess::ArrayAccess(std::string name, std::unique_ptr<Expression> index)
     : name(std::move(name)), index(std::move(index)) {}
 void ArrayAccess::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+EvalCorrStmt::EvalCorrStmt(std::string target, std::string source)
+    : target(std::move(target)), source(std::move(source)) {}
+void EvalCorrStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 

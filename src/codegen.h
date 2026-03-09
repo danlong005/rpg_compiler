@@ -3,6 +3,7 @@
 
 #include "ast.h"
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -20,6 +21,7 @@ public:
     void visit(NotExpr& node) override;
     void visit(BIFCall& node) override;
     void visit(FuncCall& node) override;
+    void visit(DclF& node) override;
     void visit(DclC& node) override;
     void visit(DclS& node) override;
     void visit(EvalStmt& node) override;
@@ -41,7 +43,11 @@ public:
     void visit(MonitorStmt& node) override;
     void visit(BegSR& node) override;
     void visit(ExSR& node) override;
+    void visit(SortAStmt& node) override;
+    void visit(ResetStmt& node) override;
+    void visit(ClearStmt& node) override;
     void visit(IndicatorExpr& node) override;
+    void visit(EvalCorrStmt& node) override;
     void visit(Program& node) override;
 
 private:
@@ -50,6 +56,7 @@ private:
     int indent_ = 1;
     bool in_procedure_ = false;
     bool uses_indicators_ = false;
+    int current_proc_parm_count_ = 0;
 
     void emitIndent();
     void emitStatements(std::vector<std::unique_ptr<Statement>>& stmts);
@@ -60,6 +67,12 @@ private:
 
     // Track DS definitions for LIKEDS resolution
     std::map<std::string, DclDS*> ds_defs_;
+
+    // Track variable types and whether they have INZ for RESET/CLEAR
+    std::map<std::string, RPGType> var_types_;
+    std::map<std::string, int> var_lengths_; // for CHAR length
+    std::set<std::string> has_inz_; // variables with INZ values
+    std::set<std::string> array_vars_; // DIM array variables
 };
 
 } // namespace rpg

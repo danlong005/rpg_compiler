@@ -141,6 +141,96 @@ test: $(TARGET)
 	$(CXX) -std=c++17 -Iruntime -o /tmp/test18 /tmp/test18.cpp
 	/tmp/test18
 	@echo ""
+	@echo "=== Test 19: Math BIFs ==="
+	./$(TARGET) tests/test19_math_bifs.rpgle -o /tmp/test19.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test19 /tmp/test19.cpp
+	/tmp/test19
+	@echo ""
+	@echo "=== Test 20: Memory BIFs ==="
+	./$(TARGET) tests/test20_memory_bifs.rpgle -o /tmp/test20.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test20 /tmp/test20.cpp
+	/tmp/test20
+	@echo ""
+	@echo "=== Test 21: %PARMS ==="
+	./$(TARGET) tests/test21_parms.rpgle -o /tmp/test21.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test21 /tmp/test21.cpp
+	/tmp/test21
+	@echo ""
+	@echo "=== Test 22: %STATUS/%ERROR ==="
+	./$(TARGET) tests/test22_status_error.rpgle -o /tmp/test22.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test22 /tmp/test22.cpp
+	/tmp/test22
+	@echo ""
+	@echo "=== Test 23: RESET/CLEAR ==="
+	./$(TARGET) tests/test23_reset_clear.rpgle -o /tmp/test23.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test23 /tmp/test23.cpp
+	/tmp/test23
+	@echo ""
+	@echo "=== Test 24: %MAX/%MIN ==="
+	./$(TARGET) tests/test24_max_min.rpgle -o /tmp/test24.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test24 /tmp/test24.cpp
+	/tmp/test24
+	@echo ""
+	@echo "=== Test 25: DCL-F ==="
+	./$(TARGET) tests/test25_dclf.rpgle -o /tmp/test25.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test25 /tmp/test25.cpp
+	/tmp/test25
+	@echo ""
+	@echo "=== Test 26: Pointers ==="
+	./$(TARGET) tests/test26_pointers.rpgle -o /tmp/test26.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test26 /tmp/test26.cpp
+	/tmp/test26
+	@echo ""
+	@echo "=== Test 27: Arrays ==="
+	./$(TARGET) tests/test27_arrays.rpgle -o /tmp/test27.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test27 /tmp/test27.cpp
+	/tmp/test27
+	@echo ""
+	@echo "=== Test 28: Conditional Compilation ==="
+	./$(TARGET) tests/test28_conditional.rpgle -o /tmp/test28.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test28 /tmp/test28.cpp
+	/tmp/test28
+	@echo ""
+	@echo "=== Test 29: DCL-SUBF/DCL-PARM ==="
+	./$(TARGET) tests/test29_dclsubf_parm.rpgle -o /tmp/test29.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test29 /tmp/test29.cpp
+	/tmp/test29
+	@echo ""
+	@echo "=== Test 30: LIKE ==="
+	./$(TARGET) tests/test30_like.rpgle -o /tmp/test30.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test30 /tmp/test30.cpp
+	/tmp/test30
+	@echo ""
+	@echo "=== Test 31: LOOKUP and SORTA ==="
+	./$(TARGET) tests/test31_lookup_sorta.rpgle -o /tmp/test31.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test31 /tmp/test31.cpp
+	/tmp/test31
+	@echo ""
+	@echo "=== Test 32: EDITC/EDITW ==="
+	./$(TARGET) tests/test32_editc_editw.rpgle -o /tmp/test32.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test32 /tmp/test32.cpp
+	/tmp/test32
+	@echo ""
+	@echo "=== Test 33: REPLACE ==="
+	./$(TARGET) tests/test33_replace.rpgle -o /tmp/test33.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test33 /tmp/test33.cpp
+	/tmp/test33
+	@echo ""
+	@echo "=== Test 34: CHECK/CHECKR ==="
+	./$(TARGET) tests/test34_check.rpgle -o /tmp/test34.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test34 /tmp/test34.cpp
+	/tmp/test34
+	@echo ""
+	@echo "=== Test 35: EVAL-CORR ==="
+	./$(TARGET) tests/test35_evalcorr.rpgle -o /tmp/test35.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test35 /tmp/test35.cpp
+	/tmp/test35
+	@echo ""
+	@echo "=== Test 36: DS Params ==="
+	./$(TARGET) tests/test36_ds_params.rpgle -o /tmp/test36.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test36 /tmp/test36.cpp
+	/tmp/test36
+	@echo ""
 	@echo "All tests passed."
 
 .PHONY: all clean test

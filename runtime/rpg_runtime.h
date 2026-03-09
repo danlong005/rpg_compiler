@@ -65,6 +65,148 @@ inline std::string rpg_xlate(const std::string& from, const std::string& to,
 inline bool rpg_found() { return false; }
 inline bool rpg_eof() { return false; }
 
+// %LOOKUP - find element in array, returns 1-based index (0 if not found)
+template<typename T, std::size_t N>
+inline int rpg_lookup(const T& val, const std::array<T, N>& arr) {
+    for (std::size_t i = 0; i < N; i++) {
+        if (arr[i] == val) return static_cast<int>(i + 1);
+    }
+    return 0;
+}
+
+// %CHECK - find first char in base NOT in comparator (1-based, 0 if all found)
+inline int rpg_check(const std::string& comp, const std::string& base, int start = 1) {
+    for (int i = start - 1; i < static_cast<int>(base.size()); i++) {
+        if (comp.find(base[i]) == std::string::npos) return i + 1;
+    }
+    return 0;
+}
+
+// %CHECKR - same as %CHECK but from right
+inline int rpg_checkr(const std::string& comp, const std::string& base, int start = 0) {
+    int end = (start > 0) ? start - 1 : static_cast<int>(base.size()) - 1;
+    for (int i = end; i >= 0; i--) {
+        if (comp.find(base[i]) == std::string::npos) return i + 1;
+    }
+    return 0;
+}
+
+// %REPLACE(new : source : start {: length})
+inline std::string rpg_replace(const std::string& newstr, const std::string& source, int start, int length = -1) {
+    std::string result = source;
+    int pos = start - 1; // 1-based to 0-based
+    if (length < 0) {
+        // Insert mode: insert at position without removing
+        result.insert(pos, newstr);
+    } else {
+        result.replace(pos, length, newstr);
+    }
+    return result;
+}
+
+// %EDITC - format number with edit code
+inline std::string rpg_editc(double val, const std::string& code) {
+    bool negative = val < 0;
+    double absval = negative ? -val : val;
+
+    // Split into integer and decimal parts
+    long long intpart = static_cast<long long>(absval * 100 + 0.5);
+    long long cents = intpart % 100;
+    long long dollars = intpart / 100;
+
+    std::string digits = std::to_string(dollars);
+    char editcode = code.empty() ? '1' : code[0];
+
+    bool use_commas = (editcode == '1' || editcode == '3');
+    bool show_sign = (editcode == '3' || editcode == '4');
+    bool show_all_zeros = (editcode == 'X' || editcode == 'x');
+
+    std::string result;
+    if (show_all_zeros) {
+        // Edit code X: show all digits with leading zeros
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%07.2f", absval);
+        return std::string(buf);
+    }
+
+    // Insert commas
+    if (use_commas && digits.size() > 3) {
+        std::string with_commas;
+        int count = 0;
+        for (int i = static_cast<int>(digits.size()) - 1; i >= 0; i--) {
+            if (count > 0 && count % 3 == 0) with_commas = "," + with_commas;
+            with_commas = digits[i] + with_commas;
+            count++;
+        }
+        digits = with_commas;
+    }
+
+    char buf[8];
+    snprintf(buf, sizeof(buf), ".%02lld", cents);
+    result = digits + buf;
+
+    if (show_sign && negative) {
+        result += "CR";
+    }
+
+    return result;
+}
+
+inline std::string rpg_editc(int val, const std::string& code) {
+    return rpg_editc(static_cast<double>(val), code);
+}
+
+// %EDITW - format number with edit word
+inline std::string rpg_editw(double val, const std::string& editword) {
+    bool negative = val < 0;
+    double absval = negative ? -val : val;
+
+    // Convert to string of digits (including decimals)
+    long long scaled = static_cast<long long>(absval * 100 + 0.5);
+    std::string digits = std::to_string(scaled);
+
+    // Count blanks in edit word (positions for digits)
+    int blank_count = 0;
+    for (char c : editword) {
+        if (c == ' ') blank_count++;
+    }
+
+    // Pad digits to match blank count
+    while (static_cast<int>(digits.size()) < blank_count) {
+        digits = "0" + digits;
+    }
+
+    // Fill in the edit word
+    std::string result;
+    int dpos = 0;
+    bool significant = false;
+    for (char c : editword) {
+        if (c == ' ') {
+            char d = digits[dpos++];
+            if (d != '0') significant = true;
+            result += significant ? d : ' ';
+        } else {
+            // Commas, periods, etc. - show only if significant digit has appeared
+            if (significant || c == '.' || c == '0') {
+                result += c;
+            } else {
+                result += ' ';
+            }
+        }
+    }
+    return result;
+}
+
+inline std::string rpg_editw(int val, const std::string& editword) {
+    return rpg_editw(static_cast<double>(val), editword);
+}
+
+// %STATUS / %ERROR - program status tracking
+inline int& rpg_status_code() { static int s = 0; return s; }
+inline bool& rpg_error_flag() { static bool e = false; return e; }
+inline int rpg_status() { return rpg_status_code(); }
+inline int rpg_error() { return rpg_error_flag() ? 1 : 0; }
+
 // --- %CHAR: generic to-string conversion ---
 inline std::string rpg_to_char(int v) { return std::to_string(v); }
 inline std::string rpg_to_char(double v) { return std::to_string(v); }

@@ -51,12 +51,19 @@ std::string CodeGen::typeToString(RPGType type, int /*length*/) {
         case RPGType::DATE: return "RpgDate";
         case RPGType::TIME: return "RpgTime";
         case RPGType::TIMESTAMP: return "RpgTimestamp";
+        case RPGType::POINTER: return "void*";
     }
     return "int";
 }
 
 std::string CodeGen::paramTypeToString(const ParamDecl& p) {
-    std::string base = typeToString(p.type, p.length);
+    std::string base;
+    if (!p.likeds.empty()) {
+        // LIKEDS parameter: use the struct type name
+        base = p.likeds + "_t";
+    } else {
+        base = typeToString(p.type, p.length);
+    }
     if (p.by_value) {
         return base;
     } else {
@@ -66,21 +73,31 @@ std::string CodeGen::paramTypeToString(const ParamDecl& p) {
 
 void CodeGen::visit(Program& node) {
     out_ << "#include \"rpg_runtime.h\"\n";
+    out_ << "#include <algorithm>\n";
     out_ << "#include <array>\n";
+    out_ << "#include <cmath>\n";
     out_ << "#include <iostream>\n";
     out_ << "#include <string>\n";
 
-    // First pass: emit forward declarations (DCL-PR) and procedure definitions before main
-    // Collect main-body statements vs procedure/prototype statements
+    // Categorize statements into DS definitions, procs/prototypes, and main body
+    std::vector<Statement*> ds_stmts;
     std::vector<Statement*> main_stmts;
     std::vector<Statement*> proc_stmts;
 
     for (auto& stmt : node.statements) {
         if (dynamic_cast<DclProc*>(stmt.get()) || dynamic_cast<DclPR*>(stmt.get())) {
             proc_stmts.push_back(stmt.get());
+        } else if (dynamic_cast<DclDS*>(stmt.get())) {
+            ds_stmts.push_back(stmt.get());
         } else {
             main_stmts.push_back(stmt.get());
         }
+    }
+
+    // Emit DS struct definitions at file scope (needed for procedure params)
+    indent_ = 0;
+    for (auto* s : ds_stmts) {
+        s->accept(*this);
     }
 
     // Emit prototypes and procedures
@@ -92,6 +109,19 @@ void CodeGen::visit(Program& node) {
     out_ << "int main() {\n";
     out_ << "    bool rpg_indicators[100] = {};\n";
     indent_ = 1;
+
+    // Emit DS instance declarations in main
+    for (auto* s : ds_stmts) {
+        auto* ds = dynamic_cast<DclDS*>(s);
+        std::string type_name = ds->like_ds.empty() ? ds->name + "_t" : ds->like_ds + "_t";
+        emitIndent();
+        if (ds->dim > 0) {
+            out_ << "std::array<" << type_name << ", " << ds->dim << "> " << ds->name << ";\n";
+        } else {
+            out_ << type_name << " " << ds->name << ";\n";
+        }
+    }
+
     for (auto* s : main_stmts) {
         s->accept(*this);
     }
@@ -123,14 +153,21 @@ void CodeGen::visit(DclProc& node) {
     out_ << ") {\n";
     indent_ = 1;
     in_procedure_ = true;
+    current_proc_parm_count_ = static_cast<int>(node.interface.params.size());
     emitStatements(node.body);
     in_procedure_ = false;
+    current_proc_parm_count_ = 0;
     out_ << "}\n";
 }
 
 void CodeGen::visit(ExprStmt& node) {
     emitIndent();
     out_ << emitExpr(*node.expr) << ";\n";
+}
+
+void CodeGen::visit(DclF& node) {
+    emitIndent();
+    out_ << "// DCL-F " << node.name << " " << node.usage << " (file I/O not yet implemented)\n";
 }
 
 void CodeGen::visit(DclC& node) {
@@ -146,7 +183,37 @@ void CodeGen::visit(DclC& node) {
 }
 
 void CodeGen::visit(DclS& node) {
+    // Track variable info for RESET/CLEAR
+    var_types_[node.name] = node.type;
+    var_lengths_[node.name] = node.length;
+    if (node.inz_value) has_inz_.insert(node.name);
+    if (node.dim > 0) array_vars_.insert(node.name);
+
+    // Handle LIKE - resolve type from referenced variable
+    if (!node.like_var.empty()) {
+        auto it = var_types_.find(node.like_var);
+        if (it != var_types_.end()) {
+            var_types_[node.name] = it->second;
+            var_lengths_[node.name] = var_lengths_[node.like_var];
+            emitIndent();
+            std::string cppType = typeToString(it->second, var_lengths_[node.like_var]);
+            out_ << cppType << " " << node.name;
+            switch (it->second) {
+                case RPGType::INT10: out_ << " = 0"; break;
+                case RPGType::PACKED: case RPGType::ZONED: out_ << " = 0.0"; break;
+                default: break;
+            }
+            out_ << ";\n";
+            return;
+        }
+    }
+
     emitIndent();
+    // Handle DIM arrays
+    if (node.dim > 0) {
+        out_ << "std::array<" << typeToString(node.type, node.length) << ", " << node.dim << "> " << node.name << ";\n";
+        return;
+    }
     switch (node.type) {
         case RPGType::CHAR:
             if (node.is_const) {
@@ -195,6 +262,14 @@ void CodeGen::visit(DclS& node) {
         case RPGType::TIMESTAMP:
             out_ << "RpgTimestamp " << node.name << ";\n";
             break;
+        case RPGType::POINTER:
+            out_ << "void* " << node.name << " = nullptr;\n";
+            break;
+    }
+    // Emit shadow variable for RESET support if INZ was specified
+    if (node.inz_value) {
+        emitIndent();
+        out_ << "const auto _init_" << node.name << " = " << node.name << ";\n";
     }
 }
 
@@ -330,6 +405,7 @@ std::string CodeGen::fieldTypeDefault(RPGType type, int length) {
         case RPGType::DATE: return "RpgDate{}";
         case RPGType::TIME: return "RpgTime{}";
         case RPGType::TIMESTAMP: return "RpgTimestamp{}";
+        case RPGType::POINTER: return "nullptr";
     }
     return "0";
 }
@@ -337,38 +413,23 @@ std::string CodeGen::fieldTypeDefault(RPGType type, int length) {
 void CodeGen::visit(DclDS& node) {
     // Store for LIKEDS lookup
     ds_defs_[node.name] = &node;
+    if (node.dim > 0) array_vars_.insert(node.name);
 
     if (!node.like_ds.empty()) {
-        // LIKEDS: reuse an existing struct type
-        if (node.dim > 0) {
-            emitIndent();
-            out_ << "std::array<" << node.like_ds << "_t, " << node.dim << "> " << node.name << ";\n";
-        } else {
-            emitIndent();
-            out_ << node.like_ds << "_t " << node.name << ";\n";
-        }
+        // LIKEDS: no struct to emit, just store reference
         return;
     }
 
-    // Emit struct definition
-    out_ << "    struct " << node.name << "_t {\n";
+    // Emit struct definition at file scope
+    out_ << "struct " << node.name << "_t {\n";
     for (auto& f : node.fields) {
-        out_ << "        " << typeToString(f.type, f.length) << " " << f.name;
+        out_ << "    " << typeToString(f.type, f.length) << " " << f.name;
         // Default init
         if (f.type == RPGType::INT10) out_ << " = 0";
         else if (f.type == RPGType::PACKED || f.type == RPGType::ZONED) out_ << " = 0.0";
         out_ << ";\n";
     }
-    out_ << "    };\n";
-
-    // Emit variable
-    if (node.dim > 0) {
-        emitIndent();
-        out_ << "std::array<" << node.name << "_t, " << node.dim << "> " << node.name << ";\n";
-    } else {
-        emitIndent();
-        out_ << node.name << "_t " << node.name << ";\n";
-    }
+    out_ << "};\n";
 }
 
 void CodeGen::visit(DotExpr& node) {
@@ -421,6 +482,38 @@ void CodeGen::visit(ExSR& node) {
     out_ << "sr_" << node.name << "();\n";
 }
 
+void CodeGen::visit(ResetStmt& node) {
+    emitIndent();
+    if (has_inz_.count(node.var_name)) {
+        out_ << node.var_name << " = _init_" << node.var_name << ";\n";
+    } else {
+        // No INZ — reset to type default
+        auto it = var_types_.find(node.var_name);
+        if (it != var_types_.end()) {
+            out_ << node.var_name << " = " << fieldTypeDefault(it->second, var_lengths_[node.var_name]) << ";\n";
+        }
+    }
+}
+
+void CodeGen::visit(ClearStmt& node) {
+    emitIndent();
+    auto it = var_types_.find(node.var_name);
+    if (it != var_types_.end()) {
+        switch (it->second) {
+            case RPGType::INT10: out_ << node.var_name << " = 0;\n"; break;
+            case RPGType::PACKED:
+            case RPGType::ZONED: out_ << node.var_name << " = 0.0;\n"; break;
+            case RPGType::CHAR:
+            case RPGType::VARCHAR: out_ << node.var_name << " = \"\";\n"; break;
+            case RPGType::IND: out_ << node.var_name << " = false;\n"; break;
+            case RPGType::DATE: out_ << node.var_name << " = RpgDate{};\n"; break;
+            case RPGType::TIME: out_ << node.var_name << " = RpgTime{};\n"; break;
+            case RPGType::TIMESTAMP: out_ << node.var_name << " = RpgTimestamp{};\n"; break;
+            case RPGType::POINTER: out_ << node.var_name << " = nullptr;\n"; break;
+        }
+    }
+}
+
 void CodeGen::visit(IndicatorExpr& node) {
     uses_indicators_ = true;
     expr_ << "rpg_indicators[" << node.number << "]";
@@ -470,6 +563,13 @@ void CodeGen::visit(NotExpr& node) {
 }
 
 void CodeGen::visit(FuncCall& node) {
+    // Check if this is actually an array access
+    if (array_vars_.count(node.name) && node.args.size() == 1) {
+        expr_ << node.name << "[";
+        node.args[0]->accept(*this);
+        expr_ << " - 1]";
+        return;
+    }
     expr_ << node.name << "(";
     for (size_t i = 0; i < node.args.size(); i++) {
         if (i > 0) expr_ << ", ";
@@ -553,6 +653,66 @@ void CodeGen::visit(BIFCall& node) {
         expr_ << "static_cast<int>(";
         node.args[0]->accept(*this);
         expr_ << ".size())";
+    } else if (node.name == "MAX") {
+        if (node.args.size() == 2) {
+            expr_ << "std::max(";
+            node.args[0]->accept(*this);
+            expr_ << ", ";
+            node.args[1]->accept(*this);
+            expr_ << ")";
+        } else {
+            expr_ << "std::max({";
+            for (size_t i = 0; i < node.args.size(); i++) {
+                if (i > 0) expr_ << ", ";
+                node.args[i]->accept(*this);
+            }
+            expr_ << "})";
+        }
+    } else if (node.name == "MIN") {
+        if (node.args.size() == 2) {
+            expr_ << "std::min(";
+            node.args[0]->accept(*this);
+            expr_ << ", ";
+            node.args[1]->accept(*this);
+            expr_ << ")";
+        } else {
+            expr_ << "std::min({";
+            for (size_t i = 0; i < node.args.size(); i++) {
+                if (i > 0) expr_ << ", ";
+                node.args[i]->accept(*this);
+            }
+            expr_ << "})";
+        }
+    } else if (node.name == "STATUS") {
+        expr_ << "rpg_status()";
+    } else if (node.name == "ERROR") {
+        expr_ << "rpg_error()";
+    } else if (node.name == "PARMS") {
+        expr_ << current_proc_parm_count_;
+    } else if (node.name == "SIZE") {
+        expr_ << "static_cast<int>(sizeof(";
+        node.args[0]->accept(*this);
+        expr_ << "))";
+    } else if (node.name == "ADDR") {
+        expr_ << "static_cast<void*>(&";
+        node.args[0]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "ABS") {
+        expr_ << "std::abs(";
+        node.args[0]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "DIV") {
+        expr_ << "(";
+        node.args[0]->accept(*this);
+        expr_ << " / ";
+        node.args[1]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "REM") {
+        expr_ << "(";
+        node.args[0]->accept(*this);
+        expr_ << " % ";
+        node.args[1]->accept(*this);
+        expr_ << ")";
     } else if (node.name == "DATE") {
         if (node.args.empty()) {
             expr_ << "rpg_current_date()";
@@ -600,6 +760,62 @@ void CodeGen::visit(BIFCall& node) {
         expr_ << "RpgDuration{";
         node.args[0]->accept(*this);
         expr_ << ", 'Y'}";
+    } else if (node.name == "CHECK") {
+        // %CHECK(comparator : base {: start})
+        expr_ << "rpg_check(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "CHECKR") {
+        // %CHECKR(comparator : base {: start})
+        expr_ << "rpg_checkr(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        if (node.args.size() > 2) {
+            expr_ << ", ";
+            node.args[2]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "REPLACE") {
+        // %REPLACE(new : source : start {: length})
+        expr_ << "rpg_replace(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        expr_ << ", ";
+        node.args[2]->accept(*this);
+        if (node.args.size() > 3) {
+            expr_ << ", ";
+            node.args[3]->accept(*this);
+        }
+        expr_ << ")";
+    } else if (node.name == "EDITC") {
+        // %EDITC(number : editcode)
+        expr_ << "rpg_editc(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "EDITW") {
+        // %EDITW(number : editword)
+        expr_ << "rpg_editw(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        expr_ << ")";
+    } else if (node.name == "LOOKUP") {
+        // %LOOKUP(arg : array) → 1-based index, 0 if not found
+        expr_ << "rpg_lookup(";
+        node.args[0]->accept(*this);
+        expr_ << ", ";
+        node.args[1]->accept(*this);
+        expr_ << ")";
     } else if (node.name == "FOUND") {
         expr_ << "rpg_found()";
     } else if (node.name == "EOF") {
@@ -607,6 +823,31 @@ void CodeGen::visit(BIFCall& node) {
     } else {
         expr_ << "/* unknown BIF: %" << node.name << " */";
     }
+}
+
+void CodeGen::visit(EvalCorrStmt& node) {
+    // Find both DS definitions and emit assignments for matching field names
+    auto tit = ds_defs_.find(node.target);
+    auto sit = ds_defs_.find(node.source);
+    if (tit != ds_defs_.end() && sit != ds_defs_.end()) {
+        DclDS* tds = tit->second;
+        DclDS* sds = sit->second;
+        for (auto& tf : tds->fields) {
+            for (auto& sf : sds->fields) {
+                if (tf.name == sf.name) {
+                    emitIndent();
+                    out_ << node.target << "." << tf.name << " = "
+                         << node.source << "." << sf.name << ";\n";
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void CodeGen::visit(SortAStmt& node) {
+    emitIndent();
+    out_ << "std::sort(" << node.array_name << ".begin(), " << node.array_name << ".end());\n";
 }
 
 } // namespace rpg
