@@ -22,6 +22,14 @@ static char* process_rpg_string(const char* text) {
     return result;
 }
 
+static char* strdup_upper(const char* text) {
+    char* result = strdup(text);
+    for (char* p = result; *p; p++) {
+        *p = toupper((unsigned char)*p);
+    }
+    return result;
+}
+
 // Buffer stack for /COPY and /INCLUDE
 #define MAX_INCLUDE_DEPTH 10
 static YY_BUFFER_STATE include_stack[MAX_INCLUDE_DEPTH];
@@ -92,7 +100,7 @@ static void parse_ctlopt(const char* text) {
             size_t start = pos + 5;
             size_t end = upper.find(')', start);
             if (end != std::string::npos) {
-                std::string name = s.substr(start, end - start);
+                std::string name = upper.substr(start, end - start);
                 // Trim whitespace
                 while (!name.empty() && name.front() == ' ') name.erase(name.begin());
                 while (!name.empty() && name.back() == ' ') name.pop_back();
@@ -544,7 +552,7 @@ static void parse_ctlopt(const char* text) {
 '([^']|'')*'        { yylval.sval = process_rpg_string(yytext); return STRING_LITERAL; }
 
 [a-zA-Z_][a-zA-Z0-9_]* {
-    yylval.sval = strdup(yytext);
+    yylval.sval = strdup_upper(yytext);
     return IDENTIFIER;
 }
 
