@@ -56,6 +56,24 @@ $(TARGET): $(OBJS)
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 
+PREFIX  ?= /usr/local
+BINDIR  := $(PREFIX)/bin
+DATADIR := $(PREFIX)/share/rpgc/runtime
+
+# Pass installed runtime path to main.cpp so rpgc can find headers after install
+CXXFLAGS += -DRPGC_RUNTIME_DIR='"$(DATADIR)"'
+
+install: $(TARGET)
+	install -d $(DESTDIR)$(BINDIR)
+	install -m 755 $(TARGET) $(DESTDIR)$(BINDIR)/$(TARGET)
+	install -d $(DESTDIR)$(DATADIR)
+	install -m 644 runtime/rpg_runtime.h $(DESTDIR)$(DATADIR)/
+	install -m 644 runtime/rpg_sql_runtime.h $(DESTDIR)$(DATADIR)/
+
+uninstall:
+	rm -f $(DESTDIR)$(BINDIR)/$(TARGET)
+	rm -rf $(DESTDIR)$(DATADIR)
+
 test: $(TARGET)
 	@bash tests/run_tests.sh
 
@@ -63,4 +81,4 @@ test: $(TARGET)
 update-expected: $(TARGET)
 	@bash tests/run_tests.sh --update
 
-.PHONY: all clean test update-expected
+.PHONY: all clean install uninstall test update-expected

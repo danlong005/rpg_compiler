@@ -39,6 +39,16 @@ If your `flex` and `bison` are in non-standard locations, edit the `FLEX` and `B
 make clean   # Remove build artifacts
 ```
 
+### Installing
+
+```bash
+sudo make install              # installs to /usr/local
+make install PREFIX=~/.local   # install without sudo
+sudo make uninstall            # remove
+```
+
+This installs the `rpgc` binary and runtime headers. `rpgc` automatically locates the runtime whether run from the source tree or after installation.
+
 ## Usage
 
 By default, `rpgc` compiles the RPG source all the way to an executable:

@@ -85,6 +85,26 @@ make
 
 This produces the `rpgc` executable.
 
+### Install (optional)
+
+To install `rpgc` system-wide:
+
+```bash
+sudo make install              # installs to /usr/local/bin
+make install PREFIX=~/.local   # or install to ~/.local/bin (no sudo needed)
+```
+
+This installs:
+- `rpgc` binary to `$PREFIX/bin/`
+- Runtime headers to `$PREFIX/share/rpgc/runtime/`
+
+When compiling RPG programs, `rpgc` automatically finds the runtime headers — it checks relative to the binary, the current directory, and the install prefix.
+
+To uninstall:
+```bash
+sudo make uninstall
+```
+
 ---
 
 ## Quick Start

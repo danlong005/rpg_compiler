@@ -3,8 +3,13 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <sys/stat.h>
 #include "ast.h"
 #include "codegen.h"
+
+#ifndef RPGC_RUNTIME_DIR
+#define RPGC_RUNTIME_DIR "/usr/local/share/rpgc/runtime"
+#endif
 
 extern FILE* yyin;
 extern rpg::Program* get_parsed_program();
@@ -111,7 +116,35 @@ int main(int argc, char* argv[]) {
         if (ext == ".sqlrpgle") is_sql = true;
     }
 
-    std::string runtime_dir = "runtime";
+    // Find runtime headers: check relative to binary, cwd, then install prefix
+    auto dir_exists = [](const std::string& path) {
+        struct stat st;
+        return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+    };
+
+    std::string runtime_dir;
+    // 1) Relative to the rpgc binary (e.g. ./runtime when run from source tree)
+    std::string self(argv[0]);
+    auto last_slash = self.rfind('/');
+    if (last_slash != std::string::npos) {
+        std::string bin_dir = self.substr(0, last_slash);
+        if (dir_exists(bin_dir + "/runtime"))
+            runtime_dir = bin_dir + "/runtime";
+    }
+    // 2) Current working directory
+    if (runtime_dir.empty() && dir_exists("runtime"))
+        runtime_dir = "runtime";
+    // 3) Installed location (compile-time default)
+    if (runtime_dir.empty() && dir_exists(RPGC_RUNTIME_DIR))
+        runtime_dir = RPGC_RUNTIME_DIR;
+
+    if (runtime_dir.empty()) {
+        std::cerr << "Error: cannot find rpgc runtime headers.\n"
+                  << "Looked in: ./runtime, " << RPGC_RUNTIME_DIR << "\n";
+        delete program;
+        return 1;
+    }
+
     std::string cmd = "clang++ -std=c++17 -I" + runtime_dir;
     if (is_sql) {
         cmd += " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc";
