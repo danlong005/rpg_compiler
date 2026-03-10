@@ -346,3 +346,4 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 83 | SQL Multi-row |
 | 84 | SQL Connect |
 | 85 | %GETENV |
+| 86 | SQL End-to-End (DS FETCH, cursors) |

@@ -1,6 +1,6 @@
 # rpgc — RPG IV to C++ Transpiler
 
-`rpgc` transpiles IBM RPG IV free-format source code into portable C++17. The generated C++ can be compiled and run on any platform with a standard C++ compiler — no IBM i required.
+`rpgc` transpiles IBM RPG IV free-format source code into portable C++17. The generated C++ can be compiled and run on macOS, Linux, or Windows — no IBM i required.
 
 ## Prerequisites
 
@@ -17,6 +17,13 @@ On Linux (Debian/Ubuntu):
 ```bash
 sudo apt install flex bison g++
 ```
+
+On Windows (via [MSYS2](https://www.msys2.org/) MINGW64 shell):
+```bash
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-flex mingw-w64-x86_64-bison make
+```
+
+> **Alternative:** Use [winflexbison](https://github.com/nicehash/winflexbison) with Visual Studio or `choco install winflexbison`. Adjust `FLEX` and `BISON` paths in the Makefile accordingly.
 
 ## Building
 
@@ -94,8 +101,8 @@ Hello from RPG!
 ## Running Tests
 
 ```bash
-make test       # Run all 76 tests
-make test42     # Run a specific test (e.g., test 42)
+make test              # Run all tests (validates runtime output)
+make update-expected   # Regenerate expected output baselines
 ```
 
 ## Project Structure
@@ -111,16 +118,19 @@ rpgc/
   runtime/
     rpg_runtime.h  Runtime support library (included by generated code)
   tests/
-    test*.rpgle    RPG test source files
-    expected/      Expected C++ output for each test
+    test*.rpgle         RPG test source files
+    test*.sqlrpgle      SQL test source files
+    expected_output/    Expected runtime output for each test
+    run_tests.sh        Test runner script
   build/           Generated lexer/parser files and object files
   Makefile
   TODO.md          Feature tracker
 ```
 
-## Feature Coverage
+## Documentation
 
-See [TODO.md](TODO.md) for a full breakdown of implemented features, remaining work, and what's not planned.
+- **[User's Guide](docs/GUIDE.md)** — Full language guide with database connection examples
+- **[TODO.md](TODO.md)** — Feature tracker (implemented, remaining, not planned)
 
 ### Highlights
 - Full free-format RPG IV support (declarations, control flow, expressions)
@@ -135,6 +145,7 @@ See [TODO.md](TODO.md) for a full breakdown of implemented features, remaining w
 - ON-EXIT cleanup blocks
 - Multi-module support (NOMAIN, EXPORT, IMPORT, EXTPROC)
 - Conditional compilation (/IF, /DEFINE, /COPY)
+- Embedded SQL via ODBC (SQLite, PostgreSQL, MySQL, SQL Server, Db2)
 
 ## License
 
