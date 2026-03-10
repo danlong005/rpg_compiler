@@ -35,6 +35,7 @@ struct DSFieldList {
 #include <vector>
 #include <string>
 #include "ast.h"
+#include "sql_utils.h"
 
 extern int yylex();
 extern int yylineno;
@@ -150,6 +151,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_RTNPARM KW_OPDESC KW_ASCEND KW_DESCEND KW_NULLIND
 %token KW_VARSIZE KW_STRING_OPT KW_TRIM_OPT
 %token KW_DCL_ENUM KW_END_ENUM KW_BOOLEAN
+%token <sval> EXEC_SQL_TEXT
 %token POWER
 %token KW_DIM_VAR KW_DIM_AUTO
 %token KW_FOR_EACH KW_IN
@@ -166,7 +168,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <stmt> statement dcl_f_stmt dcl_s_stmt dcl_c_stmt eval_stmt eval_corr_stmt evalr_stmt dsply_stmt inlr_stmt return_stmt expr_stmt reset_stmt clear_stmt sorta_stmt callp_stmt leavesr_stmt dealloc_stmt test_stmt
 %type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
-%type <stmt> monitor_stmt begsr_stmt exsr_stmt
+%type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
 %type <expr_list> arg_list call_arg_list call_args_opt
 %type <stmt_list> statement_list
@@ -256,6 +258,7 @@ statement:
     | leavesr_stmt  { $$ = $1; SET_LINE($$); }
     | dealloc_stmt  { $$ = $1; SET_LINE($$); }
     | test_stmt     { $$ = $1; SET_LINE($$); }
+    | exec_sql_stmt { $$ = $1; SET_LINE($$); }
     | expr_stmt   { $$ = $1; SET_LINE($$); }
     | error SEMICOLON { $$ = nullptr; yyerrok; }
     ;
@@ -1161,6 +1164,16 @@ test_stmt:
         $$ = new rpg::TestStmt(type, std::string($5));
         free($3);
         free($5);
+    }
+    ;
+
+/* --- Embedded SQL --- */
+
+exec_sql_stmt:
+    EXEC_SQL_TEXT {
+        rpg::SqlStmtKind kind = rpg::classifySqlStmt($1);
+        $$ = new rpg::ExecSqlStmt(std::string($1), kind);
+        free($1);
     }
     ;
 

@@ -70,6 +70,9 @@ static std::string cond_toupper(const std::string& s) {
     return r;
 }
 
+// SQL text buffer for EXEC SQL
+static std::string sql_buffer;
+
 // CTL-OPT keyword extraction helpers
 char ctlopt_main_proc[256] = {0};
 char ctlopt_datfmt[64] = {0};
@@ -142,10 +145,35 @@ static void parse_ctlopt(const char* text) {
 %option yylineno
 
 %x SKIPPING
+%x SQL
 
 %%
 
 "**FREE"            { return KW_FREE; }
+
+ /* EXEC SQL: switch to SQL mode and capture text until semicolon */
+[Ee][Xx][Ee][Cc][ \t]+[Ss][Qq][Ll][ \t]+ {
+    sql_buffer.clear();
+    BEGIN(SQL);
+}
+
+<SQL>[^;]+ {
+    sql_buffer.append(yytext);
+}
+
+<SQL>";" {
+    BEGIN(INITIAL);
+    /* Trim leading/trailing whitespace from captured SQL */
+    size_t start = sql_buffer.find_first_not_of(" \t\r\n");
+    size_t end = sql_buffer.find_last_not_of(" \t\r\n");
+    if (start != std::string::npos) {
+        yylval.sval = strdup(sql_buffer.substr(start, end - start + 1).c_str());
+    } else {
+        yylval.sval = strdup("");
+    }
+    return EXEC_SQL_TEXT;
+}
+
 "CTL-OPT"[^;]*";"  { parse_ctlopt(yytext); return KW_CTLOPT; }
 "DCL-F"             { return KW_DCL_F; }
 "DCL-S"             { return KW_DCL_S; }

@@ -2,6 +2,7 @@
 #define CODEGEN_H
 
 #include "ast.h"
+#include "sql_utils.h"
 #include <map>
 #include <set>
 #include <sstream>
@@ -55,6 +56,7 @@ public:
     void visit(ForEachStmt& node) override;
     void visit(InExpr& node) override;
     void visit(DclEnum& node) override;
+    void visit(ExecSqlStmt& node) override;
     void visit(Program& node) override;
 
 private:
@@ -68,6 +70,7 @@ private:
     std::string current_proc_name_;
     std::string datfmt_; // default date format (e.g., "*ISO", "*USA", "*MDY")
     std::string timfmt_; // default time format
+    bool uses_sql_ = false; // program contains EXEC SQL statements
 
     void emitIndent();
     void emitStatements(std::vector<std::unique_ptr<Statement>>& stmts);
@@ -78,6 +81,12 @@ private:
     int countRequiredParams(const std::vector<ParamDecl>& params);
     std::string fieldTypeDefault(RPGType type, int length);
     std::string figConstValue(const std::string& name, RPGType type, const std::string& var_name);
+
+    // SQL codegen helpers
+    void emitSqlBindParam(const std::string& var, int index, const std::string& handle = "__hstmt");
+    void emitSqlBindCol(const std::string& var, int index, const std::string& handle = "__hstmt");
+    static std::string escapeSqlForCpp(const std::string& sql);
+    static std::string sqlCommentText(const std::string& sql);
 
     // Track DS definitions for LIKEDS resolution
     std::map<std::string, DclDS*> ds_defs_;
@@ -90,6 +99,7 @@ private:
     std::set<std::string> nopass_procs_; // procs with *NOPASS params
     std::map<std::string, std::vector<ParamDecl>> nopass_proc_params_; // full param info
     std::map<std::string, std::string> extproc_map_; // RPG name → C++ name (EXTPROC/EXTPGM)
+    std::map<std::string, std::vector<std::string>> cursor_host_vars_; // cursor name → host vars for binding at OPEN
 };
 
 } // namespace rpg

@@ -298,29 +298,30 @@ struct DSFieldList {
     KW_DCL_ENUM = 468,             /* KW_DCL_ENUM  */
     KW_END_ENUM = 469,             /* KW_END_ENUM  */
     KW_BOOLEAN = 470,              /* KW_BOOLEAN  */
-    POWER = 471,                   /* POWER  */
-    KW_DIM_VAR = 472,              /* KW_DIM_VAR  */
-    KW_DIM_AUTO = 473,             /* KW_DIM_AUTO  */
-    KW_FOR_EACH = 474,             /* KW_FOR_EACH  */
-    KW_IN = 475,                   /* KW_IN  */
-    IDENTIFIER = 476,              /* IDENTIFIER  */
-    INTEGER_LITERAL = 477,         /* INTEGER_LITERAL  */
-    FLOAT_LITERAL = 478,           /* FLOAT_LITERAL  */
-    STRING_LITERAL = 479,          /* STRING_LITERAL  */
-    SEMICOLON = 480,               /* SEMICOLON  */
-    EQUALS = 481,                  /* EQUALS  */
-    LPAREN = 482,                  /* LPAREN  */
-    RPAREN = 483,                  /* RPAREN  */
-    COLON = 484,                   /* COLON  */
-    PLUS = 485,                    /* PLUS  */
-    MINUS = 486,                   /* MINUS  */
-    STAR = 487,                    /* STAR  */
-    SLASH = 488,                   /* SLASH  */
-    NE = 489,                      /* NE  */
-    LE = 490,                      /* LE  */
-    GE = 491,                      /* GE  */
-    LT = 492,                      /* LT  */
-    GT = 493                       /* GT  */
+    EXEC_SQL_TEXT = 471,           /* EXEC_SQL_TEXT  */
+    POWER = 472,                   /* POWER  */
+    KW_DIM_VAR = 473,              /* KW_DIM_VAR  */
+    KW_DIM_AUTO = 474,             /* KW_DIM_AUTO  */
+    KW_FOR_EACH = 475,             /* KW_FOR_EACH  */
+    KW_IN = 476,                   /* KW_IN  */
+    IDENTIFIER = 477,              /* IDENTIFIER  */
+    INTEGER_LITERAL = 478,         /* INTEGER_LITERAL  */
+    FLOAT_LITERAL = 479,           /* FLOAT_LITERAL  */
+    STRING_LITERAL = 480,          /* STRING_LITERAL  */
+    SEMICOLON = 481,               /* SEMICOLON  */
+    EQUALS = 482,                  /* EQUALS  */
+    LPAREN = 483,                  /* LPAREN  */
+    RPAREN = 484,                  /* RPAREN  */
+    COLON = 485,                   /* COLON  */
+    PLUS = 486,                    /* PLUS  */
+    MINUS = 487,                   /* MINUS  */
+    STAR = 488,                    /* STAR  */
+    SLASH = 489,                   /* SLASH  */
+    NE = 490,                      /* NE  */
+    LE = 491,                      /* LE  */
+    GE = 492,                      /* GE  */
+    LT = 493,                      /* LT  */
+    GT = 494                       /* GT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -329,7 +330,7 @@ struct DSFieldList {
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 80 "src/parser.y"
+#line 81 "src/parser.y"
 
     int ival;
     double fval;
@@ -349,7 +350,7 @@ union YYSTYPE
     rpg::DSField* ds_field;
     std::vector<rpg::EnumConstant>* enum_const_list;
 
-#line 353 "build/parser.h"
+#line 354 "build/parser.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

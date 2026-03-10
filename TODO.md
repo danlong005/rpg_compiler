@@ -132,57 +132,59 @@
 
 ### Embedded SQL (via ODBC)
 
-#### Phase 1 — Foundation
+#### Phase 1 — Foundation ✅
 | # | Feature | Details |
 |---|---------|---------|
-| 18 | EXEC SQL parsing | Lexer `<SQL>` start condition, captures raw SQL until `;` as `EXEC_SQL_TEXT` token |
-| 19 | Host variables | Extract `:varName` references, replace with `?` parameter markers |
-| 20 | ExecSqlStmt AST node | Single node with `SqlStmtKind` enum (avoids 15+ separate node classes) |
-| 21 | SQL utility functions | `src/sql_utils.h/.cpp` — `extractHostVariables()`, `replaceHostVarsWithMarkers()`, `classifySqlStmt()` |
-| 22 | ODBC runtime wrapper | `runtime/rpg_sql_runtime.h` — `RpgSqlEnv` class (connection, cursor, prepared stmt management) |
+| 18 | ✅ EXEC SQL parsing | Lexer `<SQL>` start condition, captures raw SQL until `;` as `EXEC_SQL_TEXT` token |
+| 19 | ✅ Host variables | Extract `:varName` references, replace with `?` parameter markers |
+| 20 | ✅ ExecSqlStmt AST node | Single node with `SqlStmtKind` enum (avoids 15+ separate node classes) |
+| 21 | ✅ SQL utility functions | `src/sql_utils.h/.cpp` — `extractHostVariables()`, `replaceHostVarsWithMarkers()`, `classifySqlStmt()` |
+| 22 | ✅ ODBC runtime wrapper | `runtime/rpg_sql_runtime.h` — `RpgSqlEnv` class (connection, cursor, prepared stmt management) |
 
-#### Phase 2 — Core SQL Statements
+#### Phase 2 — Core SQL Statements ✅
 | # | Feature | RPG Syntax | ODBC Mapping |
 |---|---------|-----------|-------------|
-| 23 | SELECT INTO | `EXEC SQL SELECT col INTO :var FROM tbl WHERE ...;` | `SQLPrepare` + `SQLBindCol` + `SQLExecute` + `SQLFetch` |
-| 24 | INSERT | `EXEC SQL INSERT INTO tbl VALUES(:v1, :v2);` | `SQLPrepare` + `SQLBindParameter` + `SQLExecute` |
-| 25 | UPDATE | `EXEC SQL UPDATE tbl SET col = :v WHERE ...;` | Same as INSERT |
-| 26 | DELETE | `EXEC SQL DELETE FROM tbl WHERE ...;` | Same as INSERT |
-| 27 | COMMIT | `EXEC SQL COMMIT;` | `SQLEndTran(SQL_COMMIT)` |
-| 28 | ROLLBACK | `EXEC SQL ROLLBACK;` | `SQLEndTran(SQL_ROLLBACK)` |
-| 29 | SQLCODE / SQLSTATE | `SQLCOD` / `SQLSTT` variables | `SQLGetDiagRec` → `__sql_env.sqlcode` / `.sqlstate` |
+| 23 | ✅ SELECT INTO | `EXEC SQL SELECT col INTO :var FROM tbl WHERE ...;` | `SQLPrepare` + `SQLBindCol` + `SQLExecute` + `SQLFetch` |
+| 24 | ✅ INSERT | `EXEC SQL INSERT INTO tbl VALUES(:v1, :v2);` | `SQLPrepare` + `SQLBindParameter` + `SQLExecute` |
+| 25 | ✅ UPDATE | `EXEC SQL UPDATE tbl SET col = :v WHERE ...;` | Same as INSERT |
+| 26 | ✅ DELETE | `EXEC SQL DELETE FROM tbl WHERE ...;` | Same as INSERT |
+| 27 | ✅ COMMIT | `EXEC SQL COMMIT;` | `SQLEndTran(SQL_COMMIT)` |
+| 28 | ✅ ROLLBACK | `EXEC SQL ROLLBACK;` | `SQLEndTran(SQL_ROLLBACK)` |
+| 29 | ✅ SQLCODE / SQLSTATE | `SQLCOD` / `SQLSTT` variables | `SQLGetDiagRec` → `__sql_env.sqlcode` / `.sqlstate` |
 
-#### Phase 3 — Cursor Operations
+#### Phase 3 — Cursor Operations ✅
 | # | Feature | RPG Syntax | ODBC Mapping |
 |---|---------|-----------|-------------|
-| 30 | DECLARE CURSOR | `EXEC SQL DECLARE C1 CURSOR FOR SELECT ...;` | `SQLPrepare` (store handle in cursor map) |
-| 31 | OPEN | `EXEC SQL OPEN C1;` | `SQLExecute` on cursor's stmt handle |
-| 32 | FETCH | `EXEC SQL FETCH C1 INTO :v1, :v2;` | `SQLBindCol` + `SQLFetch` |
-| 33 | CLOSE | `EXEC SQL CLOSE C1;` | `SQLFreeStmt(SQL_CLOSE)` |
+| 30 | ✅ DECLARE CURSOR | `EXEC SQL DECLARE C1 CURSOR FOR SELECT ...;` | `SQLPrepare` (store handle in cursor map) |
+| 31 | ✅ OPEN | `EXEC SQL OPEN C1;` | `SQLExecute` on cursor's stmt handle |
+| 32 | ✅ FETCH | `EXEC SQL FETCH C1 INTO :v1, :v2;` | `SQLBindCol` + `SQLFetch` |
+| 33 | ✅ CLOSE | `EXEC SQL CLOSE C1;` | `SQLFreeStmt(SQL_CLOSE)` |
 
-#### Phase 4 — Connection Management
+#### Phase 4 — Connection Management ✅
 | # | Feature | RPG Syntax | ODBC Mapping |
 |---|---------|-----------|-------------|
-| 34 | CONNECT | `EXEC SQL CONNECT TO :dsn USER :u USING :p;` | `SQLConnect` |
-| 35 | DISCONNECT | `EXEC SQL DISCONNECT;` | `SQLDisconnect` |
-| 36 | SET CONNECTION | `EXEC SQL SET CONNECTION :name;` | Switch active `SQLHDBC` handle |
+| 34 | ✅ CONNECT | `EXEC SQL CONNECT TO :dsn USER :u USING :p;` | `SQLConnect` |
+| 34a | ✅ CONNECT (conn string) | `EXEC SQL CONNECT USING :connStr;` | `SQLDriverConnect` |
+| 34b | ✅ CONNECT RESET | `EXEC SQL CONNECT RESET;` | `SQLDisconnect` |
+| 35 | ✅ DISCONNECT | `EXEC SQL DISCONNECT;` | `SQLDisconnect` |
+| 36 | — SET CONNECTION | Not supported (single connection per program) | — |
 
-#### Phase 5 — Dynamic SQL
+#### Phase 5 — Dynamic SQL ✅
 | # | Feature | RPG Syntax | ODBC Mapping |
 |---|---------|-----------|-------------|
-| 37 | PREPARE | `EXEC SQL PREPARE S1 FROM :sqlStr;` | `SQLPrepare` (store handle) |
-| 38 | EXECUTE | `EXEC SQL EXECUTE S1 USING :v1, :v2;` | `SQLBindParameter` + `SQLExecute` |
-| 39 | EXECUTE IMMEDIATE | `EXEC SQL EXECUTE IMMEDIATE :sqlStr;` | `SQLExecDirect` |
+| 37 | ✅ PREPARE | `EXEC SQL PREPARE S1 FROM :sqlStr;` | `SQLPrepare` (store handle) |
+| 38 | ✅ EXECUTE | `EXEC SQL EXECUTE S1 USING :v1, :v2;` | `SQLBindParameter` + `SQLExecute` |
+| 39 | ✅ EXECUTE IMMEDIATE | `EXEC SQL EXECUTE IMMEDIATE :sqlStr;` | `SQLExecDirect` |
 
-#### Phase 6 — Advanced Features
+#### Phase 6 — Advanced Features ✅
 | # | Feature | RPG Syntax | ODBC Mapping |
 |---|---------|-----------|-------------|
 | 40 | Indicator variables | `:var :ind` | `SQLLEN` indicator in bind calls |
-| 41 | GET DIAGNOSTICS | `EXEC SQL GET DIAGNOSTICS :rc = ROW_COUNT;` | `SQLGetDiagRec` / `SQLGetDiagField` |
-| 42 | CALL procedures | `EXEC SQL CALL proc(:p1, :p2);` | `SQLPrepare("{CALL proc(?,?)}")` + bind |
-| 43 | SAVEPOINT | `EXEC SQL SAVEPOINT sp1;` | SQL passthrough (driver-dependent) |
-| 44 | Multiple-row FETCH | `FETCH ... FOR :n ROWS` | `SQL_ATTR_ROW_ARRAY_SIZE` + `SQLFetchScroll` |
-| 45 | Multiple-row INSERT | `INSERT ... FOR :n ROWS` | `SQL_ATTR_PARAMSET_SIZE` + array binding |
+| 41 | ✅ GET DIAGNOSTICS | `EXEC SQL GET DIAGNOSTICS :rc = ROW_COUNT;` | `SQLGetDiagRec` / `SQLGetDiagField` |
+| 42 | ✅ CALL procedures | `EXEC SQL CALL proc(:p1, :p2);` | `SQLPrepare("{CALL proc(?,?)}")` + bind |
+| 43 | ✅ SAVEPOINT | `EXEC SQL SAVEPOINT sp1;` | SQL passthrough (driver-dependent) |
+| 44 | ✅ Multiple-row FETCH | `FETCH ... FOR :n ROWS` | Loop with `SQLFetch` into array elements |
+| 45 | ✅ Multiple-row INSERT | `INSERT ... FOR :n ROWS` | Loop with `SQLExecute` per array element |
 
 #### Architecture Notes
 - **Lexer**: `EXEC SQL` triggers exclusive start condition `<SQL>`, captures until `;`
@@ -335,3 +337,11 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 74 | %CONCAT |
 | 75 | %TLOOKUP & %ELEM |
 | 76 | DS DIM(*VAR) |
+| 77 | Embedded SQL |
+| 78 | SQL in Procedures |
+| 79 | SQL Core Statements |
+| 80 | SQL Cursors |
+| 81 | Dynamic SQL |
+| 82 | SQL Advanced |
+| 83 | SQL Multi-row |
+| 84 | SQL Connect |

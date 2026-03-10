@@ -79,12 +79,458 @@ std::string CodeGen::paramTypeToString(const ParamDecl& p) {
     }
 }
 
+std::string CodeGen::escapeSqlForCpp(const std::string& sql) {
+    std::string result;
+    for (char c : sql) {
+        switch (c) {
+            case '\n': result += " "; break;
+            case '\r': break;
+            case '\t': result += " "; break;
+            case '"':  result += "\\\""; break;
+            case '\\': result += "\\\\"; break;
+            default:   result += c; break;
+        }
+    }
+    return result;
+}
+
+std::string CodeGen::sqlCommentText(const std::string& sql) {
+    // Replace newlines with spaces for single-line comment
+    std::string result;
+    for (char c : sql) {
+        if (c == '\n' || c == '\r') result += ' ';
+        else result += c;
+    }
+    return result;
+}
+
+void CodeGen::emitSqlBindParam(const std::string& var, int index, const std::string& handle) {
+    emitIndent();
+    out_ << "__sql_env.bindParam(" << handle << ", " << index << ", " << var << ");\n";
+}
+
+void CodeGen::emitSqlBindCol(const std::string& var, int index, const std::string& handle) {
+    emitIndent();
+    out_ << "SQLLEN __sql_ind_" << index << " = 0;\n";
+    emitIndent();
+    out_ << "__sql_env.bindCol(" << handle << ", " << index << ", " << var
+         << ", __sql_strbuf_" << index << ", sizeof(__sql_strbuf_" << index
+         << "), __sql_ind_" << index << ");\n";
+}
+
+void CodeGen::visit(ExecSqlStmt& node) {
+    uses_sql_ = true;
+    emitIndent();
+    out_ << "// EXEC SQL " << sqlCommentText(node.sql_text) << "\n";
+
+    switch (node.kind) {
+        case SqlStmtKind::COMMIT:
+            emitIndent();
+            out_ << "__sql_env.commit();\n";
+            break;
+        case SqlStmtKind::ROLLBACK:
+            emitIndent();
+            out_ << "__sql_env.rollback();\n";
+            break;
+        case SqlStmtKind::CONNECT: {
+            auto info = parseConnect(node.sql_text);
+            if (info.is_reset) {
+                emitIndent();
+                out_ << "__sql_env.disconnect();\n";
+            } else if (info.user == "__CONNSTR__") {
+                // Connection string mode: CONNECT USING :connStr
+                emitIndent();
+                out_ << "__sql_env.connectStr(" << info.server << ");\n";
+            } else if (!info.user.empty()) {
+                emitIndent();
+                out_ << "__sql_env.connect(" << info.server
+                     << ", " << info.user << ", " << info.password << ");\n";
+            } else {
+                emitIndent();
+                out_ << "__sql_env.connect(" << info.server << ");\n";
+            }
+            break;
+        }
+        case SqlStmtKind::DISCONNECT:
+            emitIndent();
+            out_ << "__sql_env.disconnect();\n";
+            break;
+        case SqlStmtKind::DECLARE_CURSOR: {
+            std::string cursor_name = extractCursorName(node.sql_text);
+            std::string query = extractCursorQuery(node.sql_text);
+            std::string parameterized = replaceHostVarsWithMarkers(query);
+            std::vector<std::string> host_vars = extractHostVariables(query);
+            emitIndent();
+            out_ << "__sql_env.declareCursor(\"" << cursor_name
+                 << "\", \"" << escapeSqlForCpp(parameterized) << "\");\n";
+            // Store host vars for binding at OPEN time
+            if (!host_vars.empty()) {
+                cursor_host_vars_[cursor_name] = host_vars;
+            }
+            break;
+        }
+        case SqlStmtKind::OPEN_CURSOR: {
+            std::string cursor_name = extractCursorName(node.sql_text);
+            auto it = cursor_host_vars_.find(cursor_name);
+            if (it != cursor_host_vars_.end() && !it->second.empty()) {
+                // Bind host variables before opening
+                emitIndent();
+                out_ << "{\n";
+                indent_++;
+                emitIndent();
+                out_ << "SQLHSTMT __cstmt = __sql_env.getCursorStmt(\"" << cursor_name << "\");\n";
+                emitIndent();
+                out_ << "__sql_env.clearParamBufs();\n";
+                for (size_t i = 0; i < it->second.size(); i++) {
+                    emitSqlBindParam(it->second[i], static_cast<int>(i + 1), "__cstmt");
+                }
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            }
+            emitIndent();
+            out_ << "__sql_env.openCursor(\"" << cursor_name << "\");\n";
+            break;
+        }
+        case SqlStmtKind::CLOSE_CURSOR: {
+            std::string cursor_name = extractCursorName(node.sql_text);
+            emitIndent();
+            out_ << "__sql_env.closeCursor(\"" << cursor_name << "\");\n";
+            break;
+        }
+        case SqlStmtKind::FETCH: {
+            std::string cursor_name = extractCursorName(node.sql_text);
+            std::vector<std::string> into_vars = extractFetchIntoVars(node.sql_text);
+            std::string rows_var;
+            bool multi_row = parseFetchForRows(node.sql_text, rows_var);
+
+            emitIndent();
+            out_ << "{\n";
+            indent_++;
+            emitIndent();
+            out_ << "SQLHSTMT __cstmt = __sql_env.getCursorStmt(\"" << cursor_name << "\");\n";
+
+            if (multi_row) {
+                // Multi-row FETCH: loop N times into array elements
+                emitIndent();
+                out_ << "for (int __ri = 0; __ri < " << rows_var << "; __ri++) {\n";
+                indent_++;
+
+                for (size_t i = 0; i < into_vars.size(); i++) {
+                    emitIndent();
+                    out_ << "char __sql_strbuf_" << (i+1) << "[4096] = {};\n";
+                }
+                for (size_t i = 0; i < into_vars.size(); i++) {
+                    // Bind to array element: VAR[__ri]
+                    emitIndent();
+                    out_ << "SQLLEN __sql_ind_" << (i+1) << " = 0;\n";
+                    emitIndent();
+                    out_ << "__sql_env.bindCol(__cstmt, " << (i+1) << ", "
+                         << into_vars[i] << "[__ri], __sql_strbuf_" << (i+1)
+                         << ", sizeof(__sql_strbuf_" << (i+1) << "), __sql_ind_" << (i+1) << ");\n";
+                }
+                emitIndent();
+                out_ << "SQLRETURN __frc = SQLFetch(__cstmt);\n";
+                emitIndent();
+                out_ << "__sql_env.updateStmtDiag(__cstmt, __frc);\n";
+                emitIndent();
+                out_ << "if (__frc != SQL_SUCCESS && __frc != SQL_SUCCESS_WITH_INFO) break;\n";
+                for (size_t i = 0; i < into_vars.size(); i++) {
+                    emitIndent();
+                    out_ << "RpgSqlEnv::copyStrBuf(" << into_vars[i]
+                         << "[__ri], __sql_strbuf_" << (i+1) << ", __frc);\n";
+                }
+
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            } else {
+                // Single-row FETCH
+                for (size_t i = 0; i < into_vars.size(); i++) {
+                    emitIndent();
+                    out_ << "char __sql_strbuf_" << (i+1) << "[4096] = {};\n";
+                }
+                for (size_t i = 0; i < into_vars.size(); i++) {
+                    emitSqlBindCol(into_vars[i], static_cast<int>(i + 1), "__cstmt");
+                }
+                emitIndent();
+                out_ << "SQLRETURN __frc = SQLFetch(__cstmt);\n";
+                emitIndent();
+                out_ << "__sql_env.updateStmtDiag(__cstmt, __frc);\n";
+                for (size_t i = 0; i < into_vars.size(); i++) {
+                    emitIndent();
+                    out_ << "RpgSqlEnv::copyStrBuf(" << into_vars[i]
+                         << ", __sql_strbuf_" << (i+1) << ", __frc);\n";
+                }
+            }
+
+            indent_--;
+            emitIndent();
+            out_ << "}\n";
+            break;
+        }
+        case SqlStmtKind::SELECT_INTO: {
+            // Strip INTO clause and bind result columns
+            std::vector<std::string> into_vars;
+            std::string stripped = stripSelectInto(node.sql_text, into_vars);
+            std::string parameterized = replaceHostVarsWithMarkers(stripped);
+            std::vector<std::string> host_vars = extractHostVariables(stripped);
+
+            emitIndent();
+            out_ << "{\n";
+            indent_++;
+            emitIndent();
+            out_ << "SQLHSTMT __hstmt = __sql_env.allocStmt();\n";
+            emitIndent();
+            out_ << "__sql_env.clearParamBufs();\n";
+            emitIndent();
+            out_ << "SQLPrepare(__hstmt, (SQLCHAR*)\"" << escapeSqlForCpp(parameterized) << "\", SQL_NTS);\n";
+
+            // Bind input parameters
+            for (size_t i = 0; i < host_vars.size(); i++) {
+                emitSqlBindParam(host_vars[i], static_cast<int>(i + 1));
+            }
+
+            // Declare string buffers for output columns (needed since bind happens before fetch)
+            for (size_t i = 0; i < into_vars.size(); i++) {
+                emitIndent();
+                out_ << "char __sql_strbuf_" << (i+1) << "[4096] = {};\n";
+            }
+
+            // Bind output columns
+            for (size_t i = 0; i < into_vars.size(); i++) {
+                emitSqlBindCol(into_vars[i], static_cast<int>(i + 1));
+            }
+
+            // Execute and fetch
+            emitIndent();
+            out_ << "SQLExecute(__hstmt);\n";
+            emitIndent();
+            out_ << "SQLRETURN __frc = SQLFetch(__hstmt);\n";
+            emitIndent();
+            out_ << "__sql_env.updateStmtDiag(__hstmt, __frc);\n";
+
+            // Copy string buffers back to string variables after fetch
+            for (size_t i = 0; i < into_vars.size(); i++) {
+                emitIndent();
+                out_ << "RpgSqlEnv::copyStrBuf(" << into_vars[i]
+                     << ", __sql_strbuf_" << (i+1) << ", __frc);\n";
+            }
+
+            emitIndent();
+            out_ << "SQLFreeHandle(SQL_HANDLE_STMT, __hstmt);\n";
+            indent_--;
+            emitIndent();
+            out_ << "}\n";
+            break;
+        }
+        case SqlStmtKind::PREPARE: {
+            std::string stmt_name, from_var;
+            parsePrepare(node.sql_text, stmt_name, from_var);
+            emitIndent();
+            out_ << "__sql_env.prepareStmt(\"" << stmt_name << "\", " << from_var << ");\n";
+            break;
+        }
+        case SqlStmtKind::EXECUTE: {
+            std::string stmt_name;
+            std::vector<std::string> using_vars;
+            parseExecute(node.sql_text, stmt_name, using_vars);
+            if (!using_vars.empty()) {
+                emitIndent();
+                out_ << "{\n";
+                indent_++;
+                emitIndent();
+                out_ << "SQLHSTMT __pstmt = __sql_env.getPreparedStmt(\"" << stmt_name << "\");\n";
+                emitIndent();
+                out_ << "__sql_env.clearParamBufs();\n";
+                for (size_t i = 0; i < using_vars.size(); i++) {
+                    emitSqlBindParam(using_vars[i], static_cast<int>(i + 1), "__pstmt");
+                }
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            }
+            emitIndent();
+            out_ << "__sql_env.executeStmt(\"" << stmt_name << "\");\n";
+            break;
+        }
+        case SqlStmtKind::EXECUTE_IMMEDIATE: {
+            std::string host_var = parseExecuteImmediate(node.sql_text);
+            if (!host_var.empty()) {
+                emitIndent();
+                out_ << "__sql_env.execDirect(" << host_var << ");\n";
+            } else {
+                // Literal SQL after EXECUTE IMMEDIATE (no host var)
+                std::string upper = node.sql_text;
+                for (auto& c : upper) c = toupper(static_cast<unsigned char>(c));
+                size_t pos = upper.find("IMMEDIATE");
+                if (pos != std::string::npos) {
+                    pos += 9;
+                    while (pos < node.sql_text.size() && std::isspace(static_cast<unsigned char>(node.sql_text[pos]))) pos++;
+                    std::string literal_sql = node.sql_text.substr(pos);
+                    emitIndent();
+                    out_ << "__sql_env.execDirect(\"" << escapeSqlForCpp(literal_sql) << "\");\n";
+                }
+            }
+            break;
+        }
+        case SqlStmtKind::GET_DIAGNOSTICS: {
+            auto items = parseGetDiagnostics(node.sql_text);
+            for (auto& item : items) {
+                emitIndent();
+                if (item.item == "ROW_COUNT") {
+                    out_ << item.var << " = static_cast<int>(__sql_env.row_count);\n";
+                } else if (item.item == "DB2_RETURN_STATUS" || item.item == "RETURN_STATUS") {
+                    out_ << item.var << " = __sql_env.sqlcode;\n";
+                } else {
+                    out_ << item.var << " = __sql_env.sqlcode; // GET DIAGNOSTICS " << item.item << "\n";
+                }
+            }
+            break;
+        }
+        case SqlStmtKind::CALL: {
+            std::string proc_name;
+            std::vector<std::string> params;
+            parseCall(node.sql_text, proc_name, params);
+            std::string call_sql = "{CALL " + proc_name + "(";
+            for (size_t i = 0; i < params.size(); i++) {
+                if (i > 0) call_sql += ", ";
+                call_sql += "?";
+            }
+            call_sql += ")}";
+            if (params.empty()) {
+                emitIndent();
+                out_ << "__sql_env.execDirect(\"" << escapeSqlForCpp(call_sql) << "\");\n";
+            } else {
+                emitIndent();
+                out_ << "{\n";
+                indent_++;
+                emitIndent();
+                out_ << "SQLHSTMT __hstmt = __sql_env.allocStmt();\n";
+                emitIndent();
+                out_ << "__sql_env.clearParamBufs();\n";
+                emitIndent();
+                out_ << "SQLPrepare(__hstmt, (SQLCHAR*)\"" << escapeSqlForCpp(call_sql) << "\", SQL_NTS);\n";
+                for (size_t i = 0; i < params.size(); i++) {
+                    emitSqlBindParam(params[i], static_cast<int>(i + 1));
+                }
+                emitIndent();
+                out_ << "SQLRETURN __erc = SQLExecute(__hstmt);\n";
+                emitIndent();
+                out_ << "__sql_env.updateStmtDiag(__hstmt, __erc);\n";
+                emitIndent();
+                out_ << "SQLFreeHandle(SQL_HANDLE_STMT, __hstmt);\n";
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            }
+            break;
+        }
+        default: {
+            // Check for multi-row INSERT (FOR :n ROWS)
+            std::string rows_var, stripped_sql;
+            bool multi_row = parseInsertForRows(node.sql_text, rows_var, stripped_sql);
+            std::string sql_text = multi_row ? stripped_sql : node.sql_text;
+
+            // General case: prepare + bind params + execute (INSERT/UPDATE/DELETE/other)
+            std::vector<std::string> host_vars = extractHostVariables(sql_text);
+            std::string parameterized = replaceHostVarsWithMarkers(sql_text);
+
+            if (host_vars.empty() && !multi_row) {
+                // Simple execution, no host variables
+                emitIndent();
+                out_ << "__sql_env.execDirect(\"" << escapeSqlForCpp(parameterized) << "\");\n";
+            } else if (multi_row && !host_vars.empty()) {
+                // Multi-row INSERT: loop N times with array element bindings
+                emitIndent();
+                out_ << "{\n";
+                indent_++;
+                emitIndent();
+                out_ << "SQLHSTMT __hstmt = __sql_env.allocStmt();\n";
+                emitIndent();
+                out_ << "SQLPrepare(__hstmt, (SQLCHAR*)\"" << escapeSqlForCpp(parameterized) << "\", SQL_NTS);\n";
+                emitIndent();
+                out_ << "for (int __ri = 0; __ri < " << rows_var << "; __ri++) {\n";
+                indent_++;
+                emitIndent();
+                out_ << "__sql_env.clearParamBufs();\n";
+                for (size_t i = 0; i < host_vars.size(); i++) {
+                    emitIndent();
+                    out_ << "__sql_env.bindParam(__hstmt, " << (i+1) << ", "
+                         << host_vars[i] << "[__ri]);\n";
+                }
+                emitIndent();
+                out_ << "SQLRETURN __erc = SQLExecute(__hstmt);\n";
+                emitIndent();
+                out_ << "__sql_env.updateStmtDiag(__hstmt, __erc);\n";
+                emitIndent();
+                out_ << "if (__erc != SQL_SUCCESS && __erc != SQL_SUCCESS_WITH_INFO) break;\n";
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+                emitIndent();
+                out_ << "SQLFreeHandle(SQL_HANDLE_STMT, __hstmt);\n";
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            } else {
+                emitIndent();
+                out_ << "{\n";
+                indent_++;
+                emitIndent();
+                out_ << "SQLHSTMT __hstmt = __sql_env.allocStmt();\n";
+                emitIndent();
+                out_ << "__sql_env.clearParamBufs();\n";
+                emitIndent();
+                out_ << "SQLPrepare(__hstmt, (SQLCHAR*)\"" << escapeSqlForCpp(parameterized) << "\", SQL_NTS);\n";
+
+                for (size_t i = 0; i < host_vars.size(); i++) {
+                    emitSqlBindParam(host_vars[i], static_cast<int>(i + 1));
+                }
+
+                emitIndent();
+                out_ << "SQLRETURN __erc = SQLExecute(__hstmt);\n";
+                emitIndent();
+                out_ << "__sql_env.updateStmtDiag(__hstmt, __erc);\n";
+                emitIndent();
+                out_ << "SQLFreeHandle(SQL_HANDLE_STMT, __hstmt);\n";
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            }
+            break;
+        }
+    }
+}
+
 void CodeGen::visit(Program& node) {
     // Store date/time format settings
     datfmt_ = node.datfmt;
     timfmt_ = node.timfmt;
 
+    // Scan for EXEC SQL usage to set uses_sql_ flag
+    for (auto& stmt : node.statements) {
+        if (dynamic_cast<ExecSqlStmt*>(stmt.get())) {
+            uses_sql_ = true;
+            break;
+        }
+        // Also check inside procedures
+        auto* proc = dynamic_cast<DclProc*>(stmt.get());
+        if (proc) {
+            for (auto& s : proc->body) {
+                if (dynamic_cast<ExecSqlStmt*>(s.get())) {
+                    uses_sql_ = true;
+                    break;
+                }
+            }
+        }
+        if (uses_sql_) break;
+    }
+
     out_ << "#include \"rpg_runtime.h\"\n";
+    if (uses_sql_) {
+        out_ << "#include \"rpg_sql_runtime.h\"\n";
+    }
     out_ << "#include <algorithm>\n";
     out_ << "#include <array>\n";
     out_ << "#include <cmath>\n";
@@ -131,6 +577,11 @@ void CodeGen::visit(Program& node) {
     // Emit EXPORT/IMPORT declarations at file scope
     for (auto* s : export_decls) {
         s->accept(*this);
+    }
+
+    // Emit global SQL env if needed
+    if (uses_sql_) {
+        out_ << "static RpgSqlEnv __sql_env;\n\n";
     }
 
     // Emit prototypes and procedures
@@ -983,6 +1434,18 @@ void CodeGen::visit(IndicatorExpr& node) {
 }
 
 void CodeGen::visit(Identifier& node) {
+    // Map SQL diagnostic variables
+    if (uses_sql_) {
+        if (node.name == "SQLCOD" || node.name == "SQLCODE") {
+            expr_ << "__sql_env.sqlcode";
+            return;
+        }
+        if (node.name == "SQLSTT" || node.name == "SQLSTATE") {
+            expr_ << "__sql_env.sqlstate";
+            return;
+        }
+    }
+
     // Check if this identifier is an *OMIT parameter (pointer type) — dereference it
     if (!current_proc_name_.empty()) {
         auto pit = nopass_proc_params_.find(current_proc_name_);

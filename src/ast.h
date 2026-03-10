@@ -478,6 +478,39 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// --- Embedded SQL ---
+
+enum class SqlStmtKind {
+    SELECT_INTO,
+    INSERT,
+    UPDATE,
+    DELETE_SQL,
+    COMMIT,
+    ROLLBACK,
+    DECLARE_CURSOR,
+    OPEN_CURSOR,
+    FETCH,
+    CLOSE_CURSOR,
+    CONNECT,
+    DISCONNECT,
+    SET_CONNECTION,
+    PREPARE,
+    EXECUTE,
+    EXECUTE_IMMEDIATE,
+    GET_DIAGNOSTICS,
+    CALL,
+    SET,
+    OTHER
+};
+
+class ExecSqlStmt : public Statement {
+public:
+    std::string sql_text;      // raw SQL text (after "EXEC SQL")
+    SqlStmtKind kind;
+    ExecSqlStmt(std::string sql_text, SqlStmtKind kind);
+    void accept(ASTVisitor& visitor) override;
+};
+
 // --- Program ---
 
 class Program : public ASTNode {
@@ -552,6 +585,7 @@ public:
     virtual void visit(ForEachStmt& node) = 0;
     virtual void visit(InExpr& node) = 0;
     virtual void visit(DclEnum& node) = 0;
+    virtual void visit(ExecSqlStmt& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 

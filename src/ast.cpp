@@ -149,6 +149,10 @@ void InExpr::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 void DclEnum::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+ExecSqlStmt::ExecSqlStmt(std::string sql_text, SqlStmtKind kind)
+    : sql_text(std::move(sql_text)), kind(kind) {}
+void ExecSqlStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 } // namespace rpg
