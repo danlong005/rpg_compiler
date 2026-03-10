@@ -1,49 +1,38 @@
 **FREE
 
-// Test 84: SQL Connection Management
-// Tests CONNECT (DSN, user/pass, connection string), DISCONNECT, CONNECT RESET
+// Test 84: SQL Connection — CONNECT USING, DISCONNECT, CONNECT RESET
 
-DCL-S dsn       VARCHAR(100);
-DCL-S dbUser    VARCHAR(50);
-DCL-S dbPass    VARCHAR(50);
 DCL-S connStr   VARCHAR(256);
 DCL-S empName   VARCHAR(50);
 DCL-S empId     INT(10);
+DCL-S count     INT(10);
 
-// Connect using DSN with user/password
-dsn = 'MYDB';
-dbUser = 'admin';
-dbPass = 'secret';
-EXEC SQL CONNECT TO :dsn USER :dbUser USING :dbPass;
+// Connect using connection string
+connStr = 'Driver={SQLite3};Database=/tmp/rpgc_test84.sqlite;';
+EXEC SQL CONNECT USING :connStr;
 
-// Do some work
+EXEC SQL CREATE TABLE emp84 (id INTEGER, name VARCHAR(50));
+EXEC SQL INSERT INTO emp84 VALUES(1, 'Alice');
+EXEC SQL INSERT INTO emp84 VALUES(2, 'Bob');
+
 empId = 1;
-EXEC SQL SELECT name INTO :empName
-  FROM employees WHERE id = :empId;
-
+EXEC SQL SELECT name INTO :empName FROM emp84 WHERE id = :empId;
 DSPLY empName;
 
 // Disconnect
 EXEC SQL DISCONNECT;
 
-// Connect with DSN only (no user/password)
-dsn = 'TESTDB';
-EXEC SQL CONNECT TO :dsn;
-
-EXEC SQL CREATE TABLE temp_test (id INTEGER);
-EXEC SQL DROP TABLE temp_test;
-
-// Disconnect and reconnect using connection string
-EXEC SQL DISCONNECT;
-
-connStr = 'Driver={SQLite3};Database=test.db';
+// Reconnect
 EXEC SQL CONNECT USING :connStr;
 
-EXEC SQL CREATE TABLE temp_test2 (id INTEGER);
-EXEC SQL DROP TABLE temp_test2;
+EXEC SQL SELECT COUNT(*) INTO :count FROM emp84;
+DSPLY 'Count=' + %CHAR(count);
 
-// Use CONNECT RESET to disconnect
+// CONNECT RESET
+EXEC SQL DROP TABLE emp84;
 EXEC SQL CONNECT RESET;
+
+DSPLY 'Connection test passed';
 
 *INLR = *ON;
 RETURN;

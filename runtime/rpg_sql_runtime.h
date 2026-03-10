@@ -10,6 +10,7 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -90,6 +91,9 @@ public:
         SQLHSTMT hstmt = allocStmt();
         SQLRETURN rc = SQLExecDirect(hstmt, (SQLCHAR*)sql.c_str(), SQL_NTS);
         updateDiag(SQL_HANDLE_STMT, hstmt, rc);
+        if (rc == SQL_SUCCESS || rc == SQL_SUCCESS_WITH_INFO) {
+            SQLRowCount(hstmt, &row_count);
+        }
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     }
 
@@ -245,9 +249,10 @@ public:
     }
 
     // Parameter buffers (persist until next statement execution)
-    std::vector<std::string> param_bufs_;
-    std::vector<SQLINTEGER> param_int_bufs_;
-    std::vector<SQLDOUBLE> param_dbl_bufs_;
+    // Using deque to avoid pointer invalidation on push_back (vector reallocates)
+    std::deque<std::string> param_bufs_;
+    std::deque<SQLINTEGER> param_int_bufs_;
+    std::deque<SQLDOUBLE> param_dbl_bufs_;
 
 private:
     void updateDiag(SQLSMALLINT handleType, SQLHANDLE handle, SQLRETURN rc) {

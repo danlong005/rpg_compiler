@@ -1,31 +1,43 @@
 **free
 
+// Test 86: SQL end-to-end with data structure FETCH INTO
 
 dcl-ds row qualified;
   id packed(10:0);
-  firstName varchar(100);
-  lastName varchar(100);
+  name varchar(50);
+  salary varchar(20);
 end-ds;
 
-dcl-s connectionString varchar(100);
+dcl-s connStr varchar(200);
 
-connectionString = 'Driver={PostgreSQL};Server=localhost;Port=5432;Database=cobol;Uid=admin;Pwd=password;';
+connStr = 'Driver={SQLite3};Database=/tmp/rpgc_test86.sqlite;';
+exec sql connect using :connStr;
 
-exec sql connect using :connectionString;
+exec sql create table emp86 (
+  id integer primary key,
+  name varchar(50),
+  salary decimal(9,2)
+);
 
-exec sql declare c1 cursor for 
-         select id, fname, lname
-         from employees;
+exec sql insert into emp86 values(1, 'Alice', 75000.00);
+exec sql insert into emp86 values(2, 'Bob', 65000.00);
+exec sql insert into emp86 values(3, 'Charlie', 90000.00);
+
+exec sql declare c1 cursor for
+         select id, name, salary from emp86 order by id;
 
 exec sql open c1;
 
 exec sql fetch next from c1 into :row;
 dow sqlstate < '02000';
-  dsply 'Id: ' + %trim(%char(row.id)) + ', First Name: ' + %trim(row.firstName); 
+  dsply %trim(%char(row.id)) + ' ' + %trim(row.name) + ' ' + %trim(row.salary);
   exec sql fetch next from c1 into :row;
 enddo;
 
 exec sql close c1;
+
+exec sql drop table emp86;
+exec sql disconnect;
 
 *inlr = *on;
 return;

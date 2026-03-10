@@ -1,8 +1,34 @@
 **FREE
 
-// Test 78: Embedded SQL in procedures and mixed with regular code
+// Test 78: Embedded SQL in procedures
 
-DCL-S result VARCHAR(100);
+DCL-S connStr VARCHAR(200);
+DCL-S result  VARCHAR(100);
+
+connStr = 'Driver={SQLite3};Database=/tmp/rpgc_test78.sqlite;';
+EXEC SQL CONNECT USING :connStr;
+
+EXEC SQL CREATE TABLE emp78 (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(50),
+  salary DECIMAL(9,2)
+);
+
+EXEC SQL INSERT INTO emp78 VALUES(1, 'Alice', 75000.00);
+EXEC SQL INSERT INTO emp78 VALUES(2, 'Bob', 65000.00);
+
+result = GetEmployeeName(1);
+DSPLY result;
+
+UpdateSalary(2 : 5000.00);
+
+result = GetEmployeeName(2);
+DSPLY result;
+
+EXEC SQL DROP TABLE emp78;
+EXEC SQL DISCONNECT;
+
+*INLR = *ON;
 
 DCL-PROC GetEmployeeName;
   DCL-PI VARCHAR(100);
@@ -11,7 +37,7 @@ DCL-PROC GetEmployeeName;
 
   DCL-S empName VARCHAR(100);
 
-  EXEC SQL SELECT name INTO :empName FROM employees WHERE id = :empId;
+  EXEC SQL SELECT name INTO :empName FROM emp78 WHERE id = :empId;
 
   RETURN empName;
 END-PROC;
@@ -22,13 +48,7 @@ DCL-PROC UpdateSalary;
     amount PACKED(9:2) VALUE;
   END-PI;
 
-  EXEC SQL UPDATE employees SET salary = salary + :amount WHERE id = :empId;
+  EXEC SQL UPDATE emp78 SET salary = salary + :amount WHERE id = :empId;
   EXEC SQL COMMIT;
 
 END-PROC;
-
-// No SQL in main body - just regular code
-result = 'Test 78 passed';
-DSPLY result;
-
-*INLR = *ON;

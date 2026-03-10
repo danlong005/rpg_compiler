@@ -1,0 +1,5 @@
+ptr1 not null
+ptr2 is null
+ptr2 copied
+String pointer ok
+8

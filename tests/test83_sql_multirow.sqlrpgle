@@ -1,22 +1,24 @@
 **FREE
 
-// Test 83: Multiple-row FETCH and INSERT
-// Tests FOR :n ROWS syntax
+// Test 83: Multi-row FETCH and INSERT
 
+DCL-S connStr   VARCHAR(200);
 DCL-S ids       INT(10) DIM(10);
 DCL-S names     VARCHAR(50) DIM(10);
 DCL-S salaries  PACKED(9:2) DIM(10);
 DCL-S nRows     INT(10);
 DCL-S i         INT(10);
 
-// Create table
-EXEC SQL CREATE TABLE mrtest (
+connStr = 'Driver={SQLite3};Database=/tmp/rpgc_test83.sqlite;';
+EXEC SQL CONNECT USING :connStr;
+
+EXEC SQL CREATE TABLE mr83 (
   id INTEGER,
   name VARCHAR(50),
   salary DECIMAL(9,2)
 );
 
-// Populate with single inserts
+// Set up arrays
 ids(1) = 1;
 names(1) = 'Alice';
 salaries(1) = 75000.00;
@@ -29,32 +31,36 @@ salaries(3) = 90000.00;
 
 // Multi-row INSERT
 nRows = 3;
-EXEC SQL INSERT INTO mrtest (id, name, salary)
+EXEC SQL INSERT INTO mr83 (id, name, salary)
   VALUES(:ids, :names, :salaries)
   FOR :nRows ROWS;
 
-// Declare cursor for reading back
+// Read back with cursor + multi-row FETCH
 EXEC SQL DECLARE mrCur CURSOR FOR
-  SELECT id, name, salary FROM mrtest ORDER BY id;
+  SELECT id, name, salary FROM mr83 ORDER BY id;
 
 EXEC SQL OPEN mrCur;
 
-// Multi-row FETCH
+// Clear arrays before fetch
+FOR i = 1 TO 10;
+  ids(i) = 0;
+  names(i) = '';
+  salaries(i) = 0;
+ENDFOR;
+
 nRows = 10;
 EXEC SQL FETCH mrCur FOR :nRows ROWS
   INTO :ids, :names, :salaries;
 
 EXEC SQL CLOSE mrCur;
 
-// Display results
+// Display fetched results
 FOR i = 1 TO 3;
-  DSPLY %CHAR(ids(i));
-  DSPLY names(i);
-  DSPLY %CHAR(salaries(i));
+  DSPLY %CHAR(ids(i)) + ' ' + names(i) + ' ' + %CHAR(salaries(i));
 ENDFOR;
 
-// Cleanup
-EXEC SQL DROP TABLE mrtest;
+EXEC SQL DROP TABLE mr83;
+EXEC SQL DISCONNECT;
 
 *INLR = *ON;
 RETURN;
