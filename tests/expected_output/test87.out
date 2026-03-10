@@ -1,0 +1,16 @@
+Order: 1001
+Customer: Acme Corp
+Item: Widget
+Qty: 25
+Price: 19.990000
+Name: Alice
+Age: 30
+City: Boston
+Host: localhost
+Port: 8080
+Debug: true
+X: 42
+Y: 0
+Label: []
+Text: Price < $10 & tax
+Sender: Smith

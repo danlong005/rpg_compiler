@@ -525,28 +525,27 @@ void CodeGen::visit(Program& node) {
     datfmt_ = node.datfmt;
     timfmt_ = node.timfmt;
 
-    // Scan for EXEC SQL usage to set uses_sql_ flag
+    // Scan for EXEC SQL / XML-INTO usage to set feature flags
     for (auto& stmt : node.statements) {
-        if (dynamic_cast<ExecSqlStmt*>(stmt.get())) {
-            uses_sql_ = true;
-            break;
-        }
+        if (dynamic_cast<ExecSqlStmt*>(stmt.get())) uses_sql_ = true;
+        if (dynamic_cast<XmlIntoStmt*>(stmt.get())) uses_xml_ = true;
         // Also check inside procedures
         auto* proc = dynamic_cast<DclProc*>(stmt.get());
         if (proc) {
             for (auto& s : proc->body) {
-                if (dynamic_cast<ExecSqlStmt*>(s.get())) {
-                    uses_sql_ = true;
-                    break;
-                }
+                if (dynamic_cast<ExecSqlStmt*>(s.get())) uses_sql_ = true;
+                if (dynamic_cast<XmlIntoStmt*>(s.get())) uses_xml_ = true;
             }
         }
-        if (uses_sql_) break;
+        if (uses_sql_ && uses_xml_) break;
     }
 
     out_ << "#include \"rpg_runtime.h\"\n";
     if (uses_sql_) {
         out_ << "#include \"rpg_sql_runtime.h\"\n";
+    }
+    if (uses_xml_) {
+        out_ << "#include \"rpg_xml_runtime.h\"\n";
     }
     out_ << "#include <algorithm>\n";
     out_ << "#include <array>\n";
@@ -1295,6 +1294,9 @@ void CodeGen::visit(DclDS& node) {
             out_ << "; // OVERLAY(" << f.overlay_field;
             if (f.overlay_pos > 0) out_ << ":" << f.overlay_pos;
             out_ << ")\n";
+        } else if (!f.likeds.empty()) {
+            // LIKEDS subfield: emit nested struct type
+            out_ << "    " << f.likeds << "_t " << f.name << ";\n";
         } else if (f.pos > 0) {
             // POS field: emit with comment showing position
             out_ << "    " << typeToString(f.type, f.length) << " " << f.name;
@@ -2233,6 +2235,162 @@ void CodeGen::visit(EvalCorrStmt& node) {
                     break;
                 }
             }
+        }
+    }
+}
+
+void CodeGen::visit(XmlIntoStmt& node) {
+    // Look up target DS definition
+    auto it = ds_defs_.find(node.target);
+    if (it == ds_defs_.end()) {
+        emitIndent();
+        out_ << "// XML-INTO: unknown target DS '" << node.target << "'\n";
+        return;
+    }
+    DclDS* ds = it->second;
+
+    // Determine options string
+    std::string opts_expr;
+    if (node.options) {
+        opts_expr = emitExpr(*node.options);
+    } else {
+        opts_expr = "\"\"";
+    }
+
+    std::string xml_expr = emitExpr(*node.xml_source);
+
+    // Parse the XML into a document
+    emitIndent();
+    out_ << "{\n";
+    indent_++;
+    emitIndent();
+    out_ << "RpgXmlDoc __xml_doc = rpg_xml_parse(" << xml_expr << ");\n";
+    emitIndent();
+    out_ << "std::string __xml_opts = " << opts_expr << ";\n";
+    emitIndent();
+    out_ << "bool __xml_case_any = (__xml_opts.find(\"case=any\") != std::string::npos || "
+         << "__xml_opts.find(\"case=upper\") != std::string::npos);\n";
+
+    // Parse path= option if present
+    emitIndent();
+    out_ << "const RpgXmlNode* __xml_root = &__xml_doc.root;\n";
+    emitIndent();
+    out_ << "{\n";
+    indent_++;
+    emitIndent();
+    out_ << "auto __path_pos = __xml_opts.find(\"path=\");\n";
+    emitIndent();
+    out_ << "if (__path_pos != std::string::npos) {\n";
+    indent_++;
+    emitIndent();
+    out_ << "auto __path_start = __path_pos + 5;\n";
+    emitIndent();
+    out_ << "auto __path_end = __xml_opts.find(' ', __path_start);\n";
+    emitIndent();
+    out_ << "std::string __path = (__path_end == std::string::npos) ? "
+         << "__xml_opts.substr(__path_start) : __xml_opts.substr(__path_start, __path_end - __path_start);\n";
+    emitIndent();
+    out_ << "auto* __nav = rpg_xml_navigate(*__xml_root, __path, __xml_case_any);\n";
+    emitIndent();
+    out_ << "if (__nav) __xml_root = __nav;\n";
+    indent_--;
+    emitIndent();
+    out_ << "}\n";
+    indent_--;
+    emitIndent();
+    out_ << "}\n";
+
+    // Check if target is an array DS — if so, iterate XML children
+    bool is_array = (ds->dim > 0 || ds->dim_type != 0);
+    if (is_array) {
+        bool is_vector = (ds->dim_type == 1 || ds->dim_type == 2);
+        emitIndent();
+        out_ << "auto& __xml_children = __xml_root->children;\n";
+        if (is_vector) {
+            // DIM(*VAR) / DIM(*AUTO) — push_back into vector
+            emitIndent();
+            out_ << "for (size_t __xml_i = 0; __xml_i < __xml_children.size() && static_cast<int>(__xml_i) < "
+                 << ds->dim << "; __xml_i++) {\n";
+            indent_++;
+            emitIndent();
+            out_ << "auto& __xml_src = __xml_children[__xml_i];\n";
+            emitIndent();
+            out_ << node.target << ".push_back({});\n";
+            emitIndent();
+            out_ << "auto& __xml_tgt = " << node.target << ".back();\n";
+        } else {
+            // Fixed DIM — index into std::array
+            emitIndent();
+            out_ << "for (size_t __xml_i = 0; __xml_i < __xml_children.size() && __xml_i < "
+                 << node.target << ".size(); __xml_i++) {\n";
+            indent_++;
+            emitIndent();
+            out_ << "auto& __xml_src = __xml_children[__xml_i];\n";
+            emitIndent();
+            out_ << "auto& __xml_tgt = " << node.target << "[__xml_i];\n";
+        }
+        // Emit field assignments for array element
+        emitXmlFieldAssignments(ds, "__xml_tgt", "__xml_src");
+        indent_--;
+        emitIndent();
+        out_ << "}\n";
+    } else {
+        emitIndent();
+        out_ << "auto& __xml_src = *__xml_root;\n";
+        // Emit field assignments for scalar
+        emitXmlFieldAssignments(ds, node.target, "__xml_src");
+    }
+
+    indent_--;
+    emitIndent();
+    out_ << "}\n";
+}
+
+void CodeGen::emitXmlFieldAssignments(DclDS* ds, const std::string& target, const std::string& xml_src) {
+    for (auto& f : ds->fields) {
+        if (!f.likeds.empty()) {
+            // Nested DS — find child node and extract recursively
+            auto nested_it = ds_defs_.find(f.likeds);
+            if (nested_it != ds_defs_.end()) {
+                emitIndent();
+                out_ << "{\n";
+                indent_++;
+                emitIndent();
+                out_ << "const RpgXmlNode* __nested_" << f.name << " = rpg_xml_find("
+                     << xml_src << ", \"" << f.name << "\", __xml_case_any);\n";
+                emitIndent();
+                out_ << "if (__nested_" << f.name << ") {\n";
+                indent_++;
+                std::string nested_target = target + "." + f.name;
+                std::string nested_src = "*__nested_" + f.name;
+                emitXmlFieldAssignments(nested_it->second, nested_target, nested_src);
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            }
+            continue;
+        }
+        emitIndent();
+        switch (f.type) {
+            case RPGType::INT10:
+            case RPGType::UNS:
+                out_ << target << "." << f.name << " = rpg_xml_get_int("
+                     << xml_src << ", \"" << f.name << "\", __xml_case_any);\n";
+                break;
+            case RPGType::PACKED:
+            case RPGType::ZONED:
+            case RPGType::FLOAT4:
+            case RPGType::FLOAT8:
+                out_ << target << "." << f.name << " = rpg_xml_get_double("
+                     << xml_src << ", \"" << f.name << "\", __xml_case_any);\n";
+                break;
+            default:
+                out_ << target << "." << f.name << " = rpg_xml_get_str("
+                     << xml_src << ", \"" << f.name << "\", __xml_case_any);\n";
+                break;
         }
     }
 }

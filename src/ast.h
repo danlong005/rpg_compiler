@@ -412,6 +412,17 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// XML-INTO statement
+class XmlIntoStmt : public Statement {
+public:
+    std::string target;                          // target DS variable
+    std::unique_ptr<Expression> xml_source;      // XML string expression
+    std::unique_ptr<Expression> options;          // options string (e.g., 'case=any')
+    XmlIntoStmt(std::string target, std::unique_ptr<Expression> xml_source,
+                std::unique_ptr<Expression> options);
+    void accept(ASTVisitor& visitor) override;
+};
+
 // --- Data Structures ---
 
 struct DSField {
@@ -423,6 +434,7 @@ struct DSField {
     std::string overlay_field;
     int overlay_pos = 0;
     int pos = 0;
+    std::string likeds;  // LIKEDS subfield — nested DS type name
 };
 
 class DclDS : public Statement {
@@ -586,6 +598,7 @@ public:
     virtual void visit(InExpr& node) = 0;
     virtual void visit(DclEnum& node) = 0;
     virtual void visit(ExecSqlStmt& node) = 0;
+    virtual void visit(XmlIntoStmt& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 

@@ -287,6 +287,11 @@ run_test "85" "%%GETENV" "$TESTDIR/test85_getenv.rpgle" "run"
 # Test 86: SQL end-to-end
 run_test "86" "SQL End-to-End" "$TESTDIR/test86.sqlrpgle" "run-sql"
 
+# Tests 87-89: XML-INTO
+run_test "87" "XML-INTO" "$TESTDIR/test87.rpgle" "run"
+run_test "88" "XML-INTO Array DS" "$TESTDIR/test88.rpgle" "run"
+run_test "89" "XML-INTO Path+Nested" "$TESTDIR/test89.rpgle" "run"
+
 echo ""
 echo "========================================"
 echo -e "  Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"

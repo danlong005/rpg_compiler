@@ -57,6 +57,7 @@ public:
     void visit(InExpr& node) override;
     void visit(DclEnum& node) override;
     void visit(ExecSqlStmt& node) override;
+    void visit(XmlIntoStmt& node) override;
     void visit(Program& node) override;
 
 private:
@@ -71,6 +72,7 @@ private:
     std::string datfmt_; // default date format (e.g., "*ISO", "*USA", "*MDY")
     std::string timfmt_; // default time format
     bool uses_sql_ = false; // program contains EXEC SQL statements
+    bool uses_xml_ = false; // program contains XML-INTO statements
 
     void emitIndent();
     void emitStatements(std::vector<std::unique_ptr<Statement>>& stmts);
@@ -81,6 +83,9 @@ private:
     int countRequiredParams(const std::vector<ParamDecl>& params);
     std::string fieldTypeDefault(RPGType type, int length);
     std::string figConstValue(const std::string& name, RPGType type, const std::string& var_name);
+
+    // XML-INTO codegen helpers
+    void emitXmlFieldAssignments(DclDS* ds, const std::string& target, const std::string& xml_src);
 
     // SQL codegen helpers
     void emitSqlBindParam(const std::string& var, int index, const std::string& handle = "__hstmt");

@@ -144,7 +144,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token BIF_PADDR BIF_PROC
 %token BIF_PASSED BIF_OMITTED
 %token BIF_BITAND BIF_BITNOT BIF_BITOR BIF_BITXOR
-%token BIF_SCANR BIF_EDITFLT BIF_UNSH BIF_PARMNUM BIF_GETENV
+%token BIF_SCANR BIF_EDITFLT BIF_UNSH BIF_PARMNUM BIF_GETENV BIF_XML
 %token KW_ALL
 %token KW_UNS KW_FLOAT_TYPE KW_BINDEC KW_UCS2 KW_GRAPH KW_OBJECT KW_JAVA
 %token KW_OVERLAY KW_POS KW_PREFIX KW_DATFMT KW_TIMFMT KW_EXTNAME
@@ -154,7 +154,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token <sval> EXEC_SQL_TEXT
 %token POWER
 %token KW_DIM_VAR KW_DIM_AUTO
-%token KW_FOR_EACH KW_IN
+%token KW_FOR_EACH KW_IN KW_XML_INTO
 %token <sval> IDENTIFIER
 %token <ival> INTEGER_LITERAL
 %token <fval> FLOAT_LITERAL
@@ -168,7 +168,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <stmt> statement dcl_f_stmt dcl_s_stmt dcl_c_stmt eval_stmt eval_corr_stmt evalr_stmt dsply_stmt inlr_stmt return_stmt expr_stmt reset_stmt clear_stmt sorta_stmt callp_stmt leavesr_stmt dealloc_stmt test_stmt
 %type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
-%type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt
+%type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt xml_into_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
 %type <expr_list> arg_list call_arg_list call_args_opt
 %type <stmt_list> statement_list
@@ -259,6 +259,7 @@ statement:
     | dealloc_stmt  { $$ = $1; SET_LINE($$); }
     | test_stmt     { $$ = $1; SET_LINE($$); }
     | exec_sql_stmt { $$ = $1; SET_LINE($$); }
+    | xml_into_stmt { $$ = $1; SET_LINE($$); }
     | expr_stmt   { $$ = $1; SET_LINE($$); }
     | error SEMICOLON { $$ = nullptr; yyerrok; }
     ;
@@ -581,6 +582,21 @@ eval_corr_stmt:
         $$ = new rpg::EvalCorrStmt(std::string($2), std::string($4));
         free($2);
         free($4);
+    }
+    ;
+
+xml_into_stmt:
+    KW_XML_INTO ident BIF_XML LPAREN expression COLON expression RPAREN SEMICOLON {
+        $$ = new rpg::XmlIntoStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            std::unique_ptr<rpg::Expression>($7));
+        free($2);
+    }
+    | KW_XML_INTO ident BIF_XML LPAREN expression RPAREN SEMICOLON {
+        $$ = new rpg::XmlIntoStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            nullptr);
+        free($2);
     }
     ;
 
@@ -1465,6 +1481,19 @@ ds_field:
         f->overlay_field = $8;
         f->overlay_pos = $10;
         free($1); free($8);
+        $$ = f;
+    }
+    /* LIKEDS subfield: field LIKEDS(dsname); */
+    | IDENTIFIER KW_LIKEDS LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* f = new rpg::DSField{$1, rpg::RPGType::CHAR, 0, 0, 0};
+        f->likeds = $4;
+        free($1); free($4);
+        $$ = f;
+    }
+    | KW_DCL_SUBF IDENTIFIER KW_LIKEDS LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* f = new rpg::DSField{$2, rpg::RPGType::CHAR, 0, 0, 0};
+        f->likeds = $5;
+        free($2); free($5);
         $$ = f;
     }
     ;

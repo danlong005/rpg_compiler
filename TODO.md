@@ -22,6 +22,8 @@
 - MONITOR/ON-ERROR/ENDMON, BEGSR/ENDSR/EXSR
 - RESET, CLEAR, SORTA, DEALLOC
 - ON-EXIT (Test 42), TEST(D/T/Z) (Test 47)
+- XML-INTO (direct mode, %XML with case options) (Test 87)
+- XML-INTO Phase 2: array DS, PATH option, nested DS/LIKEDS subfields (Tests 88-89)
 - *INZSR (Test 37), *PSSR (Test 66/67)
 
 ### Expressions & Operators
@@ -198,7 +200,7 @@
 
 | # | Feature |
 |---|---------|
-| 46 | XML-SAX, XML-INTO (%XML, %HANDLER) |
+| 46 | XML-SAX (%HANDLER) |
 | 47 | Remaining CTL-OPT keywords (USRPRF, VALIDATE) |
 
 ---
@@ -347,3 +349,6 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 84 | SQL Connect |
 | 85 | %GETENV |
 | 86 | SQL End-to-End (DS FETCH, cursors) |
+| 87 | XML-INTO (direct mode, %XML, case options) |
+| 88 | XML-INTO array DS (fixed DIM, DIM(*VAR), path option) |
+| 89 | XML-INTO path option + nested DS (LIKEDS subfields) |

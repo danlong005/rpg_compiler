@@ -69,6 +69,7 @@ install: $(TARGET)
 	install -d $(DESTDIR)$(DATADIR)
 	install -m 644 runtime/rpg_runtime.h $(DESTDIR)$(DATADIR)/
 	install -m 644 runtime/rpg_sql_runtime.h $(DESTDIR)$(DATADIR)/
+	install -m 644 runtime/rpg_xml_runtime.h $(DESTDIR)$(DATADIR)/
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(TARGET)

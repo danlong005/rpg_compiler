@@ -1,0 +1,88 @@
+**FREE
+
+// Test 87: XML-INTO — parse XML into data structure
+
+DCL-DS order QUALIFIED;
+  id INT(10);
+  customer VARCHAR(50);
+  item VARCHAR(30);
+  qty INT(10);
+  price PACKED(9:2);
+END-DS;
+
+DCL-S xmlData VARCHAR(500);
+
+// Test 1: Basic XML-INTO with case=any
+xmlData = '<order><ID>1001</ID><Customer>Acme Corp</Customer><Item>Widget</Item><QTY>25</QTY><Price>19.99</Price></order>';
+
+XML-INTO order %XML(xmlData : 'case=any');
+
+DSPLY 'Order: ' + %CHAR(order.id);
+DSPLY 'Customer: ' + order.customer;
+DSPLY 'Item: ' + order.item;
+DSPLY 'Qty: ' + %CHAR(order.qty);
+DSPLY 'Price: ' + %CHAR(order.price);
+
+// Test 2: XML with case-insensitive matching
+DCL-DS person QUALIFIED;
+  name VARCHAR(40);
+  age INT(10);
+  city VARCHAR(30);
+END-DS;
+
+DCL-S xmlPerson VARCHAR(300);
+xmlPerson = '<person><Name>Alice</Name><Age>30</Age><City>Boston</City></person>';
+
+XML-INTO person %XML(xmlPerson : 'case=any');
+
+DSPLY 'Name: ' + person.name;
+DSPLY 'Age: ' + %CHAR(person.age);
+DSPLY 'City: ' + person.city;
+
+// Test 3: XML without options (defaults)
+DCL-DS config QUALIFIED;
+  host VARCHAR(50);
+  port INT(10);
+  debug VARCHAR(10);
+END-DS;
+
+DCL-S xmlConfig VARCHAR(300);
+xmlConfig = '<config><HOST>localhost</HOST><PORT>8080</PORT><DEBUG>true</DEBUG></config>';
+
+XML-INTO config %XML(xmlConfig);
+
+DSPLY 'Host: ' + config.host;
+DSPLY 'Port: ' + %CHAR(config.port);
+DSPLY 'Debug: ' + config.debug;
+
+// Test 4: XML with missing elements (should default to zero/empty)
+DCL-DS partial QUALIFIED;
+  x INT(10);
+  y INT(10);
+  label VARCHAR(20);
+END-DS;
+
+DCL-S xmlPartial VARCHAR(200);
+xmlPartial = '<point><X>42</X></point>';
+
+XML-INTO partial %XML(xmlPartial);
+
+DSPLY 'X: ' + %CHAR(partial.x);
+DSPLY 'Y: ' + %CHAR(partial.y);
+DSPLY 'Label: [' + partial.label + ']';
+
+// Test 5: XML with special characters (entities)
+DCL-DS msg QUALIFIED;
+  text VARCHAR(100);
+  sender VARCHAR(50);
+END-DS;
+
+DCL-S xmlMsg VARCHAR(300);
+xmlMsg = '<message><text>Price &lt; $10 &amp; tax</text><sender>Smith</sender></message>';
+
+XML-INTO msg %XML(xmlMsg : 'case=any');
+
+DSPLY 'Text: ' + msg.text;
+DSPLY 'Sender: ' + msg.sender;
+
+RETURN;

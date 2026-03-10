@@ -199,6 +199,7 @@ static void parse_ctlopt(const char* text) {
 "INZ"               { return KW_INZ; }
 "DSPLY"             { return KW_DSPLY; }
 "EVAL-CORR"         { return KW_EVAL_CORR; }
+"XML-INTO"          { return KW_XML_INTO; }
 "EVALR"             { return KW_EVALR; }
 "EVAL"              { return KW_EVAL; }
 "CALLP"             { return KW_CALLP; }
@@ -375,6 +376,7 @@ static void parse_ctlopt(const char* text) {
 "%MONTHS"           { return BIF_MONTHS; }
 "%YEARS"            { return BIF_YEARS; }
 "%GETENV"           { return BIF_GETENV; }
+"%XML"              { return BIF_XML; }
 "*INZSR"            { yylval.sval = strdup("*INZSR"); return IDENTIFIER; }
 "*PSSR"             { yylval.sval = strdup("*PSSR"); return IDENTIFIER; }
 "*INLR"             { return KW_INLR; }

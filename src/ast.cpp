@@ -153,6 +153,12 @@ ExecSqlStmt::ExecSqlStmt(std::string sql_text, SqlStmtKind kind)
     : sql_text(std::move(sql_text)), kind(kind) {}
 void ExecSqlStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+XmlIntoStmt::XmlIntoStmt(std::string target, std::unique_ptr<Expression> xml_source,
+                         std::unique_ptr<Expression> options)
+    : target(std::move(target)), xml_source(std::move(xml_source)),
+      options(std::move(options)) {}
+void XmlIntoStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 } // namespace rpg
