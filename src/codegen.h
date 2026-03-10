@@ -85,6 +85,8 @@ private:
     // SQL codegen helpers
     void emitSqlBindParam(const std::string& var, int index, const std::string& handle = "__hstmt");
     void emitSqlBindCol(const std::string& var, int index, const std::string& handle = "__hstmt");
+    // Expand DS host variables into qualified field names (e.g., :row → ROW.ID, ROW.NAME, ...)
+    std::vector<std::string> expandSqlIntoVars(const std::vector<std::string>& vars);
     static std::string escapeSqlForCpp(const std::string& sql);
     static std::string sqlCommentText(const std::string& sql);
 

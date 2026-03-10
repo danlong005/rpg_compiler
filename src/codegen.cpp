@@ -118,6 +118,22 @@ void CodeGen::emitSqlBindCol(const std::string& var, int index, const std::strin
          << "), __sql_ind_" << index << ");\n";
 }
 
+std::vector<std::string> CodeGen::expandSqlIntoVars(const std::vector<std::string>& vars) {
+    std::vector<std::string> expanded;
+    for (auto& v : vars) {
+        auto dit = ds_defs_.find(v);
+        if (dit != ds_defs_.end()) {
+            // It's a DS — expand into qualified field references
+            for (auto& f : dit->second->fields) {
+                expanded.push_back(v + "." + f.name);
+            }
+        } else {
+            expanded.push_back(v);
+        }
+    }
+    return expanded;
+}
+
 void CodeGen::visit(ExecSqlStmt& node) {
     uses_sql_ = true;
     emitIndent();
@@ -200,7 +216,7 @@ void CodeGen::visit(ExecSqlStmt& node) {
         }
         case SqlStmtKind::FETCH: {
             std::string cursor_name = extractCursorName(node.sql_text);
-            std::vector<std::string> into_vars = extractFetchIntoVars(node.sql_text);
+            std::vector<std::string> into_vars = expandSqlIntoVars(extractFetchIntoVars(node.sql_text));
             std::string rows_var;
             bool multi_row = parseFetchForRows(node.sql_text, rows_var);
 
@@ -271,8 +287,9 @@ void CodeGen::visit(ExecSqlStmt& node) {
         }
         case SqlStmtKind::SELECT_INTO: {
             // Strip INTO clause and bind result columns
-            std::vector<std::string> into_vars;
-            std::string stripped = stripSelectInto(node.sql_text, into_vars);
+            std::vector<std::string> raw_into_vars;
+            std::string stripped = stripSelectInto(node.sql_text, raw_into_vars);
+            std::vector<std::string> into_vars = expandSqlIntoVars(raw_into_vars);
             std::string parameterized = replaceHostVarsWithMarkers(stripped);
             std::vector<std::string> host_vars = extractHostVariables(stripped);
 
@@ -2177,6 +2194,10 @@ void CodeGen::visit(BIFCall& node) {
         } else {
             expr_ << "0 /* %PARMNUM: not in procedure */";
         }
+    } else if (node.name == "GETENV") {
+        expr_ << "rpg_getenv(";
+        node.args[0]->accept(*this);
+        expr_ << ")";
     } else {
         expr_ << "/* unknown BIF: %" << node.name << " */";
     }

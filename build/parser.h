@@ -273,55 +273,56 @@ struct DSFieldList {
     BIF_EDITFLT = 443,             /* BIF_EDITFLT  */
     BIF_UNSH = 444,                /* BIF_UNSH  */
     BIF_PARMNUM = 445,             /* BIF_PARMNUM  */
-    KW_ALL = 446,                  /* KW_ALL  */
-    KW_UNS = 447,                  /* KW_UNS  */
-    KW_FLOAT_TYPE = 448,           /* KW_FLOAT_TYPE  */
-    KW_BINDEC = 449,               /* KW_BINDEC  */
-    KW_UCS2 = 450,                 /* KW_UCS2  */
-    KW_GRAPH = 451,                /* KW_GRAPH  */
-    KW_OBJECT = 452,               /* KW_OBJECT  */
-    KW_JAVA = 453,                 /* KW_JAVA  */
-    KW_OVERLAY = 454,              /* KW_OVERLAY  */
-    KW_POS = 455,                  /* KW_POS  */
-    KW_PREFIX = 456,               /* KW_PREFIX  */
-    KW_DATFMT = 457,               /* KW_DATFMT  */
-    KW_TIMFMT = 458,               /* KW_TIMFMT  */
-    KW_EXTNAME = 459,              /* KW_EXTNAME  */
-    KW_RTNPARM = 460,              /* KW_RTNPARM  */
-    KW_OPDESC = 461,               /* KW_OPDESC  */
-    KW_ASCEND = 462,               /* KW_ASCEND  */
-    KW_DESCEND = 463,              /* KW_DESCEND  */
-    KW_NULLIND = 464,              /* KW_NULLIND  */
-    KW_VARSIZE = 465,              /* KW_VARSIZE  */
-    KW_STRING_OPT = 466,           /* KW_STRING_OPT  */
-    KW_TRIM_OPT = 467,             /* KW_TRIM_OPT  */
-    KW_DCL_ENUM = 468,             /* KW_DCL_ENUM  */
-    KW_END_ENUM = 469,             /* KW_END_ENUM  */
-    KW_BOOLEAN = 470,              /* KW_BOOLEAN  */
-    EXEC_SQL_TEXT = 471,           /* EXEC_SQL_TEXT  */
-    POWER = 472,                   /* POWER  */
-    KW_DIM_VAR = 473,              /* KW_DIM_VAR  */
-    KW_DIM_AUTO = 474,             /* KW_DIM_AUTO  */
-    KW_FOR_EACH = 475,             /* KW_FOR_EACH  */
-    KW_IN = 476,                   /* KW_IN  */
-    IDENTIFIER = 477,              /* IDENTIFIER  */
-    INTEGER_LITERAL = 478,         /* INTEGER_LITERAL  */
-    FLOAT_LITERAL = 479,           /* FLOAT_LITERAL  */
-    STRING_LITERAL = 480,          /* STRING_LITERAL  */
-    SEMICOLON = 481,               /* SEMICOLON  */
-    EQUALS = 482,                  /* EQUALS  */
-    LPAREN = 483,                  /* LPAREN  */
-    RPAREN = 484,                  /* RPAREN  */
-    COLON = 485,                   /* COLON  */
-    PLUS = 486,                    /* PLUS  */
-    MINUS = 487,                   /* MINUS  */
-    STAR = 488,                    /* STAR  */
-    SLASH = 489,                   /* SLASH  */
-    NE = 490,                      /* NE  */
-    LE = 491,                      /* LE  */
-    GE = 492,                      /* GE  */
-    LT = 493,                      /* LT  */
-    GT = 494                       /* GT  */
+    BIF_GETENV = 446,              /* BIF_GETENV  */
+    KW_ALL = 447,                  /* KW_ALL  */
+    KW_UNS = 448,                  /* KW_UNS  */
+    KW_FLOAT_TYPE = 449,           /* KW_FLOAT_TYPE  */
+    KW_BINDEC = 450,               /* KW_BINDEC  */
+    KW_UCS2 = 451,                 /* KW_UCS2  */
+    KW_GRAPH = 452,                /* KW_GRAPH  */
+    KW_OBJECT = 453,               /* KW_OBJECT  */
+    KW_JAVA = 454,                 /* KW_JAVA  */
+    KW_OVERLAY = 455,              /* KW_OVERLAY  */
+    KW_POS = 456,                  /* KW_POS  */
+    KW_PREFIX = 457,               /* KW_PREFIX  */
+    KW_DATFMT = 458,               /* KW_DATFMT  */
+    KW_TIMFMT = 459,               /* KW_TIMFMT  */
+    KW_EXTNAME = 460,              /* KW_EXTNAME  */
+    KW_RTNPARM = 461,              /* KW_RTNPARM  */
+    KW_OPDESC = 462,               /* KW_OPDESC  */
+    KW_ASCEND = 463,               /* KW_ASCEND  */
+    KW_DESCEND = 464,              /* KW_DESCEND  */
+    KW_NULLIND = 465,              /* KW_NULLIND  */
+    KW_VARSIZE = 466,              /* KW_VARSIZE  */
+    KW_STRING_OPT = 467,           /* KW_STRING_OPT  */
+    KW_TRIM_OPT = 468,             /* KW_TRIM_OPT  */
+    KW_DCL_ENUM = 469,             /* KW_DCL_ENUM  */
+    KW_END_ENUM = 470,             /* KW_END_ENUM  */
+    KW_BOOLEAN = 471,              /* KW_BOOLEAN  */
+    EXEC_SQL_TEXT = 472,           /* EXEC_SQL_TEXT  */
+    POWER = 473,                   /* POWER  */
+    KW_DIM_VAR = 474,              /* KW_DIM_VAR  */
+    KW_DIM_AUTO = 475,             /* KW_DIM_AUTO  */
+    KW_FOR_EACH = 476,             /* KW_FOR_EACH  */
+    KW_IN = 477,                   /* KW_IN  */
+    IDENTIFIER = 478,              /* IDENTIFIER  */
+    INTEGER_LITERAL = 479,         /* INTEGER_LITERAL  */
+    FLOAT_LITERAL = 480,           /* FLOAT_LITERAL  */
+    STRING_LITERAL = 481,          /* STRING_LITERAL  */
+    SEMICOLON = 482,               /* SEMICOLON  */
+    EQUALS = 483,                  /* EQUALS  */
+    LPAREN = 484,                  /* LPAREN  */
+    RPAREN = 485,                  /* RPAREN  */
+    COLON = 486,                   /* COLON  */
+    PLUS = 487,                    /* PLUS  */
+    MINUS = 488,                   /* MINUS  */
+    STAR = 489,                    /* STAR  */
+    SLASH = 490,                   /* SLASH  */
+    NE = 491,                      /* NE  */
+    LE = 492,                      /* LE  */
+    GE = 493,                      /* GE  */
+    LT = 494,                      /* LT  */
+    GT = 495                       /* GT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -350,7 +351,7 @@ union YYSTYPE
     rpg::DSField* ds_field;
     std::vector<rpg::EnumConstant>* enum_const_list;
 
-#line 354 "build/parser.h"
+#line 355 "build/parser.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

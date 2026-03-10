@@ -14,6 +14,12 @@
 #include <iomanip>
 #include <cctype>
 
+// %GETENV - read environment variable (returns empty string if not set)
+inline std::string rpg_getenv(const std::string& name) {
+    const char* val = std::getenv(name.c_str());
+    return val ? std::string(val) : std::string();
+}
+
 // %TRIM - trim both sides
 inline std::string rpg_trim(const std::string& s) {
     auto start = s.find_first_not_of(' ');

@@ -117,15 +117,27 @@ std::string extractCursorName(const std::string& sql) {
     while (i < upper.size() && std::isspace(static_cast<unsigned char>(upper[i]))) i++;
 
     // Skip the leading keyword: DECLARE, OPEN, FETCH, or CLOSE
-    // Then the next non-whitespace word is the cursor name
-    // Skip keyword
     while (i < upper.size() && !std::isspace(static_cast<unsigned char>(upper[i]))) i++;
-    // Skip whitespace
     while (i < upper.size() && std::isspace(static_cast<unsigned char>(upper[i]))) i++;
-    // Read cursor name
+
+    // For FETCH: handle "FETCH [NEXT|PRIOR|FIRST|LAST] [FROM] cursor"
+    // Skip optional scroll keywords and FROM
     size_t start = i;
     while (i < upper.size() && isIdentChar(upper[i])) i++;
-    return upper.substr(start, i - start);
+    std::string word = upper.substr(start, i - start);
+    if (word == "NEXT" || word == "PRIOR" || word == "FIRST" || word == "LAST") {
+        while (i < upper.size() && std::isspace(static_cast<unsigned char>(upper[i]))) i++;
+        start = i;
+        while (i < upper.size() && isIdentChar(upper[i])) i++;
+        word = upper.substr(start, i - start);
+    }
+    if (word == "FROM") {
+        while (i < upper.size() && std::isspace(static_cast<unsigned char>(upper[i]))) i++;
+        start = i;
+        while (i < upper.size() && isIdentChar(upper[i])) i++;
+        word = upper.substr(start, i - start);
+    }
+    return word;
 }
 
 std::string extractCursorQuery(const std::string& sql) {

@@ -37,7 +37,7 @@
 - **Bitwise:** %BITAND, %BITNOT, %BITOR, %BITXOR (Test 68)
 - **Date/Time:** %DATE, %TIME, %TIMESTAMP, %DIFF, %DAYS, %MONTHS, %YEARS, %HOURS, %MINUTES, %SECONDS, %MSECONDS, %SUBDT
 - **Memory/Pointer:** %ALLOC, %REALLOC, %ADDR, %PADDR, %PROC, %STR
-- **Other:** %PARMS, %STATUS, %ERROR, %FOUND, %EOF, %PASSED, %OMITTED, %MAX, %MIN
+- **Other:** %PARMS, %STATUS, %ERROR, %FOUND, %EOF, %PASSED, %OMITTED, %MAX, %MIN, %GETENV (Test 85)
 
 ### %STATUS Code Values
 | Code | Description | Applicable |
@@ -345,3 +345,4 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 82 | SQL Advanced |
 | 83 | SQL Multi-row |
 | 84 | SQL Connect |
+| 85 | %GETENV |

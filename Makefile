@@ -444,35 +444,44 @@ test: $(TARGET)
 	@echo ""
 	@echo ""
 	@echo "=== Test 77: Embedded SQL ==="
-	./$(TARGET) -S tests/test77_exec_sql.rpgle -o /tmp/test77.cpp
+	./$(TARGET) -S tests/test77_exec_sql.sqlrpgle -o /tmp/test77.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "=== Test 78: SQL in Procedures ==="
-	./$(TARGET) -S tests/test78_exec_sql_proc.rpgle -o /tmp/test78.cpp
+	./$(TARGET) -S tests/test78_exec_sql_proc.sqlrpgle -o /tmp/test78.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "=== Test 79: SQL Core Statements ==="
-	./$(TARGET) -S tests/test79_sql_core.rpgle -o /tmp/test79.cpp
+	./$(TARGET) -S tests/test79_sql_core.sqlrpgle -o /tmp/test79.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "=== Test 80: SQL Cursors ==="
-	./$(TARGET) -S tests/test80_sql_cursors.rpgle -o /tmp/test80.cpp
+	./$(TARGET) -S tests/test80_sql_cursors.sqlrpgle -o /tmp/test80.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "=== Test 81: Dynamic SQL ==="
-	./$(TARGET) -S tests/test81_sql_dynamic.rpgle -o /tmp/test81.cpp
+	./$(TARGET) -S tests/test81_sql_dynamic.sqlrpgle -o /tmp/test81.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "=== Test 82: SQL Advanced ==="
-	./$(TARGET) -S tests/test82_sql_advanced.rpgle -o /tmp/test82.cpp
+	./$(TARGET) -S tests/test82_sql_advanced.sqlrpgle -o /tmp/test82.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "=== Test 83: SQL Multi-row ==="
-	./$(TARGET) -S tests/test83_sql_multirow.rpgle -o /tmp/test83.cpp
+	./$(TARGET) -S tests/test83_sql_multirow.sqlrpgle -o /tmp/test83.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "=== Test 84: SQL Connect ==="
-	./$(TARGET) -S tests/test84_sql_connect.rpgle -o /tmp/test84.cpp
+	./$(TARGET) -S tests/test84_sql_connect.sqlrpgle -o /tmp/test84.cpp
+	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
+	@echo ""
+	@echo "=== Test 85: %%GETENV ==="
+	./$(TARGET) -S tests/test85_getenv.rpgle -o /tmp/test85.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test85 /tmp/test85.cpp
+	/tmp/test85
+	@echo ""
+	@echo "=== Test 86: SQL End-to-End ==="
+	./$(TARGET) -S tests/test86.sqlrpgle -o /tmp/test86.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 	@echo ""
 	@echo "All tests passed."
@@ -533,35 +542,44 @@ test76: $(TARGET)
 	/tmp/test76
 
 test77: $(TARGET)
-	./$(TARGET) -S tests/test77_exec_sql.rpgle -o /tmp/test77.cpp
+	./$(TARGET) -S tests/test77_exec_sql.sqlrpgle -o /tmp/test77.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
 test78: $(TARGET)
-	./$(TARGET) -S tests/test78_exec_sql_proc.rpgle -o /tmp/test78.cpp
+	./$(TARGET) -S tests/test78_exec_sql_proc.sqlrpgle -o /tmp/test78.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
 test79: $(TARGET)
-	./$(TARGET) -S tests/test79_sql_core.rpgle -o /tmp/test79.cpp
+	./$(TARGET) -S tests/test79_sql_core.sqlrpgle -o /tmp/test79.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
 test80: $(TARGET)
-	./$(TARGET) -S tests/test80_sql_cursors.rpgle -o /tmp/test80.cpp
+	./$(TARGET) -S tests/test80_sql_cursors.sqlrpgle -o /tmp/test80.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
 test81: $(TARGET)
-	./$(TARGET) -S tests/test81_sql_dynamic.rpgle -o /tmp/test81.cpp
+	./$(TARGET) -S tests/test81_sql_dynamic.sqlrpgle -o /tmp/test81.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
 test82: $(TARGET)
-	./$(TARGET) -S tests/test82_sql_advanced.rpgle -o /tmp/test82.cpp
+	./$(TARGET) -S tests/test82_sql_advanced.sqlrpgle -o /tmp/test82.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
 test83: $(TARGET)
-	./$(TARGET) -S tests/test83_sql_multirow.rpgle -o /tmp/test83.cpp
+	./$(TARGET) -S tests/test83_sql_multirow.sqlrpgle -o /tmp/test83.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
 test84: $(TARGET)
-	./$(TARGET) -S tests/test84_sql_connect.rpgle -o /tmp/test84.cpp
+	./$(TARGET) -S tests/test84_sql_connect.sqlrpgle -o /tmp/test84.cpp
 	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
 
-.PHONY: all clean test test66 test67 test68 test69 test70 test71 test72 test73 test74 test75 test76 test77 test78 test79 test80 test81 test82 test83 test84
+test85: $(TARGET)
+	./$(TARGET) -S tests/test85_getenv.rpgle -o /tmp/test85.cpp
+	$(CXX) -std=c++17 -Iruntime -o /tmp/test85 /tmp/test85.cpp
+	/tmp/test85
+
+test86: $(TARGET)
+	./$(TARGET) -S tests/test86.sqlrpgle -o /tmp/test86.cpp
+	@echo "Parse + codegen OK (SQL test - compile requires ODBC)"
+
+.PHONY: all clean test test66 test67 test68 test69 test70 test71 test72 test73 test74 test75 test76 test77 test78 test79 test80 test81 test82 test83 test84 test85 test86

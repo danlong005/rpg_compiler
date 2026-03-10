@@ -144,7 +144,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token BIF_PADDR BIF_PROC
 %token BIF_PASSED BIF_OMITTED
 %token BIF_BITAND BIF_BITNOT BIF_BITOR BIF_BITXOR
-%token BIF_SCANR BIF_EDITFLT BIF_UNSH BIF_PARMNUM
+%token BIF_SCANR BIF_EDITFLT BIF_UNSH BIF_PARMNUM BIF_GETENV
 %token KW_ALL
 %token KW_UNS KW_FLOAT_TYPE KW_BINDEC KW_UCS2 KW_GRAPH KW_OBJECT KW_JAVA
 %token KW_OVERLAY KW_POS KW_PREFIX KW_DATFMT KW_TIMFMT KW_EXTNAME
@@ -2200,6 +2200,9 @@ primary_expr:
         args->push_back(new rpg::Identifier($3));
         free($3);
         $$ = make_bif("PARMNUM", args);
+    }
+    | BIF_GETENV LPAREN arg_list RPAREN {
+        $$ = make_bif("GETENV", $3);
     }
     | INDICATOR {
         $$ = new rpg::IndicatorExpr($1);

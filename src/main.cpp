@@ -102,9 +102,21 @@ int main(int argc, char* argv[]) {
         out << cpp_code;
     }
 
+    // Detect SQL source by .sqlrpgle extension
+    std::string input_str(input_file);
+    bool is_sql = false;
+    if (input_str.size() >= 9) {
+        std::string ext = input_str.substr(input_str.size() - 9);
+        for (auto& c : ext) c = tolower(static_cast<unsigned char>(c));
+        if (ext == ".sqlrpgle") is_sql = true;
+    }
+
     std::string runtime_dir = "runtime";
-    std::string cmd = "clang++ -std=c++17 -I" + runtime_dir +
-                      " -o " + exe_path + " " + cpp_path;
+    std::string cmd = "clang++ -std=c++17 -I" + runtime_dir;
+    if (is_sql) {
+        cmd += " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc";
+    }
+    cmd += " -o " + exe_path + " " + cpp_path;
     int rc = system(cmd.c_str());
 
     if (!keep_cpp) {

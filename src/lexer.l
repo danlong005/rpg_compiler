@@ -374,6 +374,7 @@ static void parse_ctlopt(const char* text) {
 "%DAYS"             { return BIF_DAYS; }
 "%MONTHS"           { return BIF_MONTHS; }
 "%YEARS"            { return BIF_YEARS; }
+"%GETENV"           { return BIF_GETENV; }
 "*INZSR"            { yylval.sval = strdup("*INZSR"); return IDENTIFIER; }
 "*PSSR"             { yylval.sval = strdup("*PSSR"); return IDENTIFIER; }
 "*INLR"             { return KW_INLR; }
