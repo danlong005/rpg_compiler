@@ -155,6 +155,7 @@ public:
     std::string timfmt;  // per-field TIMFMT
     std::string nullind; // NULLIND(field)
     std::string java_class; // OBJECT(*JAVA:'class')
+    std::string dtaara_name; // DTAARA(*LDA), DTAARA(MYDA), etc.
     std::unique_ptr<Expression> inz_value;
     DclS(std::string name, RPGType type, int length, int digits = 0, int decimals = 0,
          bool is_const = false, std::unique_ptr<Expression> inz_value = nullptr, int dim = 0);
@@ -423,6 +424,29 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// --- Data Area Statements ---
+
+class DataInStmt : public Statement {
+public:
+    std::string var_name;
+    explicit DataInStmt(std::string v);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class DataOutStmt : public Statement {
+public:
+    std::string var_name;
+    explicit DataOutStmt(std::string v);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class DataUnlockStmt : public Statement {
+public:
+    std::string var_name;
+    explicit DataUnlockStmt(std::string v);
+    void accept(ASTVisitor& visitor) override;
+};
+
 // --- Data Structures ---
 
 struct DSField {
@@ -448,6 +472,7 @@ public:
     std::string prefix;  // PREFIX(pfx)
     int prefix_nbr = 0;
     int occurs = 0;      // OCCURS(n), 0 = not multi-occurrence
+    bool is_psds = false; // PSDS or SDS keyword
     std::vector<DSField> fields;
     DclDS(std::string name);
     void accept(ASTVisitor& visitor) override;
@@ -599,6 +624,9 @@ public:
     virtual void visit(DclEnum& node) = 0;
     virtual void visit(ExecSqlStmt& node) = 0;
     virtual void visit(XmlIntoStmt& node) = 0;
+    virtual void visit(DataInStmt& node) = 0;
+    virtual void visit(DataOutStmt& node) = 0;
+    virtual void visit(DataUnlockStmt& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 

@@ -147,7 +147,8 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token BIF_SCANR BIF_EDITFLT BIF_UNSH BIF_PARMNUM BIF_GETENV BIF_XML
 %token KW_ALL
 %token KW_UNS KW_FLOAT_TYPE KW_BINDEC KW_UCS2 KW_GRAPH KW_OBJECT KW_JAVA
-%token KW_OVERLAY KW_POS KW_PREFIX KW_DATFMT KW_TIMFMT KW_EXTNAME
+%token KW_OVERLAY KW_POS KW_PREFIX KW_DATFMT KW_TIMFMT KW_EXTNAME KW_PSDS KW_SDS
+%token KW_DTAARA KW_OUT KW_UNLOCK
 %token KW_RTNPARM KW_OPDESC KW_ASCEND KW_DESCEND KW_NULLIND
 %token KW_VARSIZE KW_STRING_OPT KW_TRIM_OPT
 %token KW_DCL_ENUM KW_END_ENUM KW_BOOLEAN
@@ -169,6 +170,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
 %type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt xml_into_stmt
+%type <stmt> in_da_stmt out_da_stmt unlock_da_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
 %type <expr_list> arg_list call_arg_list call_args_opt
 %type <stmt_list> statement_list
@@ -260,6 +262,9 @@ statement:
     | test_stmt     { $$ = $1; SET_LINE($$); }
     | exec_sql_stmt { $$ = $1; SET_LINE($$); }
     | xml_into_stmt { $$ = $1; SET_LINE($$); }
+    | in_da_stmt    { $$ = $1; SET_LINE($$); }
+    | out_da_stmt   { $$ = $1; SET_LINE($$); }
+    | unlock_da_stmt { $$ = $1; SET_LINE($$); }
     | expr_stmt   { $$ = $1; SET_LINE($$); }
     | error SEMICOLON { $$ = nullptr; yyerrok; }
     ;
@@ -501,6 +506,26 @@ dcl_s_stmt:
         n->timfmt = $6;
         $$ = n; free($2); free($6);
     }
+    | KW_DCL_S ident KW_CHAR LPAREN INTEGER_LITERAL RPAREN KW_DTAARA LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::CHAR, $5);
+        n->dtaara_name = $9;
+        $$ = n; free($2); free($9);
+    }
+    | KW_DCL_S ident KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN KW_DTAARA LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::VARCHAR, $5);
+        n->dtaara_name = $9;
+        $$ = n; free($2); free($9);
+    }
+    | KW_DCL_S ident KW_INT LPAREN INTEGER_LITERAL RPAREN KW_DTAARA LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::INT10, 0);
+        n->dtaara_name = $9;
+        $$ = n; free($2); free($9);
+    }
+    | KW_DCL_S ident KW_PACKED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN KW_DTAARA LPAREN IDENTIFIER RPAREN SEMICOLON {
+        auto* n = new rpg::DclS($2, rpg::RPGType::PACKED, 0, $5, $7);
+        n->dtaara_name = $11;
+        $$ = n; free($2); free($11);
+    }
     ;
 
 dcl_s_keywords:
@@ -596,6 +621,27 @@ xml_into_stmt:
         $$ = new rpg::XmlIntoStmt(std::string($2),
             std::unique_ptr<rpg::Expression>($5),
             nullptr);
+        free($2);
+    }
+    ;
+
+in_da_stmt:
+    KW_IN IDENTIFIER SEMICOLON {
+        $$ = new rpg::DataInStmt($2);
+        free($2);
+    }
+    ;
+
+out_da_stmt:
+    KW_OUT IDENTIFIER SEMICOLON {
+        $$ = new rpg::DataOutStmt($2);
+        free($2);
+    }
+    ;
+
+unlock_da_stmt:
+    KW_UNLOCK IDENTIFIER SEMICOLON {
+        $$ = new rpg::DataUnlockStmt($2);
         free($2);
     }
     ;
@@ -1389,6 +1435,44 @@ dcl_ds_stmt:
         free($2); free($5);
         $$ = ds;
     }
+    /* DCL-DS name PSDS QUALIFIED; fields END-DS; */
+    | KW_DCL_DS IDENTIFIER psds_kw KW_QUALIFIED SEMICOLON ds_fields KW_END_DS SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->is_psds = true;
+        ds->qualified = true;
+        ds->fields = std::move($6->fields);
+        delete $6;
+        free($2);
+        $$ = ds;
+    }
+    /* DCL-DS name QUALIFIED PSDS; fields END-DS; */
+    | KW_DCL_DS IDENTIFIER KW_QUALIFIED psds_kw SEMICOLON ds_fields KW_END_DS SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->is_psds = true;
+        ds->qualified = true;
+        ds->fields = std::move($6->fields);
+        delete $6;
+        free($2);
+        $$ = ds;
+    }
+    /* DCL-DS name PSDS; fields END-DS; (not qualified) */
+    | KW_DCL_DS IDENTIFIER psds_kw SEMICOLON ds_fields KW_END_DS SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->is_psds = true;
+        ds->qualified = false;
+        ds->fields = std::move($5->fields);
+        delete $5;
+        free($2);
+        $$ = ds;
+    }
+    /* DCL-DS name PSDS; (empty — no subfields declared) */
+    | KW_DCL_DS IDENTIFIER psds_kw SEMICOLON {
+        auto* ds = new rpg::DclDS($2);
+        ds->is_psds = true;
+        ds->qualified = false;
+        free($2);
+        $$ = ds;
+    }
     ;
 
 ds_fields:
@@ -1400,6 +1484,11 @@ ds_fields:
         $$->fields.push_back(*$2);
         delete $2;
     }
+    ;
+
+psds_kw:
+    KW_PSDS {}
+    | KW_SDS {}
     ;
 
 ds_field:

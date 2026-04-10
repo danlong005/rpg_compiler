@@ -35,19 +35,21 @@ $(BUILDDIR)/lexer.cpp: $(SRCDIR)/lexer.l $(BUILDDIR)/parser.h | $(BUILDDIR)
 $(BUILDDIR)/lexer.o: $(BUILDDIR)/lexer.cpp
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
-$(BUILDDIR)/parser.o: $(BUILDDIR)/parser.cpp
+HDRS := $(SRCDIR)/ast.h $(SRCDIR)/codegen.h $(BUILDDIR)/parser.h
+
+$(BUILDDIR)/ast.o: $(SRCDIR)/ast.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
-$(BUILDDIR)/ast.o: $(SRCDIR)/ast.cpp
+$(BUILDDIR)/codegen.o: $(SRCDIR)/codegen.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
-$(BUILDDIR)/codegen.o: $(SRCDIR)/codegen.cpp
+$(BUILDDIR)/sql_utils.o: $(SRCDIR)/sql_utils.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
-$(BUILDDIR)/sql_utils.o: $(SRCDIR)/sql_utils.cpp
+$(BUILDDIR)/main.o: $(SRCDIR)/main.cpp $(SRCDIR)/ast.h $(SRCDIR)/codegen.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
-$(BUILDDIR)/main.o: $(SRCDIR)/main.cpp
+$(BUILDDIR)/parser.o: $(BUILDDIR)/parser.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(TARGET): $(OBJS)

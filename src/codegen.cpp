@@ -525,10 +525,12 @@ void CodeGen::visit(Program& node) {
     datfmt_ = node.datfmt;
     timfmt_ = node.timfmt;
 
-    // Scan for EXEC SQL / XML-INTO usage to set feature flags
+    // Scan for EXEC SQL / XML-INTO / PSDS usage to set feature flags
     for (auto& stmt : node.statements) {
         if (dynamic_cast<ExecSqlStmt*>(stmt.get())) uses_sql_ = true;
         if (dynamic_cast<XmlIntoStmt*>(stmt.get())) uses_xml_ = true;
+        auto* ds = dynamic_cast<DclDS*>(stmt.get());
+        if (ds && ds->is_psds) uses_psds_ = true;
         // Also check inside procedures
         auto* proc = dynamic_cast<DclProc*>(stmt.get());
         if (proc) {
@@ -537,7 +539,7 @@ void CodeGen::visit(Program& node) {
                 if (dynamic_cast<XmlIntoStmt*>(s.get())) uses_xml_ = true;
             }
         }
-        if (uses_sql_ && uses_xml_) break;
+        if (uses_sql_ && uses_xml_ && uses_psds_) break;
     }
 
     out_ << "#include \"rpg_runtime.h\"\n";
@@ -619,8 +621,14 @@ void CodeGen::visit(Program& node) {
         return;
     }
 
-    // Emit main
-    out_ << "int main() {\n";
+    // Emit main (use argc/argv when PSDS is declared)
+    if (uses_psds_) {
+        out_ << "int main(int argc, char* argv[]) {\n";
+        out_ << "    (void)argc;\n";
+        out_ << "    rpg_psds_init(argv[0]);\n";
+    } else {
+        out_ << "int main() {\n";
+    }
     out_ << "    bool rpg_indicators[100] = {};\n";
     indent_ = 1;
 
@@ -638,6 +646,21 @@ void CodeGen::visit(Program& node) {
             out_ << "std::array<" << type_name << ", " << ds->dim << "> " << ds->name << ";\n";
         } else {
             out_ << type_name << " " << ds->name << ";\n";
+        }
+        // If this is a PSDS, initialize POS-mapped subfields from runtime
+        if (ds->is_psds && ds->dim == 0) {
+            for (auto& f : ds->fields) {
+                if (f.pos <= 0) continue;
+                emitIndent();
+                bool is_numeric = (f.type == RPGType::INT10 || f.type == RPGType::PACKED ||
+                                   f.type == RPGType::ZONED || f.type == RPGType::FLOAT8 ||
+                                   f.type == RPGType::UNS);
+                if (is_numeric) {
+                    out_ << ds->name << "." << f.name << " = rpg_psds_field_int(" << f.pos << ");\n";
+                } else {
+                    out_ << ds->name << "." << f.name << " = rpg_psds_field_str(" << f.pos << ");\n";
+                }
+            }
         }
     }
 
@@ -693,7 +716,9 @@ void CodeGen::visit(Program& node) {
     }
     if (pssr_stmt) {
         indent_--; emitIndent(); out_ << "} catch (...) {\n";
-        indent_++; emitIndent(); out_ << "sr__PSSR();\n";
+        indent_++;
+        if (uses_psds_) { emitIndent(); out_ << "rpg_psds_sync();\n"; }
+        emitIndent(); out_ << "sr__PSSR();\n";
         indent_--; emitIndent(); out_ << "}\n";
     }
     out_ << "}\n";
@@ -875,6 +900,7 @@ void CodeGen::visit(DclS& node) {
     var_lengths_[node.name] = node.length;
     if (node.inz_value) has_inz_.insert(node.name);
     if (node.dim > 0) array_vars_.insert(node.name);
+    if (!node.dtaara_name.empty()) dtaara_vars_[node.name] = node.dtaara_name;
 
     // TEMPLATE: skip emission (type definition only, no variable)
     if (node.is_template) return;
@@ -1385,6 +1411,7 @@ void CodeGen::visit(MonitorStmt& node) {
     emitIndent();
     out_ << "} catch (...) {\n";
     indent_++;
+    if (uses_psds_) { emitIndent(); out_ << "rpg_psds_sync();\n"; }
     emitStatements(node.on_error_body);
     indent_--;
     emitIndent();
@@ -2392,6 +2419,33 @@ void CodeGen::emitXmlFieldAssignments(DclDS* ds, const std::string& target, cons
                      << xml_src << ", \"" << f.name << "\", __xml_case_any);\n";
                 break;
         }
+    }
+}
+
+void CodeGen::visit(DataInStmt& node) {
+    auto it = dtaara_vars_.find(node.var_name);
+    if (it != dtaara_vars_.end()) {
+        int len = 0;
+        auto lit = var_lengths_.find(node.var_name);
+        if (lit != var_lengths_.end()) len = lit->second;
+        emitIndent();
+        out_ << node.var_name << " = rpg_da_read(\"" << it->second << "\", " << len << ");\n";
+    }
+}
+
+void CodeGen::visit(DataOutStmt& node) {
+    auto it = dtaara_vars_.find(node.var_name);
+    if (it != dtaara_vars_.end()) {
+        emitIndent();
+        out_ << "rpg_da_write(\"" << it->second << "\", " << node.var_name << ");\n";
+    }
+}
+
+void CodeGen::visit(DataUnlockStmt& node) {
+    auto it = dtaara_vars_.find(node.var_name);
+    if (it != dtaara_vars_.end()) {
+        emitIndent();
+        out_ << "rpg_da_unlock(\"" << it->second << "\");\n";
     }
 }
 

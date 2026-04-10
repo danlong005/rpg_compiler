@@ -246,6 +246,11 @@ static void parse_ctlopt(const char* text) {
 "POS"               { return KW_POS; }
 "PREFIX"            { return KW_PREFIX; }
 "EXTNAME"           { return KW_EXTNAME; }
+"PSDS"              { return KW_PSDS; }
+"SDS"               { return KW_SDS; }
+"DTAARA"            { return KW_DTAARA; }
+"OUT"               { return KW_OUT; }
+"UNLOCK"            { return KW_UNLOCK; }
 "RTNPARM"           { return KW_RTNPARM; }
 "OPDESC"            { return KW_OPDESC; }
 "ASCEND"            { return KW_ASCEND; }
@@ -379,6 +384,9 @@ static void parse_ctlopt(const char* text) {
 "%XML"              { return BIF_XML; }
 "*INZSR"            { yylval.sval = strdup("*INZSR"); return IDENTIFIER; }
 "*PSSR"             { yylval.sval = strdup("*PSSR"); return IDENTIFIER; }
+"*LDA"              { yylval.sval = strdup("*LDA"); return IDENTIFIER; }
+"*GDA"              { yylval.sval = strdup("*GDA"); return IDENTIFIER; }
+"*PDA"              { yylval.sval = strdup("*PDA"); return IDENTIFIER; }
 "*INLR"             { return KW_INLR; }
 "*ON"               { return KW_ON; }
 "*OFF"              { return KW_OFF; }

@@ -289,42 +289,47 @@ struct DSFieldList {
     KW_DATFMT = 459,               /* KW_DATFMT  */
     KW_TIMFMT = 460,               /* KW_TIMFMT  */
     KW_EXTNAME = 461,              /* KW_EXTNAME  */
-    KW_RTNPARM = 462,              /* KW_RTNPARM  */
-    KW_OPDESC = 463,               /* KW_OPDESC  */
-    KW_ASCEND = 464,               /* KW_ASCEND  */
-    KW_DESCEND = 465,              /* KW_DESCEND  */
-    KW_NULLIND = 466,              /* KW_NULLIND  */
-    KW_VARSIZE = 467,              /* KW_VARSIZE  */
-    KW_STRING_OPT = 468,           /* KW_STRING_OPT  */
-    KW_TRIM_OPT = 469,             /* KW_TRIM_OPT  */
-    KW_DCL_ENUM = 470,             /* KW_DCL_ENUM  */
-    KW_END_ENUM = 471,             /* KW_END_ENUM  */
-    KW_BOOLEAN = 472,              /* KW_BOOLEAN  */
-    EXEC_SQL_TEXT = 473,           /* EXEC_SQL_TEXT  */
-    POWER = 474,                   /* POWER  */
-    KW_DIM_VAR = 475,              /* KW_DIM_VAR  */
-    KW_DIM_AUTO = 476,             /* KW_DIM_AUTO  */
-    KW_FOR_EACH = 477,             /* KW_FOR_EACH  */
-    KW_IN = 478,                   /* KW_IN  */
-    KW_XML_INTO = 479,             /* KW_XML_INTO  */
-    IDENTIFIER = 480,              /* IDENTIFIER  */
-    INTEGER_LITERAL = 481,         /* INTEGER_LITERAL  */
-    FLOAT_LITERAL = 482,           /* FLOAT_LITERAL  */
-    STRING_LITERAL = 483,          /* STRING_LITERAL  */
-    SEMICOLON = 484,               /* SEMICOLON  */
-    EQUALS = 485,                  /* EQUALS  */
-    LPAREN = 486,                  /* LPAREN  */
-    RPAREN = 487,                  /* RPAREN  */
-    COLON = 488,                   /* COLON  */
-    PLUS = 489,                    /* PLUS  */
-    MINUS = 490,                   /* MINUS  */
-    STAR = 491,                    /* STAR  */
-    SLASH = 492,                   /* SLASH  */
-    NE = 493,                      /* NE  */
-    LE = 494,                      /* LE  */
-    GE = 495,                      /* GE  */
-    LT = 496,                      /* LT  */
-    GT = 497                       /* GT  */
+    KW_PSDS = 462,                 /* KW_PSDS  */
+    KW_SDS = 463,                  /* KW_SDS  */
+    KW_DTAARA = 464,               /* KW_DTAARA  */
+    KW_OUT = 465,                  /* KW_OUT  */
+    KW_UNLOCK = 466,               /* KW_UNLOCK  */
+    KW_RTNPARM = 467,              /* KW_RTNPARM  */
+    KW_OPDESC = 468,               /* KW_OPDESC  */
+    KW_ASCEND = 469,               /* KW_ASCEND  */
+    KW_DESCEND = 470,              /* KW_DESCEND  */
+    KW_NULLIND = 471,              /* KW_NULLIND  */
+    KW_VARSIZE = 472,              /* KW_VARSIZE  */
+    KW_STRING_OPT = 473,           /* KW_STRING_OPT  */
+    KW_TRIM_OPT = 474,             /* KW_TRIM_OPT  */
+    KW_DCL_ENUM = 475,             /* KW_DCL_ENUM  */
+    KW_END_ENUM = 476,             /* KW_END_ENUM  */
+    KW_BOOLEAN = 477,              /* KW_BOOLEAN  */
+    EXEC_SQL_TEXT = 478,           /* EXEC_SQL_TEXT  */
+    POWER = 479,                   /* POWER  */
+    KW_DIM_VAR = 480,              /* KW_DIM_VAR  */
+    KW_DIM_AUTO = 481,             /* KW_DIM_AUTO  */
+    KW_FOR_EACH = 482,             /* KW_FOR_EACH  */
+    KW_IN = 483,                   /* KW_IN  */
+    KW_XML_INTO = 484,             /* KW_XML_INTO  */
+    IDENTIFIER = 485,              /* IDENTIFIER  */
+    INTEGER_LITERAL = 486,         /* INTEGER_LITERAL  */
+    FLOAT_LITERAL = 487,           /* FLOAT_LITERAL  */
+    STRING_LITERAL = 488,          /* STRING_LITERAL  */
+    SEMICOLON = 489,               /* SEMICOLON  */
+    EQUALS = 490,                  /* EQUALS  */
+    LPAREN = 491,                  /* LPAREN  */
+    RPAREN = 492,                  /* RPAREN  */
+    COLON = 493,                   /* COLON  */
+    PLUS = 494,                    /* PLUS  */
+    MINUS = 495,                   /* MINUS  */
+    STAR = 496,                    /* STAR  */
+    SLASH = 497,                   /* SLASH  */
+    NE = 498,                      /* NE  */
+    LE = 499,                      /* LE  */
+    GE = 500,                      /* GE  */
+    LT = 501,                      /* LT  */
+    GT = 502                       /* GT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -353,7 +358,7 @@ union YYSTYPE
     rpg::DSField* ds_field;
     std::vector<rpg::EnumConstant>* enum_const_list;
 
-#line 357 "build/parser.h"
+#line 362 "build/parser.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

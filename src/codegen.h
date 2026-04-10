@@ -58,6 +58,9 @@ public:
     void visit(DclEnum& node) override;
     void visit(ExecSqlStmt& node) override;
     void visit(XmlIntoStmt& node) override;
+    void visit(DataInStmt& node) override;
+    void visit(DataOutStmt& node) override;
+    void visit(DataUnlockStmt& node) override;
     void visit(Program& node) override;
 
 private:
@@ -71,8 +74,9 @@ private:
     std::string current_proc_name_;
     std::string datfmt_; // default date format (e.g., "*ISO", "*USA", "*MDY")
     std::string timfmt_; // default time format
-    bool uses_sql_ = false; // program contains EXEC SQL statements
-    bool uses_xml_ = false; // program contains XML-INTO statements
+    bool uses_sql_ = false;  // program contains EXEC SQL statements
+    bool uses_xml_ = false;  // program contains XML-INTO statements
+    bool uses_psds_ = false; // program declares a PSDS
 
     void emitIndent();
     void emitStatements(std::vector<std::unique_ptr<Statement>>& stmts);
@@ -106,6 +110,7 @@ private:
     std::set<std::string> nopass_procs_; // procs with *NOPASS params
     std::map<std::string, std::vector<ParamDecl>> nopass_proc_params_; // full param info
     std::map<std::string, std::string> extproc_map_; // RPG name → C++ name (EXTPROC/EXTPGM)
+    std::map<std::string, std::string> dtaara_vars_; // varname → data area name
     std::map<std::string, std::vector<std::string>> cursor_host_vars_; // cursor name → host vars for binding at OPEN
 };
 

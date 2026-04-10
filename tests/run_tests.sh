@@ -292,6 +292,14 @@ run_test "87" "XML-INTO" "$TESTDIR/test87.rpgle" "run"
 run_test "88" "XML-INTO Array DS" "$TESTDIR/test88.rpgle" "run"
 run_test "89" "XML-INTO Path+Nested" "$TESTDIR/test89.rpgle" "run"
 
+# Tests 90-91: PSDS
+run_test "90" "PSDS Basic" "$TESTDIR/test90_psds_basic.rpgle" "run"
+run_test "91" "PSDS + MONITOR" "$TESTDIR/test91_psds_monitor.rpgle" "run"
+
+# Tests 92-93: Data Areas
+run_test "92" "Data Area *LDA round-trip" "$TESTDIR/test92_data_area_lda.rpgle" "run"
+run_test "93" "Data Area named" "$TESTDIR/test93_data_area_named.rpgle" "run"
+
 echo ""
 echo "========================================"
 echo -e "  Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"

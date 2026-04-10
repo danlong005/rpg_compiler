@@ -159,6 +159,15 @@ XmlIntoStmt::XmlIntoStmt(std::string target, std::unique_ptr<Expression> xml_sou
       options(std::move(options)) {}
 void XmlIntoStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+DataInStmt::DataInStmt(std::string v) : var_name(std::move(v)) {}
+void DataInStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+DataOutStmt::DataOutStmt(std::string v) : var_name(std::move(v)) {}
+void DataOutStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+DataUnlockStmt::DataUnlockStmt(std::string v) : var_name(std::move(v)) {}
+void DataUnlockStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 } // namespace rpg

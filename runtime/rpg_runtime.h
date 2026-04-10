@@ -219,6 +219,133 @@ inline bool& rpg_error_flag() { static bool e = false; return e; }
 inline int rpg_status() { return rpg_status_code(); }
 inline int rpg_error() { return rpg_error_flag() ? 1 : 0; }
 
+// --- PSDS — Program Status Data Structure ---
+// Cross-platform PID
+#ifdef _WIN32
+#include <process.h>
+inline int rpg_get_pid() { return _getpid(); }
+#else
+#include <unistd.h>
+inline int rpg_get_pid() { return (int)getpid(); }
+#endif
+
+struct RpgPsds {
+    std::string proc_name;        // pos 1-10:   procedure/program name
+    int         status_code = 0;  // pos 11-15:  last status code
+    int         prev_status = 0;  // pos 16-20:  previous status code
+    std::string routine_name;     // pos 21-28:  routine name
+    int         parm_count = 0;   // pos 37-39:  parameter count
+    std::string program_name;     // pos 81-90:  program name
+    std::string user_profile;     // pos 91-100: user profile
+    std::string job_number;       // pos 101-108: job number (PID)
+    std::string run_date;         // pos 109-118: run date YYYYMMDD
+    std::string run_time;         // pos 119-124: run time HHMMSS
+};
+
+inline RpgPsds& rpg_psds() { static RpgPsds p; return p; }
+
+inline std::string rpg_basename_prog(const char* path) {
+    std::string s = path ? path : "PROGRAM";
+    size_t p = s.find_last_of("/\\");
+    if (p != std::string::npos) s = s.substr(p + 1);
+    size_t dot = s.rfind('.');
+    if (dot != std::string::npos) s = s.substr(0, dot);
+    for (auto& c : s) c = (char)toupper((unsigned char)c);
+    if (s.size() > 10) s = s.substr(0, 10);
+    return s;
+}
+
+inline void rpg_psds_init(const char* argv0) {
+    auto& p = rpg_psds();
+    p.proc_name = rpg_basename_prog(argv0);
+    p.program_name = p.proc_name;
+    p.routine_name = p.proc_name;
+    const char* u = std::getenv("USER");
+    if (!u) u = std::getenv("USERNAME");
+    if (u) {
+        p.user_profile = std::string(u);
+        if (p.user_profile.size() > 10) p.user_profile.resize(10);
+    } else {
+        p.user_profile = "UNKNOWN   ";
+    }
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%08d", rpg_get_pid());
+    p.job_number = buf;
+    std::time_t now = std::time(nullptr);
+    std::tm* t = std::localtime(&now);
+    std::snprintf(buf, sizeof(buf), "%04d%02d%02d",
+        t->tm_year + 1900, t->tm_mon + 1, t->tm_mday);
+    p.run_date = buf;
+    std::snprintf(buf, sizeof(buf), "%02d%02d%02d",
+        t->tm_hour, t->tm_min, t->tm_sec);
+    p.run_time = buf;
+}
+
+inline void rpg_psds_sync() {
+    rpg_psds().status_code = rpg_status_code();
+    rpg_psds().prev_status = rpg_status_code();
+}
+
+inline std::string rpg_psds_field_str(int pos) {
+    auto& p = rpg_psds();
+    if (pos >= 1   && pos <= 10)  return p.proc_name;
+    if (pos >= 21  && pos <= 28)  return p.routine_name;
+    if (pos >= 81  && pos <= 90)  return p.program_name;
+    if (pos >= 91  && pos <= 100) return p.user_profile;
+    if (pos >= 101 && pos <= 108) return p.job_number;
+    if (pos >= 109 && pos <= 118) return p.run_date;
+    if (pos >= 119 && pos <= 124) return p.run_time;
+    return "";
+}
+inline int rpg_psds_field_int(int pos) {
+    if (pos >= 11 && pos <= 15) return rpg_status_code();
+    if (pos >= 16 && pos <= 20) return rpg_psds().prev_status;
+    if (pos >= 37 && pos <= 39) return rpg_psds().parm_count;
+    return 0;
+}
+
+// --- Data Areas ---
+#include <filesystem>
+#include <fstream>
+
+inline std::filesystem::path rpg_da_dir() {
+    const char* env = std::getenv("RPGC_DA_DIR");
+    if (env && env[0]) {
+        std::filesystem::path p(env);
+        std::filesystem::create_directories(p);
+        return p;
+    }
+    const char* home = std::getenv("HOME");
+    if (!home) home = std::getenv("USERPROFILE");
+    std::filesystem::path p = home ? std::filesystem::path(home) / ".rpgc" / "da"
+                                   : std::filesystem::path(".rpgc") / "da";
+    std::filesystem::create_directories(p);
+    return p;
+}
+
+inline std::string rpg_da_path(const std::string& name) {
+    std::string upper = name;
+    for (auto& c : upper) c = (char)toupper((unsigned char)c);
+    if (!upper.empty() && upper[0] == '*') upper = upper.substr(1);
+    return (rpg_da_dir() / upper).string();
+}
+
+inline std::string rpg_da_read(const std::string& name, int max_len) {
+    std::ifstream f(rpg_da_path(name), std::ios::binary);
+    if (!f) return std::string(max_len, ' ');
+    std::string content((std::istreambuf_iterator<char>(f)),
+                         std::istreambuf_iterator<char>());
+    content.resize(max_len, ' ');
+    return content;
+}
+
+inline void rpg_da_write(const std::string& name, const std::string& value) {
+    std::ofstream f(rpg_da_path(name), std::ios::binary | std::ios::trunc);
+    f << value;
+}
+
+inline void rpg_da_unlock(const std::string& /*name*/) {}
+
 // --- %CHAR: generic to-string conversion ---
 inline std::string rpg_to_char(int v) { return std::to_string(v); }
 inline std::string rpg_to_char(unsigned int v) { return std::to_string(v); }
