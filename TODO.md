@@ -120,7 +120,7 @@
 | 3 | ~~COMMIT / ROLBK~~ — Moved to Embedded SQL Phase 2 | Opcodes |
 | 4 | IN / OUT — Data area operations | Opcodes |
 | 5 | *USER — Current user profile figurative constant | Constants |
-| 6 | PSDS — Program Status Data Structure | DS Keywords |
+| 6 | ✅ PSDS — Program Status Data Structure | DS Keywords |
 | 7 | %ELEM(*ALLOC) / %ELEM(*KEEP) — Varying array control | BIFs |
 | 8 | SND-MSG / ON-EXCP — Message operations (7.5+) | Modern |
 | 9 | DATA-INTO / DATA-GEN (%DATA, %GEN, %PARSER) | Modern |
@@ -352,3 +352,7 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 87 | XML-INTO (direct mode, %XML, case options) |
 | 88 | XML-INTO array DS (fixed DIM, DIM(*VAR), path option) |
 | 89 | XML-INTO path option + nested DS (LIKEDS subfields) |
+| 90 | PSDS Basic |
+| 91 | PSDS + MONITOR |
+| 92 | Data Area *LDA round-trip |
+| 93 | Data Area named |
