@@ -331,8 +331,20 @@ inline std::string rpg_da_path(const std::string& name) {
 }
 
 inline std::string rpg_da_read(const std::string& name, int max_len) {
-    std::ifstream f(rpg_da_path(name), std::ios::binary);
-    if (!f) return std::string(max_len, ' ');
+    std::string path = rpg_da_path(name);
+    if (!std::filesystem::exists(path)) {
+        rpg_status_code() = 401; // data area not found
+        rpg_error_flag() = true;
+        return std::string(max_len, ' ');
+    }
+    std::ifstream f(path, std::ios::binary);
+    if (!f) {
+        rpg_status_code() = 415; // error accessing data area
+        rpg_error_flag() = true;
+        return std::string(max_len, ' ');
+    }
+    rpg_status_code() = 0;
+    rpg_error_flag() = false;
     std::string content((std::istreambuf_iterator<char>(f)),
                          std::istreambuf_iterator<char>());
     content.resize(max_len, ' ');
@@ -341,7 +353,19 @@ inline std::string rpg_da_read(const std::string& name, int max_len) {
 
 inline void rpg_da_write(const std::string& name, const std::string& value) {
     std::ofstream f(rpg_da_path(name), std::ios::binary | std::ios::trunc);
+    if (!f) {
+        rpg_status_code() = 413; // error updating data area
+        rpg_error_flag() = true;
+        return;
+    }
     f << value;
+    if (!f) {
+        rpg_status_code() = 413;
+        rpg_error_flag() = true;
+        return;
+    }
+    rpg_status_code() = 0;
+    rpg_error_flag() = false;
 }
 
 inline void rpg_da_unlock(const std::string& /*name*/) {}

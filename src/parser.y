@@ -107,6 +107,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_CONST KW_INZ
 %token KW_DSPLY
 %token KW_EVAL KW_EVAL_CORR KW_EVALR KW_CALLP KW_LEAVESR KW_ON_EXIT KW_DEALLOC KW_TEST
+%token <sval> KW_EVAL_EXT KW_EVALR_EXT KW_CALLP_EXT
 %token KW_STATIC KW_TEMPLATE KW_BASED KW_OPTIONS KW_NOPASS KW_OMIT
 %token KW_EXPORT KW_IMPORT KW_EXTPGM KW_EXTPROC KW_CTLOPT
 %token KW_RETURN
@@ -600,6 +601,14 @@ eval_stmt:
             std::unique_ptr<rpg::Expression>($4)
         );
     }
+    | KW_EVAL_EXT eval_target EQUALS expression SEMICOLON {
+        auto* s = new rpg::EvalStmt(
+            std::unique_ptr<rpg::Expression>($2),
+            std::unique_ptr<rpg::Expression>($4)
+        );
+        s->extenders = $1; free($1);
+        $$ = s;
+    }
     ;
 
 eval_corr_stmt:
@@ -653,11 +662,23 @@ evalr_stmt:
             std::unique_ptr<rpg::Expression>($4)
         );
     }
+    | KW_EVALR_EXT eval_target EQUALS expression SEMICOLON {
+        auto* s = new rpg::EvalRStmt(
+            std::unique_ptr<rpg::Expression>($2),
+            std::unique_ptr<rpg::Expression>($4)
+        );
+        s->extenders = $1; free($1);
+        $$ = s;
+    }
     ;
 
 callp_stmt:
     KW_CALLP expression SEMICOLON {
-        $$ = new rpg::ExprStmt(std::unique_ptr<rpg::Expression>($2));
+        $$ = new rpg::CallpStmt(std::unique_ptr<rpg::Expression>($2), "");
+    }
+    | KW_CALLP_EXT expression SEMICOLON {
+        $$ = new rpg::CallpStmt(std::unique_ptr<rpg::Expression>($2), $1);
+        free($1);
     }
     ;
 

@@ -200,8 +200,29 @@ static void parse_ctlopt(const char* text) {
 "DSPLY"             { return KW_DSPLY; }
 "EVAL-CORR"         { return KW_EVAL_CORR; }
 "XML-INTO"          { return KW_XML_INTO; }
+"EVALR("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_EVALR_EXT;
+}
 "EVALR"             { return KW_EVALR; }
+"EVAL("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_EVAL_EXT;
+}
 "EVAL"              { return KW_EVAL; }
+"CALLP("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_CALLP_EXT;
+}
 "CALLP"             { return KW_CALLP; }
 "LEAVESR"           { return KW_LEAVESR; }
 "ON-EXIT"           { return KW_ON_EXIT; }

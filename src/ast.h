@@ -166,6 +166,7 @@ class EvalStmt : public Statement {
 public:
     std::unique_ptr<Expression> target;
     std::unique_ptr<Expression> value;
+    std::string extenders; // e.g. "H", "MR", "E"
     EvalStmt(std::unique_ptr<Expression> target, std::unique_ptr<Expression> value);
     void accept(ASTVisitor& visitor) override;
 };
@@ -394,6 +395,7 @@ class EvalRStmt : public Statement {
 public:
     std::unique_ptr<Expression> target;
     std::unique_ptr<Expression> value;
+    std::string extenders; // e.g. "H", "E"
     EvalRStmt(std::unique_ptr<Expression> target, std::unique_ptr<Expression> value);
     void accept(ASTVisitor& visitor) override;
 };
@@ -444,6 +446,14 @@ class DataUnlockStmt : public Statement {
 public:
     std::string var_name;
     explicit DataUnlockStmt(std::string v);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class CallpStmt : public Statement {
+public:
+    std::unique_ptr<Expression> expr;
+    std::string extenders; // e.g. "E"
+    CallpStmt(std::unique_ptr<Expression> expr, std::string extenders);
     void accept(ASTVisitor& visitor) override;
 };
 
@@ -627,6 +637,7 @@ public:
     virtual void visit(DataInStmt& node) = 0;
     virtual void visit(DataOutStmt& node) = 0;
     virtual void visit(DataUnlockStmt& node) = 0;
+    virtual void visit(CallpStmt& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 

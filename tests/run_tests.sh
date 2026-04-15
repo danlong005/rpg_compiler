@@ -300,6 +300,30 @@ run_test "91" "PSDS + MONITOR" "$TESTDIR/test91_psds_monitor.rpgle" "run"
 run_test "92" "Data Area *LDA round-trip" "$TESTDIR/test92_data_area_lda.rpgle" "run"
 run_test "93" "Data Area named" "$TESTDIR/test93_data_area_named.rpgle" "run"
 
+# Tests 94-95: Operation Extenders
+run_test "94" "Extender (H) Half-Adjust" "$TESTDIR/test94_extender_h.rpgle" "run"
+run_test "95" "Extender (E) Error" "$TESTDIR/test95_extender_e.rpgle" "run"
+
+# Tests 96-98: Data Area %STATUS codes
+_DA_DIR="$HOME/.rpgc/da"
+mkdir -p "$_DA_DIR"
+
+# 96: status 401 — data area file must not exist
+rm -f "$_DA_DIR/NOSUCHDA96"
+run_test "96" "DA Status 401 (not found)" "$TESTDIR/test96_da_status401.rpgle" "run"
+
+# 97: status 415 — file exists but no read permission
+printf '%-10s' 'TESTDATA' > "$_DA_DIR/RPGCTEST97DA"
+chmod 000 "$_DA_DIR/RPGCTEST97DA"
+run_test "97" "DA Status 415 (cannot read)" "$TESTDIR/test97_da_status415.rpgle" "run"
+chmod 644 "$_DA_DIR/RPGCTEST97DA" 2>/dev/null; rm -f "$_DA_DIR/RPGCTEST97DA"
+
+# 98: status 413 — file exists but no write permission
+printf '%-10s' 'TESTDATA' > "$_DA_DIR/RPGCTEST98DA"
+chmod 444 "$_DA_DIR/RPGCTEST98DA"
+run_test "98" "DA Status 413 (cannot write)" "$TESTDIR/test98_da_status413.rpgle" "run"
+chmod 644 "$_DA_DIR/RPGCTEST98DA" 2>/dev/null; rm -f "$_DA_DIR/RPGCTEST98DA"
+
 echo ""
 echo "========================================"
 echo -e "  Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"

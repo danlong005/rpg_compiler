@@ -66,13 +66,13 @@
 | 233 | Halt indicator on when RETURN | ✅ |
 | 299 | RPG IV runtime error | ✅ |
 | 301-399 | File I/O errors | N/A (using SQL) |
-| 401 | Data area not found | Maybe |
-| 402 | Data area type/length mismatch | Maybe |
-| 411 | Data area not locked | Maybe |
-| 412 | Data area lock error | Maybe |
-| 413 | Error updating data area | Maybe |
-| 414 | User not authorized to data area | Maybe |
-| 415 | Error accessing data area | Maybe |
+| 401 | Data area not found | ✅ |
+| 402 | Data area type/length mismatch | N/A (file-based, no schema) |
+| 411 | Data area not locked | N/A (locking is a no-op) |
+| 412 | Data area lock error | N/A (locking is a no-op) |
+| 413 | Error updating data area | ✅ |
+| 414 | User not authorized to data area | N/A (IBM i user profiles) |
+| 415 | Error accessing data area | ✅ |
 | 421 | Error calling DSPLY | ✅ |
 | 431 | Error calling SND-MSG | N/A (IBM i) |
 | 450 | Character conversion error | ✅ |
@@ -115,19 +115,19 @@
 
 | # | Feature | Section |
 |---|---------|---------|
-| 1 | Operation extenders (E), (H), (N), (M), (R), (P) | Opcodes |
+| 1 | ✅ Operation extenders (E), (H), (N), (M), (R), (P) | Opcodes |
 | 2 | DUMP opcode (debug) | Opcodes |
 | 3 | ~~COMMIT / ROLBK~~ — Moved to Embedded SQL Phase 2 | Opcodes |
-| 4 | IN / OUT — Data area operations | Opcodes |
+| 4 | ✅ IN / OUT — Data area operations | Opcodes |
 | 5 | *USER — Current user profile figurative constant | Constants |
 | 6 | ✅ PSDS — Program Status Data Structure | DS Keywords |
 | 7 | %ELEM(*ALLOC) / %ELEM(*KEEP) — Varying array control | BIFs |
 | 8 | SND-MSG / ON-EXCP — Message operations (7.5+) | Modern |
 | 9 | DATA-INTO / DATA-GEN (%DATA, %GEN, %PARSER) | Modern |
 | 10 | OVERLOAD — Overloaded procedures (7.4+) | Modern |
-| 11 | Data area operations (IN/OUT/UNLOCK, DTAARA, *LDA/*GDA/*PDA) | Data Areas |
+| 11 | ✅ Data area operations (IN/OUT/UNLOCK, DTAARA, *LDA/*GDA/*PDA) | Data Areas |
 | 12 | %DATA, %GEN, %PARSER, %HANDLER, %XML, %MSG, %TARGET — Companion BIFs | BIFs |
-| 13 | RPG status codes (full %STATUS value set) | Error Handling |
+| 13 | ✅ RPG status codes (full %STATUS value set) | Error Handling |
 
 ### ~~File I/O~~ — Not Planned (using SQL as data access path instead)
 ~~Full DCL-F, CHAIN, READ, WRITE, UPDATE, DELETE, SETLL, SETGT, record formats, INFSR~~
@@ -356,3 +356,8 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 91 | PSDS + MONITOR |
 | 92 | Data Area *LDA round-trip |
 | 93 | Data Area named |
+| 94 | Extender (H) Half-Adjust |
+| 95 | Extender (E) Error |
+| 96 | DA Status 401 (not found) |
+| 97 | DA Status 415 (cannot read) |
+| 98 | DA Status 413 (cannot write) |

@@ -168,6 +168,10 @@ void DataOutStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 DataUnlockStmt::DataUnlockStmt(std::string v) : var_name(std::move(v)) {}
 void DataUnlockStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+CallpStmt::CallpStmt(std::unique_ptr<Expression> e, std::string ext)
+    : expr(std::move(e)), extenders(std::move(ext)) {}
+void CallpStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 } // namespace rpg

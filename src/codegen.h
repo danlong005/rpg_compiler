@@ -61,6 +61,7 @@ public:
     void visit(DataInStmt& node) override;
     void visit(DataOutStmt& node) override;
     void visit(DataUnlockStmt& node) override;
+    void visit(CallpStmt& node) override;
     void visit(Program& node) override;
 
 private:

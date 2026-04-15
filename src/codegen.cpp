@@ -1134,7 +1134,35 @@ void CodeGen::visit(EvalStmt& node) {
         }
     }
 
-    out_ << target_str << " = " << emitExpr(*node.value) << ";";
+    bool half_adj = node.extenders.find('H') != std::string::npos
+                 || node.extenders.find('R') != std::string::npos;
+    bool error_ext = node.extenders.find('E') != std::string::npos;
+
+    std::string rhs = emitExpr(*node.value);
+    if (half_adj) {
+        // Check if target is a numeric type so we apply rounding
+        auto* tgt_id = dynamic_cast<rpg::Identifier*>(node.target.get());
+        bool is_numeric = false;
+        if (tgt_id && var_types_.count(tgt_id->name)) {
+            auto t = var_types_[tgt_id->name];
+            is_numeric = (t == RPGType::INT10 || t == RPGType::PACKED ||
+                          t == RPGType::ZONED  || t == RPGType::FLOAT4 ||
+                          t == RPGType::FLOAT8 || t == RPGType::UNS    ||
+                          t == RPGType::BINDEC);
+        }
+        if (is_numeric) {
+            rhs = "static_cast<decltype(" + target_str + ")>(std::round(static_cast<double>(" + rhs + ")))";
+        }
+    }
+
+    if (error_ext) {
+        out_ << "rpg_error_flag() = false; rpg_status_code() = 0;\n";
+        emitIndent();
+        out_ << "try { " << target_str << " = " << rhs << "; }";
+        out_ << " catch (...) { rpg_error_flag() = true; rpg_status_code() = 202; }";
+    } else {
+        out_ << target_str << " = " << rhs << ";";
+    }
     if (node.line > 0) out_ << " // line " << node.line;
     out_ << "\n";
 }
@@ -2237,7 +2265,13 @@ void CodeGen::visit(EvalRStmt& node) {
     emitIndent();
     std::string target = emitExpr(*node.target);
     std::string value = emitExpr(*node.value);
-    out_ << target << " = rpg_evalr(" << target << ", " << value << ");\n";
+    bool half_adj = node.extenders.find('H') != std::string::npos;
+    if (half_adj) {
+        // EVALR(H): right-adjust with half-adjust on numeric result
+        out_ << target << " = rpg_evalr(" << target << ", std::to_string(std::round(std::stod(" << value << "))));\n";
+    } else {
+        out_ << target << " = rpg_evalr(" << target << ", " << value << ");\n";
+    }
 }
 
 void CodeGen::visit(LeaveSRStmt& node) {
@@ -2446,6 +2480,24 @@ void CodeGen::visit(DataUnlockStmt& node) {
     if (it != dtaara_vars_.end()) {
         emitIndent();
         out_ << "rpg_da_unlock(\"" << it->second << "\");\n";
+    }
+}
+
+void CodeGen::visit(CallpStmt& node) {
+    bool error_ext = node.extenders.find('E') != std::string::npos;
+    emitIndent();
+    if (error_ext) {
+        out_ << "rpg_error_flag() = false; rpg_status_code() = 0;\n";
+        emitIndent();
+        out_ << "try {\n";
+        indent_++;
+        emitIndent();
+        out_ << emitExpr(*node.expr) << ";\n";
+        indent_--;
+        emitIndent();
+        out_ << "} catch (...) { rpg_error_flag() = true; rpg_status_code() = 202; }\n";
+    } else {
+        out_ << emitExpr(*node.expr) << ";\n";
     }
 }
 
