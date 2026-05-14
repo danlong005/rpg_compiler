@@ -196,24 +196,34 @@ int main(int argc, char* argv[]) {
             mkdir(".vscode", 0755);
         }
 
+        // Choose debugger type based on platform
+#if defined(_WIN32)
+        std::string dbg_type = "cppvsdbg";
+        std::string dbg_ext  = "ms-vscode.cpptools";
+        std::string dbg_ext_name = "C/C++ (ms-vscode.cpptools)";
+#else
+        std::string dbg_type = "lldb";
+        std::string dbg_ext  = "vadimcn.vscode-lldb";
+        std::string dbg_ext_name = "CodeLLDB (vadimcn.vscode-lldb)";
+#endif
+
         std::ofstream launch(".vscode/launch.json");
         if (launch) {
             launch << "{\n";
             launch << "    \"version\": \"0.2.0\",\n";
             launch << "    \"configurations\": [\n";
             launch << "        {\n";
-            launch << "            \"type\": \"lldb\",\n";
+            launch << "            \"type\": \"" << dbg_type << "\",\n";
             launch << "            \"request\": \"launch\",\n";
             launch << "            \"name\": \"Debug " << base << "\",\n";
             launch << "            \"program\": \"" << abs_exe << "\",\n";
             launch << "            \"args\": [],\n";
-            launch << "            \"cwd\": \"${workspaceFolder}\",\n";
-            launch << "            \"sourceLanguages\": [\"rpgle\"]\n";
+            launch << "            \"cwd\": \"${workspaceFolder}\"\n";
             launch << "        }\n";
             launch << "    ]\n";
             launch << "}\n";
             std::cerr << "Debug info written to .vscode/launch.json\n";
-            std::cerr << "Install the CodeLLDB extension in VS Code, then press F5 to debug.\n";
+            std::cerr << "Install the " << dbg_ext_name << " extension in VS Code, then press F5 to debug.\n";
         }
     }
 

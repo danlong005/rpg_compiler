@@ -79,7 +79,14 @@ By default, `rpgc` compiles the RPG source all the way to an executable:
 
 **One-time setup:**
 
-1. Install the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension in VS Code.
+Install the appropriate VS Code extension for your platform:
+
+| Platform | Extension |
+|----------|-----------|
+| macOS / Linux | [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) (`vadimcn.vscode-lldb`) |
+| Windows | [C/C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) (`ms-vscode.cpptools`) |
+
+`rpgc -g` automatically generates the correct `launch.json` for your platform.
 
 **Per-program workflow:**
 
