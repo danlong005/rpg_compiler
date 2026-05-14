@@ -13,6 +13,10 @@ namespace rpg {
 class CodeGen : public ASTVisitor {
 public:
     std::string generate(Program& program);
+    void setDebugMode(bool on, const std::string& src_file) {
+        debug_mode_ = on;
+        source_file_ = src_file;
+    }
 
     void visit(Identifier& node) override;
     void visit(IntLiteral& node) override;
@@ -58,6 +62,8 @@ public:
     void visit(DclEnum& node) override;
     void visit(ExecSqlStmt& node) override;
     void visit(XmlIntoStmt& node) override;
+    void visit(DataIntoStmt& node) override;
+    void visit(DataGenStmt& node) override;
     void visit(DataInStmt& node) override;
     void visit(DataOutStmt& node) override;
     void visit(DataUnlockStmt& node) override;
@@ -75,11 +81,16 @@ private:
     std::string current_proc_name_;
     std::string datfmt_; // default date format (e.g., "*ISO", "*USA", "*MDY")
     std::string timfmt_; // default time format
-    bool uses_sql_ = false;  // program contains EXEC SQL statements
-    bool uses_xml_ = false;  // program contains XML-INTO statements
-    bool uses_psds_ = false; // program declares a PSDS
+    bool debug_mode_ = false; // emit #line directives for source-level debugging
+    std::string source_file_; // absolute path to the .rpgle source file
+
+    bool uses_sql_ = false;   // program contains EXEC SQL statements
+    bool uses_xml_ = false;   // program contains XML-INTO statements
+    bool uses_json_ = false;  // program contains DATA-INTO / DATA-GEN statements
+    bool uses_psds_ = false;  // program declares a PSDS
 
     void emitIndent();
+    void emitLineDirective(int line);
     void emitStatements(std::vector<std::unique_ptr<Statement>>& stmts);
     std::string emitExpr(Expression& expr);
     std::string typeToString(RPGType type, int length = 0);
@@ -91,6 +102,10 @@ private:
 
     // XML-INTO codegen helpers
     void emitXmlFieldAssignments(DclDS* ds, const std::string& target, const std::string& xml_src);
+
+    // DATA-INTO / DATA-GEN codegen helpers
+    void emitJsonFieldAssignments(DclDS* ds, const std::string& target, const std::string& json_src);
+    void emitJsonFieldGeneration(DclDS* ds, const std::string& source, const std::string& out_var, bool first);
 
     // SQL codegen helpers
     void emitSqlBindParam(const std::string& var, int index, const std::string& handle = "__hstmt");

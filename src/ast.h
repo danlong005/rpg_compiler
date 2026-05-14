@@ -426,6 +426,30 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// DATA-INTO statement — parse data (JSON etc.) into a DS
+class DataIntoStmt : public Statement {
+public:
+    std::string target;                          // target DS variable
+    std::unique_ptr<Expression> data_source;     // source expression (%DATA first arg)
+    std::unique_ptr<Expression> options;         // options string (%DATA second arg, optional)
+    std::unique_ptr<Expression> parser;          // %PARSER arg (optional, stubbed)
+    DataIntoStmt(std::string target, std::unique_ptr<Expression> data_source,
+                 std::unique_ptr<Expression> options, std::unique_ptr<Expression> parser);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// DATA-GEN statement — generate data (JSON etc.) from a DS into a string variable
+class DataGenStmt : public Statement {
+public:
+    std::string source_ds;                       // source DS variable
+    std::unique_ptr<Expression> output_var;      // output variable expression (%DATA first arg)
+    std::unique_ptr<Expression> options;         // options string (%DATA second arg, optional)
+    std::unique_ptr<Expression> parser;          // %PARSER arg (optional, stubbed)
+    DataGenStmt(std::string source_ds, std::unique_ptr<Expression> output_var,
+                std::unique_ptr<Expression> options, std::unique_ptr<Expression> parser);
+    void accept(ASTVisitor& visitor) override;
+};
+
 // --- Data Area Statements ---
 
 class DataInStmt : public Statement {
@@ -634,6 +658,8 @@ public:
     virtual void visit(DclEnum& node) = 0;
     virtual void visit(ExecSqlStmt& node) = 0;
     virtual void visit(XmlIntoStmt& node) = 0;
+    virtual void visit(DataIntoStmt& node) = 0;
+    virtual void visit(DataGenStmt& node) = 0;
     virtual void visit(DataInStmt& node) = 0;
     virtual void visit(DataOutStmt& node) = 0;
     virtual void visit(DataUnlockStmt& node) = 0;

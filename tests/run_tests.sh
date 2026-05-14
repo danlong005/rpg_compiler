@@ -324,6 +324,12 @@ chmod 444 "$_DA_DIR/RPGCTEST98DA"
 run_test "98" "DA Status 413 (cannot write)" "$TESTDIR/test98_da_status413.rpgle" "run"
 chmod 644 "$_DA_DIR/RPGCTEST98DA" 2>/dev/null; rm -f "$_DA_DIR/RPGCTEST98DA"
 
+# 99: DATA-INTO — parse JSON into DS
+run_test "99" "DATA-INTO JSON parsing" "$TESTDIR/test99_data_into.rpgle" "run"
+
+# 100: DATA-GEN — generate JSON from DS
+run_test "100" "DATA-GEN JSON generation" "$TESTDIR/test100_data_gen.rpgle" "run"
+
 echo ""
 echo "========================================"
 echo -e "  Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"

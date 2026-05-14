@@ -200,6 +200,8 @@ static void parse_ctlopt(const char* text) {
 "DSPLY"             { return KW_DSPLY; }
 "EVAL-CORR"         { return KW_EVAL_CORR; }
 "XML-INTO"          { return KW_XML_INTO; }
+"DATA-INTO"         { return KW_DATA_INTO; }
+"DATA-GEN"          { return KW_DATA_GEN; }
 "EVALR("[EHMNRP]+")" {
     char *p = strchr(yytext, '(') + 1;
     char ext[16] = {0}; int i = 0;
@@ -403,6 +405,8 @@ static void parse_ctlopt(const char* text) {
 "%YEARS"            { return BIF_YEARS; }
 "%GETENV"           { return BIF_GETENV; }
 "%XML"              { return BIF_XML; }
+"%DATA"             { return BIF_DATA; }
+"%PARSER"           { return BIF_PARSER; }
 "*INZSR"            { yylval.sval = strdup("*INZSR"); return IDENTIFIER; }
 "*PSSR"             { yylval.sval = strdup("*PSSR"); return IDENTIFIER; }
 "*LDA"              { yylval.sval = strdup("*LDA"); return IDENTIFIER; }

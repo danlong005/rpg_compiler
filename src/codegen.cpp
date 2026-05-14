@@ -35,8 +35,15 @@ static std::string stripOuterParens(const std::string& s) {
     return s;
 }
 
+void CodeGen::emitLineDirective(int line) {
+    if (debug_mode_ && line > 0 && !source_file_.empty()) {
+        out_ << "#line " << line << " \"" << source_file_ << "\"\n";
+    }
+}
+
 void CodeGen::emitStatements(std::vector<std::unique_ptr<Statement>>& stmts) {
     for (auto& s : stmts) {
+        emitLineDirective(s->line);
         s->accept(*this);
     }
 }
@@ -529,6 +536,8 @@ void CodeGen::visit(Program& node) {
     for (auto& stmt : node.statements) {
         if (dynamic_cast<ExecSqlStmt*>(stmt.get())) uses_sql_ = true;
         if (dynamic_cast<XmlIntoStmt*>(stmt.get())) uses_xml_ = true;
+        if (dynamic_cast<DataIntoStmt*>(stmt.get())) uses_json_ = true;
+        if (dynamic_cast<DataGenStmt*>(stmt.get())) uses_json_ = true;
         auto* ds = dynamic_cast<DclDS*>(stmt.get());
         if (ds && ds->is_psds) uses_psds_ = true;
         // Also check inside procedures
@@ -537,9 +546,11 @@ void CodeGen::visit(Program& node) {
             for (auto& s : proc->body) {
                 if (dynamic_cast<ExecSqlStmt*>(s.get())) uses_sql_ = true;
                 if (dynamic_cast<XmlIntoStmt*>(s.get())) uses_xml_ = true;
+                if (dynamic_cast<DataIntoStmt*>(s.get())) uses_json_ = true;
+                if (dynamic_cast<DataGenStmt*>(s.get())) uses_json_ = true;
             }
         }
-        if (uses_sql_ && uses_xml_ && uses_psds_) break;
+        if (uses_sql_ && uses_xml_ && uses_json_ && uses_psds_) break;
     }
 
     out_ << "#include \"rpg_runtime.h\"\n";
@@ -548,6 +559,9 @@ void CodeGen::visit(Program& node) {
     }
     if (uses_xml_) {
         out_ << "#include \"rpg_xml_runtime.h\"\n";
+    }
+    if (uses_json_) {
+        out_ << "#include \"rpg_json_runtime.h\"\n";
     }
     out_ << "#include <algorithm>\n";
     out_ << "#include <array>\n";
@@ -687,21 +701,25 @@ void CodeGen::visit(Program& node) {
 
     // 1. Emit declarations
     for (auto* s : decl_stmts) {
+        emitLineDirective(s->line);
         s->accept(*this);
     }
 
     // 2. Emit subroutine lambdas (so they can be called later)
     for (auto* s : sr_stmts) {
+        emitLineDirective(s->line);
         s->accept(*this);
     }
 
     // 2.5 Emit *PSSR lambda
     if (pssr_stmt) {
+        emitLineDirective(pssr_stmt->line);
         pssr_stmt->accept(*this);
     }
 
     // 3. Emit *INZSR and auto-call it
     if (inzsr_stmt) {
+        emitLineDirective(inzsr_stmt->line);
         inzsr_stmt->accept(*this);
         emitIndent();
         out_ << "sr__INZSR();\n";
@@ -712,6 +730,7 @@ void CodeGen::visit(Program& node) {
         emitIndent(); out_ << "try {\n"; indent_++;
     }
     for (auto* s : exec_stmts) {
+        emitLineDirective(s->line);
         s->accept(*this);
     }
     if (pssr_stmt) {
@@ -1555,7 +1574,16 @@ void CodeGen::visit(FloatLiteral& node) {
 }
 
 void CodeGen::visit(StringLiteral& node) {
-    expr_ << "\"" << node.value << "\"";
+    expr_ << "\"";
+    for (unsigned char c : node.value) {
+        if (c == '"')       expr_ << "\\\"";
+        else if (c == '\\') expr_ << "\\\\";
+        else if (c == '\n') expr_ << "\\n";
+        else if (c == '\r') expr_ << "\\r";
+        else if (c == '\t') expr_ << "\\t";
+        else                expr_ << static_cast<char>(c);
+    }
+    expr_ << "\"";
 }
 
 void CodeGen::visit(BinaryExpr& node) {
@@ -2267,8 +2295,8 @@ void CodeGen::visit(EvalRStmt& node) {
     std::string value = emitExpr(*node.value);
     bool half_adj = node.extenders.find('H') != std::string::npos;
     if (half_adj) {
-        // EVALR(H): right-adjust with half-adjust on numeric result
-        out_ << target << " = rpg_evalr(" << target << ", std::to_string(std::round(std::stod(" << value << "))));\n";
+        // EVALR(H): round numeric value, convert to string, right-adjust
+        out_ << target << " = rpg_evalr(" << target << ", std::to_string((long long)std::round(static_cast<double>(" << value << "))));\n";
     } else {
         out_ << target << " = rpg_evalr(" << target << ", " << value << ");\n";
     }
@@ -2451,6 +2479,203 @@ void CodeGen::emitXmlFieldAssignments(DclDS* ds, const std::string& target, cons
             default:
                 out_ << target << "." << f.name << " = rpg_xml_get_str("
                      << xml_src << ", \"" << f.name << "\", __xml_case_any);\n";
+                break;
+        }
+    }
+}
+
+void CodeGen::visit(DataIntoStmt& node) {
+    auto it = ds_defs_.find(node.target);
+    if (it == ds_defs_.end()) {
+        emitIndent();
+        out_ << "// DATA-INTO: unknown target DS '" << node.target << "'\n";
+        return;
+    }
+    DclDS* ds = it->second;
+
+    std::string opts_expr = node.options ? emitExpr(*node.options) : "\"\"";
+    std::string data_expr = emitExpr(*node.data_source);
+
+    emitIndent();
+    out_ << "{\n";
+    indent_++;
+    emitIndent();
+    out_ << "RpgJsonNode __json_doc = rpg_json_parse(" << data_expr << ");\n";
+    emitIndent();
+    out_ << "std::string __json_opts = " << opts_expr << ";\n";
+    emitIndent();
+    out_ << "bool __json_case_any = (__json_opts.find(\"case=any\") != std::string::npos || "
+         << "__json_opts.find(\"case=upper\") != std::string::npos);\n";
+
+    bool is_array = (ds->dim > 0 || ds->dim_type != 0);
+    if (is_array) {
+        bool is_vector = (ds->dim_type == 1 || ds->dim_type == 2);
+        emitIndent();
+        out_ << "auto& __json_items = __json_doc.items;\n";
+        if (is_vector) {
+            emitIndent();
+            out_ << "for (size_t __ji = 0; __ji < __json_items.size() && static_cast<int>(__ji) < "
+                 << ds->dim << "; __ji++) {\n";
+            indent_++;
+            emitIndent();
+            out_ << "auto& __json_src = __json_items[__ji];\n";
+            emitIndent();
+            out_ << node.target << ".push_back({});\n";
+            emitIndent();
+            out_ << "auto& __json_tgt = " << node.target << ".back();\n";
+        } else {
+            emitIndent();
+            out_ << "for (size_t __ji = 0; __ji < __json_items.size() && __ji < "
+                 << node.target << ".size(); __ji++) {\n";
+            indent_++;
+            emitIndent();
+            out_ << "auto& __json_src = __json_items[__ji];\n";
+            emitIndent();
+            out_ << "auto& __json_tgt = " << node.target << "[__ji];\n";
+        }
+        emitJsonFieldAssignments(ds, "__json_tgt", "__json_src");
+        indent_--;
+        emitIndent();
+        out_ << "}\n";
+    } else {
+        emitIndent();
+        out_ << "auto& __json_src = __json_doc;\n";
+        emitJsonFieldAssignments(ds, node.target, "__json_src");
+    }
+
+    indent_--;
+    emitIndent();
+    out_ << "}\n";
+}
+
+void CodeGen::emitJsonFieldAssignments(DclDS* ds, const std::string& target, const std::string& json_src) {
+    for (auto& f : ds->fields) {
+        if (!f.likeds.empty()) {
+            auto nested_it = ds_defs_.find(f.likeds);
+            if (nested_it != ds_defs_.end()) {
+                emitIndent();
+                out_ << "{\n";
+                indent_++;
+                emitIndent();
+                out_ << "const RpgJsonNode* __nested_" << f.name << " = rpg_json_find("
+                     << json_src << ", \"" << f.name << "\", __json_case_any);\n";
+                emitIndent();
+                out_ << "if (__nested_" << f.name << ") {\n";
+                indent_++;
+                std::string nested_target = target + "." + f.name;
+                std::string nested_src = "*__nested_" + f.name;
+                emitJsonFieldAssignments(nested_it->second, nested_target, nested_src);
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+                indent_--;
+                emitIndent();
+                out_ << "}\n";
+            }
+            continue;
+        }
+        emitIndent();
+        switch (f.type) {
+            case RPGType::INT10:
+            case RPGType::UNS:
+                out_ << target << "." << f.name << " = rpg_json_get_int("
+                     << json_src << ", \"" << f.name << "\", __json_case_any);\n";
+                break;
+            case RPGType::PACKED:
+            case RPGType::ZONED:
+            case RPGType::FLOAT4:
+            case RPGType::FLOAT8:
+                out_ << target << "." << f.name << " = rpg_json_get_double("
+                     << json_src << ", \"" << f.name << "\", __json_case_any);\n";
+                break;
+            default:
+                out_ << target << "." << f.name << " = rpg_json_get_str("
+                     << json_src << ", \"" << f.name << "\", __json_case_any);\n";
+                break;
+        }
+    }
+}
+
+void CodeGen::visit(DataGenStmt& node) {
+    auto it = ds_defs_.find(node.source_ds);
+    if (it == ds_defs_.end()) {
+        emitIndent();
+        out_ << "// DATA-GEN: unknown source DS '" << node.source_ds << "'\n";
+        return;
+    }
+    DclDS* ds = it->second;
+
+    std::string output_expr = emitExpr(*node.output_var);
+
+    emitIndent();
+    out_ << "{\n";
+    indent_++;
+    emitIndent();
+    out_ << "std::string __json_out;\n";
+
+    bool is_array = (ds->dim > 0 || ds->dim_type != 0);
+    if (is_array) {
+        bool is_vector = (ds->dim_type == 1 || ds->dim_type == 2);
+        emitIndent();
+        out_ << "__json_out = \"[\";\n";
+        if (is_vector) {
+            emitIndent();
+            out_ << "for (size_t __gi = 0; __gi < " << node.source_ds << ".size(); __gi++) {\n";
+        } else {
+            emitIndent();
+            out_ << "for (size_t __gi = 0; __gi < " << node.source_ds << ".size(); __gi++) {\n";
+        }
+        indent_++;
+        emitIndent();
+        out_ << "if (__gi > 0) __json_out += \",\";\n";
+        emitIndent();
+        out_ << "__json_out += \"{\";\n";
+        emitJsonFieldGeneration(ds, node.source_ds + "[__gi]", "__json_out", true);
+        emitIndent();
+        out_ << "__json_out += \"}\";\n";
+        indent_--;
+        emitIndent();
+        out_ << "}\n";
+        emitIndent();
+        out_ << "__json_out += \"]\";\n";
+    } else {
+        emitIndent();
+        out_ << "__json_out = \"{\";\n";
+        emitJsonFieldGeneration(ds, node.source_ds, "__json_out", true);
+        emitIndent();
+        out_ << "__json_out += \"}\";\n";
+    }
+
+    emitIndent();
+    out_ << output_expr << " = __json_out;\n";
+    indent_--;
+    emitIndent();
+    out_ << "}\n";
+}
+
+void CodeGen::emitJsonFieldGeneration(DclDS* ds, const std::string& source,
+                                      const std::string& out_var, bool first) {
+    bool f_first = first;
+    for (auto& f : ds->fields) {
+        std::string sep = f_first ? "" : ",";
+        f_first = false;
+        std::string field_ref = source + "." + f.name;
+        emitIndent();
+        out_ << out_var << " += \"" << sep << "\\\"" << f.name << "\\\":\";\n";
+        emitIndent();
+        switch (f.type) {
+            case RPGType::INT10:
+            case RPGType::UNS:
+                out_ << out_var << " += std::to_string(" << field_ref << ");\n";
+                break;
+            case RPGType::PACKED:
+            case RPGType::ZONED:
+            case RPGType::FLOAT4:
+            case RPGType::FLOAT8:
+                out_ << out_var << " += std::to_string(" << field_ref << ");\n";
+                break;
+            default:
+                out_ << out_var << " += \"\\\"\" + rpg_json_escape(" << field_ref << ") + \"\\\"\";\n";
                 break;
         }
     }

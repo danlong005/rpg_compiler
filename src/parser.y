@@ -146,6 +146,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token BIF_PASSED BIF_OMITTED
 %token BIF_BITAND BIF_BITNOT BIF_BITOR BIF_BITXOR
 %token BIF_SCANR BIF_EDITFLT BIF_UNSH BIF_PARMNUM BIF_GETENV BIF_XML
+%token BIF_DATA BIF_PARSER
 %token KW_ALL
 %token KW_UNS KW_FLOAT_TYPE KW_BINDEC KW_UCS2 KW_GRAPH KW_OBJECT KW_JAVA
 %token KW_OVERLAY KW_POS KW_PREFIX KW_DATFMT KW_TIMFMT KW_EXTNAME KW_PSDS KW_SDS
@@ -156,7 +157,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token <sval> EXEC_SQL_TEXT
 %token POWER
 %token KW_DIM_VAR KW_DIM_AUTO
-%token KW_FOR_EACH KW_IN KW_XML_INTO
+%token KW_FOR_EACH KW_IN KW_XML_INTO KW_DATA_INTO KW_DATA_GEN
 %token <sval> IDENTIFIER
 %token <ival> INTEGER_LITERAL
 %token <fval> FLOAT_LITERAL
@@ -171,7 +172,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
 %type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt xml_into_stmt
-%type <stmt> in_da_stmt out_da_stmt unlock_da_stmt
+%type <stmt> in_da_stmt out_da_stmt unlock_da_stmt data_into_stmt data_gen_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
 %type <expr_list> arg_list call_arg_list call_args_opt
 %type <stmt_list> statement_list
@@ -262,7 +263,9 @@ statement:
     | dealloc_stmt  { $$ = $1; SET_LINE($$); }
     | test_stmt     { $$ = $1; SET_LINE($$); }
     | exec_sql_stmt { $$ = $1; SET_LINE($$); }
-    | xml_into_stmt { $$ = $1; SET_LINE($$); }
+    | xml_into_stmt  { $$ = $1; SET_LINE($$); }
+    | data_into_stmt { $$ = $1; SET_LINE($$); }
+    | data_gen_stmt  { $$ = $1; SET_LINE($$); }
     | in_da_stmt    { $$ = $1; SET_LINE($$); }
     | out_da_stmt   { $$ = $1; SET_LINE($$); }
     | unlock_da_stmt { $$ = $1; SET_LINE($$); }
@@ -630,6 +633,66 @@ xml_into_stmt:
         $$ = new rpg::XmlIntoStmt(std::string($2),
             std::unique_ptr<rpg::Expression>($5),
             nullptr);
+        free($2);
+    }
+    ;
+
+data_into_stmt:
+    KW_DATA_INTO ident BIF_DATA LPAREN expression COLON expression RPAREN BIF_PARSER LPAREN expression RPAREN SEMICOLON {
+        $$ = new rpg::DataIntoStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            std::unique_ptr<rpg::Expression>($7),
+            std::unique_ptr<rpg::Expression>($11));
+        free($2);
+    }
+    | KW_DATA_INTO ident BIF_DATA LPAREN expression COLON expression RPAREN SEMICOLON {
+        $$ = new rpg::DataIntoStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            std::unique_ptr<rpg::Expression>($7),
+            nullptr);
+        free($2);
+    }
+    | KW_DATA_INTO ident BIF_DATA LPAREN expression RPAREN BIF_PARSER LPAREN expression RPAREN SEMICOLON {
+        $$ = new rpg::DataIntoStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            nullptr,
+            std::unique_ptr<rpg::Expression>($9));
+        free($2);
+    }
+    | KW_DATA_INTO ident BIF_DATA LPAREN expression RPAREN SEMICOLON {
+        $$ = new rpg::DataIntoStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            nullptr, nullptr);
+        free($2);
+    }
+    ;
+
+data_gen_stmt:
+    KW_DATA_GEN ident BIF_DATA LPAREN expression COLON expression RPAREN BIF_PARSER LPAREN expression RPAREN SEMICOLON {
+        $$ = new rpg::DataGenStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            std::unique_ptr<rpg::Expression>($7),
+            std::unique_ptr<rpg::Expression>($11));
+        free($2);
+    }
+    | KW_DATA_GEN ident BIF_DATA LPAREN expression COLON expression RPAREN SEMICOLON {
+        $$ = new rpg::DataGenStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            std::unique_ptr<rpg::Expression>($7),
+            nullptr);
+        free($2);
+    }
+    | KW_DATA_GEN ident BIF_DATA LPAREN expression RPAREN BIF_PARSER LPAREN expression RPAREN SEMICOLON {
+        $$ = new rpg::DataGenStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            nullptr,
+            std::unique_ptr<rpg::Expression>($9));
+        free($2);
+    }
+    | KW_DATA_GEN ident BIF_DATA LPAREN expression RPAREN SEMICOLON {
+        $$ = new rpg::DataGenStmt(std::string($2),
+            std::unique_ptr<rpg::Expression>($5),
+            nullptr, nullptr);
         free($2);
     }
     ;

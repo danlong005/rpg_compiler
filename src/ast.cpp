@@ -159,6 +159,18 @@ XmlIntoStmt::XmlIntoStmt(std::string target, std::unique_ptr<Expression> xml_sou
       options(std::move(options)) {}
 void XmlIntoStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+DataIntoStmt::DataIntoStmt(std::string target, std::unique_ptr<Expression> data_source,
+                           std::unique_ptr<Expression> options, std::unique_ptr<Expression> parser)
+    : target(std::move(target)), data_source(std::move(data_source)),
+      options(std::move(options)), parser(std::move(parser)) {}
+void DataIntoStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+DataGenStmt::DataGenStmt(std::string source_ds, std::unique_ptr<Expression> output_var,
+                         std::unique_ptr<Expression> options, std::unique_ptr<Expression> parser)
+    : source_ds(std::move(source_ds)), output_var(std::move(output_var)),
+      options(std::move(options)), parser(std::move(parser)) {}
+void DataGenStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 DataInStmt::DataInStmt(std::string v) : var_name(std::move(v)) {}
 void DataInStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 

@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 #include <sys/stat.h>
+#include <climits>
+#include <cstdlib>
 #include "ast.h"
 #include "codegen.h"
 
@@ -17,8 +19,9 @@ extern int get_parse_error_count();
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: rpgc <input.rpgle> [-S] [-o output] [--keep-cpp]\n";
+        std::cerr << "Usage: rpgc <input.rpgle> [-S] [-g] [-o output] [--keep-cpp]\n";
         std::cerr << "  -S           Emit C++ source only, do not compile\n";
+        std::cerr << "  -g           Compile with debug info (for GDB/LLDB/VS Code)\n";
         std::cerr << "  -o file      Output file (executable, or C++ file with -S)\n";
         std::cerr << "  --keep-cpp   Keep the intermediate .cpp file after compiling\n";
         return 1;
@@ -28,10 +31,13 @@ int main(int argc, char* argv[]) {
     const char* output_file = nullptr;
     bool emit_only = false;
     bool keep_cpp = false;
+    bool debug_mode = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-S") == 0) {
             emit_only = true;
+        } else if (strcmp(argv[i], "-g") == 0) {
+            debug_mode = true;
         } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             output_file = argv[++i];
         } else if (strcmp(argv[i], "--keep-cpp") == 0) {
@@ -69,7 +75,16 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Resolve absolute path to source file for #line directives
+    std::string abs_source;
+    {
+        char buf[PATH_MAX];
+        if (realpath(input_file, buf)) abs_source = buf;
+        else abs_source = input_file;
+    }
+
     rpg::CodeGen codegen;
+    if (debug_mode) codegen.setDebugMode(true, abs_source);
     std::string cpp_code = codegen.generate(*program);
 
     if (emit_only) {
@@ -146,6 +161,9 @@ int main(int argc, char* argv[]) {
     }
 
     std::string cmd = "clang++ -std=c++17 -I" + runtime_dir;
+    if (debug_mode) {
+        cmd += " -g -O0";
+    }
     if (is_sql) {
         cmd += " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc";
     }
@@ -160,6 +178,43 @@ int main(int argc, char* argv[]) {
         std::cerr << "C++ compilation failed.\n";
         delete program;
         return 1;
+    }
+
+    // Generate .vscode/launch.json for VS Code debugging
+    if (debug_mode) {
+        // Resolve absolute path to the output binary
+        std::string abs_exe;
+        {
+            char buf[PATH_MAX];
+            if (realpath(exe_path.c_str(), buf)) abs_exe = buf;
+            else abs_exe = exe_path;
+        }
+
+        // Create .vscode directory if needed
+        struct stat st;
+        if (stat(".vscode", &st) != 0) {
+            mkdir(".vscode", 0755);
+        }
+
+        std::ofstream launch(".vscode/launch.json");
+        if (launch) {
+            launch << "{\n";
+            launch << "    \"version\": \"0.2.0\",\n";
+            launch << "    \"configurations\": [\n";
+            launch << "        {\n";
+            launch << "            \"type\": \"lldb\",\n";
+            launch << "            \"request\": \"launch\",\n";
+            launch << "            \"name\": \"Debug " << base << "\",\n";
+            launch << "            \"program\": \"" << abs_exe << "\",\n";
+            launch << "            \"args\": [],\n";
+            launch << "            \"cwd\": \"${workspaceFolder}\",\n";
+            launch << "            \"sourceLanguages\": [\"rpgle\"]\n";
+            launch << "        }\n";
+            launch << "    ]\n";
+            launch << "}\n";
+            std::cerr << "Debug info written to .vscode/launch.json\n";
+            std::cerr << "Install the CodeLLDB extension in VS Code, then press F5 to debug.\n";
+        }
     }
 
     delete program;
