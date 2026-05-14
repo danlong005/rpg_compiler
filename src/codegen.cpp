@@ -2341,6 +2341,19 @@ void CodeGen::visit(EvalCorrStmt& node) {
     }
 }
 
+void CodeGen::visit(SndMsgStmt& node) {
+    std::string msg_expr = emitExpr(*node.message);
+    if (node.msg_type == "ESCAPE") {
+        emitIndent();
+        out_ << "std::cerr << \"ESCAPE: \" << " << msg_expr << " << std::endl;\n";
+        emitIndent();
+        out_ << "throw std::runtime_error(" << msg_expr << ");\n";
+    } else {
+        emitIndent();
+        out_ << "std::cerr << \"" << node.msg_type << ": \" << " << msg_expr << " << std::endl;\n";
+    }
+}
+
 void CodeGen::visit(XmlIntoStmt& node) {
     // Look up target DS definition
     auto it = ds_defs_.find(node.target);

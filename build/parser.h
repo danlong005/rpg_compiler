@@ -320,24 +320,29 @@ struct DSFieldList {
     KW_XML_INTO = 490,             /* KW_XML_INTO  */
     KW_DATA_INTO = 491,            /* KW_DATA_INTO  */
     KW_DATA_GEN = 492,             /* KW_DATA_GEN  */
-    IDENTIFIER = 493,              /* IDENTIFIER  */
-    INTEGER_LITERAL = 494,         /* INTEGER_LITERAL  */
-    FLOAT_LITERAL = 495,           /* FLOAT_LITERAL  */
-    STRING_LITERAL = 496,          /* STRING_LITERAL  */
-    SEMICOLON = 497,               /* SEMICOLON  */
-    EQUALS = 498,                  /* EQUALS  */
-    LPAREN = 499,                  /* LPAREN  */
-    RPAREN = 500,                  /* RPAREN  */
-    COLON = 501,                   /* COLON  */
-    PLUS = 502,                    /* PLUS  */
-    MINUS = 503,                   /* MINUS  */
-    STAR = 504,                    /* STAR  */
-    SLASH = 505,                   /* SLASH  */
-    NE = 506,                      /* NE  */
-    LE = 507,                      /* LE  */
-    GE = 508,                      /* GE  */
-    LT = 509,                      /* LT  */
-    GT = 510                       /* GT  */
+    KW_SND_MSG = 493,              /* KW_SND_MSG  */
+    KW_STAR_INFO = 494,            /* KW_STAR_INFO  */
+    KW_STAR_DIAG = 495,            /* KW_STAR_DIAG  */
+    KW_STAR_ESCAPE = 496,          /* KW_STAR_ESCAPE  */
+    KW_TYPE = 497,                 /* KW_TYPE  */
+    IDENTIFIER = 498,              /* IDENTIFIER  */
+    INTEGER_LITERAL = 499,         /* INTEGER_LITERAL  */
+    FLOAT_LITERAL = 500,           /* FLOAT_LITERAL  */
+    STRING_LITERAL = 501,          /* STRING_LITERAL  */
+    SEMICOLON = 502,               /* SEMICOLON  */
+    EQUALS = 503,                  /* EQUALS  */
+    LPAREN = 504,                  /* LPAREN  */
+    RPAREN = 505,                  /* RPAREN  */
+    COLON = 506,                   /* COLON  */
+    PLUS = 507,                    /* PLUS  */
+    MINUS = 508,                   /* MINUS  */
+    STAR = 509,                    /* STAR  */
+    SLASH = 510,                   /* SLASH  */
+    NE = 511,                      /* NE  */
+    LE = 512,                      /* LE  */
+    GE = 513,                      /* GE  */
+    LT = 514,                      /* LT  */
+    GT = 515                       /* GT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -366,7 +371,7 @@ union YYSTYPE
     rpg::DSField* ds_field;
     std::vector<rpg::EnumConstant>* enum_const_list;
 
-#line 370 "build/parser.h"
+#line 375 "build/parser.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

@@ -61,6 +61,7 @@ public:
     void visit(InExpr& node) override;
     void visit(DclEnum& node) override;
     void visit(ExecSqlStmt& node) override;
+    void visit(SndMsgStmt& node) override;
     void visit(XmlIntoStmt& node) override;
     void visit(DataIntoStmt& node) override;
     void visit(DataGenStmt& node) override;

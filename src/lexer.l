@@ -196,12 +196,14 @@ static void parse_ctlopt(const char* text) {
 "PRINTER"           { return KW_PRINTER; }
 "WORKSTN"           { return KW_WORKSTN; }
 "USAGE"             { return KW_USAGE; }
+"TYPE"              { return KW_TYPE; }
 "INZ"               { return KW_INZ; }
 "DSPLY"             { return KW_DSPLY; }
 "EVAL-CORR"         { return KW_EVAL_CORR; }
 "XML-INTO"          { return KW_XML_INTO; }
 "DATA-INTO"         { return KW_DATA_INTO; }
 "DATA-GEN"          { return KW_DATA_GEN; }
+"SND-MSG"           { return KW_SND_MSG; }
 "EVALR("[EHMNRP]+")" {
     char *p = strchr(yytext, '(') + 1;
     char ext[16] = {0}; int i = 0;
@@ -412,6 +414,9 @@ static void parse_ctlopt(const char* text) {
 "*LDA"              { yylval.sval = strdup("*LDA"); return IDENTIFIER; }
 "*GDA"              { yylval.sval = strdup("*GDA"); return IDENTIFIER; }
 "*PDA"              { yylval.sval = strdup("*PDA"); return IDENTIFIER; }
+"*INFO"             { return KW_STAR_INFO; }
+"*DIAG"             { return KW_STAR_DIAG; }
+"*ESCAPE"           { return KW_STAR_ESCAPE; }
 "*INLR"             { return KW_INLR; }
 "*ON"               { return KW_ON; }
 "*OFF"              { return KW_OFF; }

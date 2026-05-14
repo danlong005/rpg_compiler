@@ -159,6 +159,10 @@ XmlIntoStmt::XmlIntoStmt(std::string target, std::unique_ptr<Expression> xml_sou
       options(std::move(options)) {}
 void XmlIntoStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+SndMsgStmt::SndMsgStmt(std::string msg_type, std::unique_ptr<Expression> message)
+    : msg_type(std::move(msg_type)), message(std::move(message)) {}
+void SndMsgStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 DataIntoStmt::DataIntoStmt(std::string target, std::unique_ptr<Expression> data_source,
                            std::unique_ptr<Expression> options, std::unique_ptr<Expression> parser)
     : target(std::move(target)), data_source(std::move(data_source)),

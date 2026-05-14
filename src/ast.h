@@ -426,6 +426,15 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// SND-MSG statement
+class SndMsgStmt : public Statement {
+public:
+    std::string msg_type;                   // "INFO", "DIAG", or "ESCAPE"
+    std::unique_ptr<Expression> message;
+    SndMsgStmt(std::string msg_type, std::unique_ptr<Expression> message);
+    void accept(ASTVisitor& visitor) override;
+};
+
 // DATA-INTO statement — parse data (JSON etc.) into a DS
 class DataIntoStmt : public Statement {
 public:
@@ -658,6 +667,7 @@ public:
     virtual void visit(InExpr& node) = 0;
     virtual void visit(DclEnum& node) = 0;
     virtual void visit(ExecSqlStmt& node) = 0;
+    virtual void visit(SndMsgStmt& node) = 0;
     virtual void visit(XmlIntoStmt& node) = 0;
     virtual void visit(DataIntoStmt& node) = 0;
     virtual void visit(DataGenStmt& node) = 0;

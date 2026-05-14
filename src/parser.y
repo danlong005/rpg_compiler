@@ -157,7 +157,8 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token <sval> EXEC_SQL_TEXT
 %token POWER
 %token KW_DIM_VAR KW_DIM_AUTO
-%token KW_FOR_EACH KW_IN KW_XML_INTO KW_DATA_INTO KW_DATA_GEN
+%token KW_FOR_EACH KW_IN KW_XML_INTO KW_DATA_INTO KW_DATA_GEN KW_SND_MSG
+%token KW_STAR_INFO KW_STAR_DIAG KW_STAR_ESCAPE KW_TYPE
 %token <sval> IDENTIFIER
 %token <ival> INTEGER_LITERAL
 %token <fval> FLOAT_LITERAL
@@ -172,7 +173,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
 %type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt xml_into_stmt
-%type <stmt> in_da_stmt out_da_stmt unlock_da_stmt data_into_stmt data_gen_stmt
+%type <stmt> in_da_stmt out_da_stmt unlock_da_stmt data_into_stmt data_gen_stmt snd_msg_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
 %type <expr_list> arg_list call_arg_list call_args_opt
 %type <stmt_list> statement_list
@@ -266,6 +267,7 @@ statement:
     | xml_into_stmt  { $$ = $1; SET_LINE($$); }
     | data_into_stmt { $$ = $1; SET_LINE($$); }
     | data_gen_stmt  { $$ = $1; SET_LINE($$); }
+    | snd_msg_stmt   { $$ = $1; SET_LINE($$); }
     | in_da_stmt    { $$ = $1; SET_LINE($$); }
     | out_da_stmt   { $$ = $1; SET_LINE($$); }
     | unlock_da_stmt { $$ = $1; SET_LINE($$); }
@@ -694,6 +696,30 @@ data_gen_stmt:
             std::unique_ptr<rpg::Expression>($5),
             nullptr, nullptr);
         free($2);
+    }
+    ;
+
+snd_msg_stmt:
+    KW_SND_MSG KW_STAR_ESCAPE expression SEMICOLON {
+        $$ = new rpg::SndMsgStmt("ESCAPE", std::unique_ptr<rpg::Expression>($3));
+    }
+    | KW_SND_MSG KW_STAR_INFO expression SEMICOLON {
+        $$ = new rpg::SndMsgStmt("INFO", std::unique_ptr<rpg::Expression>($3));
+    }
+    | KW_SND_MSG KW_STAR_DIAG expression SEMICOLON {
+        $$ = new rpg::SndMsgStmt("DIAG", std::unique_ptr<rpg::Expression>($3));
+    }
+    | KW_SND_MSG KW_TYPE LPAREN KW_STAR_ESCAPE RPAREN expression SEMICOLON {
+        $$ = new rpg::SndMsgStmt("ESCAPE", std::unique_ptr<rpg::Expression>($6));
+    }
+    | KW_SND_MSG KW_TYPE LPAREN KW_STAR_INFO RPAREN expression SEMICOLON {
+        $$ = new rpg::SndMsgStmt("INFO", std::unique_ptr<rpg::Expression>($6));
+    }
+    | KW_SND_MSG KW_TYPE LPAREN KW_STAR_DIAG RPAREN expression SEMICOLON {
+        $$ = new rpg::SndMsgStmt("DIAG", std::unique_ptr<rpg::Expression>($6));
+    }
+    | KW_SND_MSG expression SEMICOLON {
+        $$ = new rpg::SndMsgStmt("INFO", std::unique_ptr<rpg::Expression>($2));
     }
     ;
 
