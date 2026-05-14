@@ -112,7 +112,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_EXPORT KW_IMPORT KW_EXTPGM KW_EXTPROC KW_CTLOPT
 %token KW_RETURN
 %token KW_INLR KW_ON
-%token KW_BLANKS KW_ZEROS KW_HIVAL KW_LOVAL
+%token KW_BLANKS KW_ZEROS KW_HIVAL KW_LOVAL KW_USER
 %token KW_IF KW_ELSEIF KW_ELSE KW_ENDIF
 %token KW_DOW KW_DOU KW_ENDDO
 %token KW_FOR KW_ENDFOR KW_TO KW_DOWNTO KW_BY
@@ -2420,6 +2420,10 @@ primary_expr:
     }
     | KW_OMIT {
         $$ = new rpg::Identifier("nullptr");
+    }
+    | KW_USER {
+        $$ = new rpg::Identifier("RPG_USER");
+        if (g_program) g_program->uses_user_const = true;
     }
     | KW_BLANKS {
         $$ = new rpg::Identifier("RPG_BLANKS");

@@ -330,6 +330,9 @@ run_test "99" "DATA-INTO JSON parsing" "$TESTDIR/test99_data_into.rpgle" "run"
 # 100: DATA-GEN — generate JSON from DS
 run_test "100" "DATA-GEN JSON generation" "$TESTDIR/test100_data_gen.rpgle" "run"
 
+# 101: *USER figurative constant
+run_test "101" "*USER figurative constant" "$TESTDIR/test101_user.rpgle" "run"
+
 echo ""
 echo "========================================"
 echo -e "  Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"

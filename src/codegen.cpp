@@ -532,6 +532,9 @@ void CodeGen::visit(Program& node) {
     datfmt_ = node.datfmt;
     timfmt_ = node.timfmt;
 
+    // *USER constant requires PSDS initialization
+    if (node.uses_user_const) uses_psds_ = true;
+
     // Scan for EXEC SQL / XML-INTO / PSDS usage to set feature flags
     for (auto& stmt : node.statements) {
         if (dynamic_cast<ExecSqlStmt*>(stmt.get())) uses_sql_ = true;
@@ -1087,6 +1090,9 @@ std::string CodeGen::figConstValue(const std::string& name, RPGType type, const 
         if (type == RPGType::CHAR || type == RPGType::VARCHAR) return "\"\"";
         if (type == RPGType::PACKED || type == RPGType::ZONED) return "0.0";
         return "0";
+    } else if (name == "RPG_USER") {
+        uses_psds_ = true;
+        return "rpg_psds_field_str(91)";
     } else if (name == "RPG_HIVAL") {
         if (type == RPGType::INT10) return "INT_MAX";
         if (type == RPGType::PACKED || type == RPGType::ZONED) return "DBL_MAX";
@@ -1527,6 +1533,13 @@ void CodeGen::visit(IndicatorExpr& node) {
 }
 
 void CodeGen::visit(Identifier& node) {
+    // *USER figurative constant
+    if (node.name == "RPG_USER") {
+        uses_psds_ = true;
+        expr_ << "rpg_psds_field_str(91)";
+        return;
+    }
+
     // Map SQL diagnostic variables
     if (uses_sql_) {
         if (node.name == "SQLCOD" || node.name == "SQLCODE") {

@@ -416,6 +416,7 @@ static void parse_ctlopt(const char* text) {
 "*ON"               { return KW_ON; }
 "*OFF"              { return KW_OFF; }
 "*NULL"             { return KW_NULL; }
+"*USER"             { return KW_USER; }
 "*BLANKS"           { return KW_BLANKS; }
 "*BLANK"            { return KW_BLANKS; }
 "*ZEROS"            { return KW_ZEROS; }

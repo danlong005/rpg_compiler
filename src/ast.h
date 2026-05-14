@@ -586,10 +586,11 @@ public:
 
 class Program : public ASTNode {
 public:
-    bool nomain = false; // CTL-OPT NOMAIN
-    std::string main_proc; // CTL-OPT MAIN(procname)
-    std::string datfmt; // CTL-OPT DATFMT(fmt)
-    std::string timfmt; // CTL-OPT TIMFMT(fmt)
+    bool nomain = false;
+    bool uses_user_const = false; // program references *USER
+    std::string main_proc;
+    std::string datfmt;
+    std::string timfmt;
     std::vector<std::unique_ptr<Statement>> statements;
     void accept(ASTVisitor& visitor) override;
 };
