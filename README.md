@@ -70,7 +70,35 @@ By default, `rpgc` compiles the RPG source all the way to an executable:
 |------|-------------|
 | `-o file` | Output file (executable by default, or C++ file with `-S`) |
 | `-S` | Emit C++ source only, do not compile |
+| `-g` | Compile with debug symbols for source-level debugging |
 | `--keep-cpp` | Keep the intermediate `.cpp` file after compiling |
+
+### Debugging in VS Code
+
+`rpgc -g` compiles your program with full debug symbols and generates a `.vscode/launch.json` configured for the **CodeLLDB** extension. The debugger maps execution back to your original `.rpgle` source, so you step through RPG — not generated C++.
+
+**One-time setup:**
+
+1. Install the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension in VS Code.
+
+**Per-program workflow:**
+
+```bash
+# Compile with debug info
+./rpgc -g program.rpgle -o program
+```
+
+This produces the `program` binary and writes `.vscode/launch.json`. Then in VS Code:
+
+1. Open the folder containing your `.rpgle` files.
+2. Set breakpoints by clicking in the gutter of any `.rpgle` file.
+3. Press **F5** to launch the debugger.
+
+You can step through your RPG source line by line, inspect variable values by hovering, and view the call stack — all anchored to your `.rpgle` file.
+
+> **Note:** If you recompile without `-g`, remove `.vscode/launch.json` or the debugger will still try to attach.
+
+---
 
 ### Multi-module programs
 
@@ -156,6 +184,8 @@ rpgc/
 - Multi-module support (NOMAIN, EXPORT, IMPORT, EXTPROC)
 - Conditional compilation (/IF, /DEFINE, /COPY)
 - Embedded SQL via ODBC (SQLite, PostgreSQL, MySQL, SQL Server, Db2)
+- DATA-INTO / DATA-GEN for JSON parsing and generation
+- Source-level debugging in VS Code via CodeLLDB (`rpgc -g`)
 
 ## License
 
