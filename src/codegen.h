@@ -138,6 +138,7 @@ private:
 
     // RLA codegen helpers
     void emitRlaFileOpen(const std::string& fname, const ExternalFileDesc& desc, bool keyed);
+    std::string rlaFieldVar(const std::string& fname, const std::string& fieldName) const;
     std::string rlaKeyColName(const std::string& fname) const;
     std::string rlaColumnList(const ExternalFileDesc& desc) const;
     std::string rlaParamList(const ExternalFileDesc& desc, size_t count) const;

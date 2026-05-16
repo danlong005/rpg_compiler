@@ -5,8 +5,8 @@
 //         CUSTOMERS (keyed — looks up customer name)
 // Writes: messages  (EXEC SQL INSERT — auto-generated id)
 
-DCL-F ORDERS    DISK;
-DCL-F CUSTOMERS DISK KEYED;
+DCL-F ORDERS    DISK PREFIX(ORD_);
+DCL-F CUSTOMERS DISK KEYED PREFIX(CUST_);
 
 DCL-S today   VARCHAR(10);
 DCL-S custId  PACKED(10:0);
@@ -19,21 +19,21 @@ EXEC SQL SELECT date('now') INTO :today;
 READ ORDERS;
 DOW NOT %EOF(ORDERS);
 
-  IF ORDERS_PLACED_AT = today AND ORDERS_THANKED = 'N';
-    custId  = ORDERS_CUSTOMER_ID;
-    orderId = ORDERS_ID;
+  IF ORD_PLACED_AT = today AND ORD_THANKED = 'N';
+    custId  = ORD_CUSTOMER_ID;
+    orderId = ORD_ID;
 
     CHAIN custId CUSTOMERS;
     IF %FOUND(CUSTOMERS);
-      msg = 'Dear ' + %TRIM(CUSTOMERS_FIRST_NAME) + ' ' +
-            %TRIM(CUSTOMERS_LAST_NAME) +
+      msg = 'Dear ' + %TRIM(CUST_FIRST_NAME) + ' ' +
+            %TRIM(CUST_LAST_NAME) +
             ', thank you for your order! We appreciate your business.';
 
       EXEC SQL INSERT INTO messages(customer_id, order_id, message, email, status)
                VALUES(:custId, :orderId, :msg, '', ' ');
 
-      DSPLY 'Message queued for ' + %TRIM(CUSTOMERS_FIRST_NAME) + ' ' +
-            %TRIM(CUSTOMERS_LAST_NAME);
+      DSPLY 'Message queued for ' + %TRIM(CUST_FIRST_NAME) + ' ' +
+            %TRIM(CUST_LAST_NAME);
     ENDIF;
   ENDIF;
 

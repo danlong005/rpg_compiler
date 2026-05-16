@@ -950,12 +950,13 @@ void CodeGen::visit(DclF& node) {
     // Per-field variables (act as the "record buffer")
     for (auto& f : desc.fields) {
         emitIndent();
+        std::string fvar = node.prefix.empty() ? f.name : node.prefix + f.name;
         if (f.cppType == "std::string") {
-            out_ << "std::string " << node.name << "_" << f.name << ";\n";
+            out_ << "std::string " << fvar << ";\n";
         } else if (f.cppType == "long") {
-            out_ << "long " << node.name << "_" << f.name << " = 0;\n";
+            out_ << "long " << fvar << " = 0;\n";
         } else {
-            out_ << "double " << node.name << "_" << f.name << " = 0.0;\n";
+            out_ << "double " << fvar << " = 0.0;\n";
         }
     }
 
@@ -2937,6 +2938,13 @@ std::string CodeGen::rlaParamList(const ExternalFileDesc& /*desc*/, size_t count
     return s;
 }
 
+std::string CodeGen::rlaFieldVar(const std::string& fname, const std::string& fieldName) const {
+    auto it = file_defs_.find(fname);
+    if (it != file_defs_.end() && !it->second->prefix.empty())
+        return it->second->prefix + fieldName;
+    return fieldName;
+}
+
 std::string CodeGen::rlaKeyColName(const std::string& fname) const {
     auto it = ext_file_descs_.find(fname);
     if (it == ext_file_descs_.end() || it->second.fields.empty()) return "";
@@ -3002,7 +3010,7 @@ void CodeGen::emitRlaFetchBind(const std::string& fname, const ExternalFileDesc&
     for (size_t i = 0; i < desc.fields.size(); i++) {
         auto& f = desc.fields[i];
         int col = static_cast<int>(i) + 1;
-        std::string fvar = fname + "_" + f.name;
+        std::string fvar = rlaFieldVar(fname, f.name);
         if (f.bindKind == "str") {
             emitIndent(); out_ << "char __rla_buf_" << i << "[4096] = {};\n";
             emitIndent(); out_ << "SQLLEN __rla_ind_" << i << " = 0;\n";
@@ -3030,7 +3038,7 @@ void CodeGen::emitRlaCopyBack(const std::string& fname, const ExternalFileDesc& 
                                const std::string& /*stmtVar*/, const std::string& rcVar) {
     for (size_t i = 0; i < desc.fields.size(); i++) {
         auto& f = desc.fields[i];
-        std::string fvar = fname + "_" + f.name;
+        std::string fvar = rlaFieldVar(fname, f.name);
         emitIndent();
         if (f.bindKind == "str") {
             out_ << "if (" << rcVar << " == SQL_SUCCESS || " << rcVar
@@ -3101,7 +3109,7 @@ void CodeGen::visit(ReadeStmt& node) {
                        << "_scroll, SQL_FETCH_NEXT, 0);\n";
     // Post-check key equality
     if (!keyVar.empty() && !keyCol.empty()) {
-        std::string fvar = node.filename + "_" + keyCol;
+        std::string fvar = rlaFieldVar(node.filename, keyCol);
         emitIndent(); out_ << "if (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO) {\n";
         indent_++;
         emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
@@ -3131,7 +3139,7 @@ void CodeGen::visit(ReadpeStmt& node) {
     emitIndent(); out_ << "SQLRETURN __rla_rc = SQLFetchScroll(" << node.filename
                        << "_scroll, SQL_FETCH_PRIOR, 0);\n";
     if (!keyVar.empty() && !keyCol.empty()) {
-        std::string fvar = node.filename + "_" + keyCol;
+        std::string fvar = rlaFieldVar(node.filename, keyCol);
         emitIndent(); out_ << "if (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO) {\n";
         indent_++;
         emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
@@ -3181,7 +3189,7 @@ void CodeGen::visit(WriteStmt& node) {
     emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
     emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
     for (size_t i = 0; i < desc.fields.size(); i++) {
-        std::string fvar = node.filename + "_" + desc.fields[i].name;
+        std::string fvar = rlaFieldVar(node.filename, desc.fields[i].name);
         emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_ins, "
                            << (i+1) << ", " << fvar << ");\n";
     }
@@ -3205,12 +3213,12 @@ void CodeGen::visit(UpdateStmt& node) {
     emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
     // Bind non-key fields first, then key last
     for (size_t i = 1; i < desc.fields.size(); i++) {
-        std::string fvar = node.filename + "_" + desc.fields[i].name;
+        std::string fvar = rlaFieldVar(node.filename, desc.fields[i].name);
         emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_upd, "
                            << i << ", " << fvar << ");\n";
     }
     // Key field last
-    std::string keyFvar = node.filename + "_" + desc.fields[0].name;
+    std::string keyFvar = rlaFieldVar(node.filename, desc.fields[0].name);
     emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_upd, "
                        << desc.fields.size() << ", " << keyFvar << ");\n";
     emitIndent(); out_ << "SQLExecute(" << node.filename << "_upd);\n";
@@ -3229,7 +3237,7 @@ void CodeGen::visit(DeleteStmt& node) {
     emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
     emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
     if (!desc.fields.empty()) {
-        std::string keyFvar = node.filename + "_" + desc.fields[0].name;
+        std::string keyFvar = rlaFieldVar(node.filename, desc.fields[0].name);
         emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_del, 1, "
                            << keyFvar << ");\n";
     }

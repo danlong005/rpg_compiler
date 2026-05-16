@@ -27,7 +27,7 @@ SETLL key CUSTFL106;
 // READE reads next record with same key prefix (here: exact key match)
 READE key CUSTFL106;
 IF %FOUND(CUSTFL106);
-  DSPLY CUSTFL106_CUSTNAME;
+  DSPLY CUSTNAME;
 ENDIF;
 
 // SETLL to 'B' range, then sequential READ from position
@@ -35,8 +35,8 @@ key = 'B001';
 SETLL key CUSTFL106;
 READ CUSTFL106;
 DOW NOT %EOF(CUSTFL106);
-  IF CUSTFL106_CUSTNO >= 'B001' AND CUSTFL106_CUSTNO <= 'B003';
-    DSPLY CUSTFL106_CUSTNO;
+  IF CUSTNO >= 'B001' AND CUSTNO <= 'B003';
+    DSPLY CUSTNO;
   ENDIF;
   READ CUSTFL106;
 ENDDO;

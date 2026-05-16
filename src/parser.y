@@ -62,6 +62,7 @@ static bool g_dclf_keyed = false;
 static bool g_dclf_usropn = false;
 static char* g_dclf_extdesc = nullptr;
 static char* g_dclf_usages = nullptr;
+static char* g_dclf_prefix = nullptr;
 
 static rpg::BIFCall* make_bif(const char* name, std::vector<rpg::Expression*>* raw_args) {
     std::vector<std::unique_ptr<rpg::Expression>> args;
@@ -308,6 +309,8 @@ dcl_f_stmt:
         n->usages  = g_dclf_usages ? g_dclf_usages : "";
         if (g_dclf_usages) { free(g_dclf_usages); g_dclf_usages = nullptr; }
         n->usropn  = g_dclf_usropn;
+        n->prefix  = g_dclf_prefix ? g_dclf_prefix : "";
+        if (g_dclf_prefix) { free(g_dclf_prefix); g_dclf_prefix = nullptr; }
         g_dclf_keyed = false; g_dclf_usropn = false;
         $$ = n;
     }
@@ -327,12 +330,17 @@ dclf_opts:
         g_dclf_keyed = false; g_dclf_usropn = false;
         if (g_dclf_extdesc) { free(g_dclf_extdesc); g_dclf_extdesc = nullptr; }
         if (g_dclf_usages)  { free(g_dclf_usages);  g_dclf_usages  = nullptr; }
+        if (g_dclf_prefix)  { free(g_dclf_prefix);  g_dclf_prefix  = nullptr; }
     }
     | dclf_opts KW_KEYED       { g_dclf_keyed = true; }
     | dclf_opts KW_USROPN      { g_dclf_usropn = true; }
     | dclf_opts KW_EXTDESC LPAREN STRING_LITERAL RPAREN {
         if (g_dclf_extdesc) free(g_dclf_extdesc);
         g_dclf_extdesc = $4;
+    }
+    | dclf_opts KW_PREFIX LPAREN IDENTIFIER RPAREN {
+        if (g_dclf_prefix) free(g_dclf_prefix);
+        g_dclf_prefix = $4;
     }
     | dclf_opts KW_USAGE LPAREN IDENTIFIER RPAREN {
         if (g_dclf_usages) free(g_dclf_usages);

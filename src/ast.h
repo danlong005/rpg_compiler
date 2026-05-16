@@ -125,6 +125,7 @@ public:
     std::string extdesc;  // EXTDESC('tablename') override
     std::string usages;   // *INPUT, *OUTPUT, *UPDATE, etc.
     bool usropn = false;
+    std::string prefix;   // PREFIX(pfx) — prepended to field variable names
     DclF(std::string name, std::string usage);
     void accept(ASTVisitor& visitor) override;
 };
