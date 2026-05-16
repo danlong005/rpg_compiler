@@ -7,7 +7,7 @@ A three-program workflow that demonstrates record-level access (RLA), embedded S
 | Program | Description |
 |---------|-------------|
 | `CUST01R` | Reads the orders table for orders placed today, looks up each customer, and writes a thank-you message to the messages table |
-| `CUST02` | Reads pending messages, fetches the customer email address, updates the message record with the email, and marks it sent (`status = 'X'`) |
+| `CUST02R` | Reads pending messages, fetches the customer email address, updates the message record with the email, and marks it sent (`status = 'X'`) |
 | `CUST03R` | Reads completed messages (`status = 'X'`) and updates the orders table to mark each order as thanked (`thanked = 'Y'`) |
 
 ## Tables
@@ -51,7 +51,7 @@ export RPGC_DSN="Driver={SQLite3};Database=/tmp/example.db;"
 
 ```bash
 rpgc examples/CUST01R.rpgle   -o CUST01R
-rpgc examples/CUST02.sqlrpgle -o CUST02
+rpgc examples/CUST02R.rpgle -o CUST02
 rpgc examples/CUST03R.rpgle   -o CUST03R
 ```
 
@@ -61,7 +61,7 @@ Run the programs in order:
 
 ```bash
 ./CUST01R   # queue thank-you messages for today's orders
-./CUST02    # populate email addresses and mark messages sent
+./CUST02R    # populate email addresses and mark messages sent
 ./CUST03R   # mark orders as thanked
 ```
 
@@ -72,7 +72,7 @@ $ ./CUST01R
 Message queued for Alice Smith
 Message queued for Bob Jones
 
-$ ./CUST02
+$ ./CUST02R
 Email queued for Alice: alice@example.com
 Email queued for Bob: bob@example.com
 
