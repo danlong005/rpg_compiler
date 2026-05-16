@@ -7,4 +7,6 @@ build/parser.cpp
 build/parser.h
 *.dSYM/
 .vscode/
+/*.cpp
+/*.o
 test99_data_into
