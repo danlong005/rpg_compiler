@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Linux: build .deb and .rpm ──────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            flex bison g++ \
+            unixodbc-dev \
+            ruby ruby-dev build-essential
+          sudo gem install --no-document fpm
+
+      - name: Build
+        run: make PREFIX=/usr
+
+      - name: Stage install
+        run: sudo make install PREFIX=/usr DESTDIR=/tmp/rpgc-root
+
+      - name: Package .deb
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          fpm -s dir -t deb \
+              -n rpgc -v "$VERSION" \
+              --description "RPG IV compiler — run RPG programs on Linux without IBM i" \
+              --url "https://github.com/${{ github.repository }}" \
+              --maintainer "${{ github.repository_owner }}" \
+              --depends unixodbc \
+              -C /tmp/rpgc-root \
+              usr/
+
+      - name: Package .rpm
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          fpm -s dir -t rpm \
+              -n rpgc -v "$VERSION" \
+              --description "RPG IV compiler — run RPG programs on Linux without IBM i" \
+              --url "https://github.com/${{ github.repository }}" \
+              --maintainer "${{ github.repository_owner }}" \
+              --depends unixODBC \
+              -C /tmp/rpgc-root \
+              usr/
+
+      - name: Upload packages to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            rpgc_*.deb
+            rpgc-*.rpm
+
+  # ── macOS: build .dmg ───────────────────────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: brew install flex bison unixodbc
+
+      - name: Build
+        run: make
+
+      - name: Stage install
+        run: sudo make install DESTDIR=/tmp/rpgc-root
+
+      - name: Build .pkg installer
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          pkgbuild \
+            --root /tmp/rpgc-root \
+            --identifier com.rpgc.compiler \
+            --version "$VERSION" \
+            --install-location / \
+            "rpgc-${VERSION}.pkg"
+
+      - name: Wrap .pkg in .dmg
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          hdiutil create \
+            -volname "rpgc ${VERSION}" \
+            -srcfolder "rpgc-${VERSION}.pkg" \
+            -ov -format UDZO \
+            "rpgc-${VERSION}-macos.dmg"
+
+      - name: Upload DMG to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rpgc-*-macos.dmg

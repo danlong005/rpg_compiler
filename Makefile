@@ -1,7 +1,21 @@
 CXX      := clang++
 CXXFLAGS := -std=c++17 -Wall -Wextra -Wno-deprecated-register -Wno-unused-function
-FLEX     := /opt/homebrew/opt/flex/bin/flex
-BISON    := /opt/homebrew/opt/bison/bin/bison
+
+# Platform-specific tool and library paths
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    BREW_PREFIX := $(shell brew --prefix 2>/dev/null || echo /opt/homebrew)
+    FLEX        ?= $(BREW_PREFIX)/opt/flex/bin/flex
+    BISON       ?= $(BREW_PREFIX)/opt/bison/bin/bison
+    ODBC_CFLAGS ?= -I$(BREW_PREFIX)/include
+    ODBC_LIBS   ?= -L$(BREW_PREFIX)/lib -lodbc
+else
+    FLEX        ?= flex
+    BISON       ?= bison
+    ODBC_CFLAGS ?=
+    ODBC_LIBS   ?= -lodbc
+    CXX         := g++
+endif
 
 SRCDIR   := src
 BUILDDIR := build
@@ -25,6 +39,13 @@ OBJS := $(BUILDDIR)/lexer.o \
         $(BUILDDIR)/extdesc.o \
         $(BUILDDIR)/main.o
 
+PREFIX  ?= /usr/local
+BINDIR  := $(PREFIX)/bin
+DATADIR := $(PREFIX)/share/rpgc/runtime
+
+# Pass installed runtime path to main.cpp so rpgc can find headers after install
+CXXFLAGS += -DRPGC_RUNTIME_DIR='"$(DATADIR)"'
+
 all: $(TARGET)
 
 $(BUILDDIR):
@@ -45,7 +66,7 @@ $(BUILDDIR)/ast.o: $(SRCDIR)/ast.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(BUILDDIR)/codegen.o: $(SRCDIR)/codegen.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -I/opt/homebrew/include -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(ODBC_CFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(BUILDDIR)/sql_utils.o: $(SRCDIR)/sql_utils.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
@@ -54,26 +75,19 @@ $(BUILDDIR)/conf.o: $(SRCDIR)/conf.cpp $(SRCDIR)/conf.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(BUILDDIR)/extdesc.o: $(SRCDIR)/extdesc.cpp $(SRCDIR)/extdesc.h $(SRCDIR)/conf.h
-	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -I/opt/homebrew/include -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(ODBC_CFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(BUILDDIR)/main.o: $(SRCDIR)/main.cpp $(SRCDIR)/ast.h $(SRCDIR)/codegen.h $(SRCDIR)/conf.h $(SRCDIR)/extdesc.h
-	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -I/opt/homebrew/include -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(ODBC_CFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(BUILDDIR)/parser.o: $(BUILDDIR)/parser.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -I/opt/homebrew/include -L/opt/homebrew/lib -o $@ $^ -lodbc
+	$(CXX) $(CXXFLAGS) $(ODBC_CFLAGS) -o $@ $^ $(ODBC_LIBS)
 
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
-
-PREFIX  ?= /usr/local
-BINDIR  := $(PREFIX)/bin
-DATADIR := $(PREFIX)/share/rpgc/runtime
-
-# Pass installed runtime path to main.cpp so rpgc can find headers after install
-CXXFLAGS += -DRPGC_RUNTIME_DIR='"$(DATADIR)"'
 
 install: $(TARGET)
 	install -d $(DESTDIR)$(BINDIR)
@@ -90,7 +104,6 @@ uninstall:
 test: $(TARGET)
 	@bash tests/run_tests.sh
 
-# Update expected output baselines (run after verifying tests produce correct output)
 update-expected: $(TARGET)
 	@bash tests/run_tests.sh --update
 
