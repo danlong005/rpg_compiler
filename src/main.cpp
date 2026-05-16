@@ -2,12 +2,15 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <sys/stat.h>
 #include <climits>
 #include <cstdlib>
 #include "ast.h"
 #include "codegen.h"
+#include "conf.h"
+#include "extdesc.h"
 
 #ifndef RPGC_RUNTIME_DIR
 #define RPGC_RUNTIME_DIR "/usr/local/share/rpgc/runtime"
@@ -59,6 +62,33 @@ int main(int argc, char* argv[]) {
     auto slash = base.rfind('/');
     if (slash != std::string::npos) base = base.substr(slash + 1);
 
+    // Load rpgc.conf
+    RpgConf conf = RpgConf::load();
+
+    // Read source for pre-pass (extdesc query)
+    std::string src_text;
+    {
+        std::ifstream src_f(input_file);
+        if (!src_f) {
+            std::cerr << "Error: cannot open " << input_file << "\n";
+            return 1;
+        }
+        std::ostringstream ss;
+        ss << src_f.rdbuf();
+        src_text = ss.str();
+    }
+
+    // Determine source directory for .extdesc cache lookup
+    std::string src_dir;
+    {
+        std::string inp(input_file);
+        auto sl = inp.rfind('/');
+        src_dir = (sl != std::string::npos) ? inp.substr(0, sl) : ".";
+    }
+
+    // Preemptive EXTDESC pass: query DB schema (or read cache)
+    auto ext_descs = queryExternalDescs(src_text, src_dir, conf);
+
     yyin = fopen(input_file, "r");
     if (!yyin) {
         std::cerr << "Error: cannot open " << input_file << "\n";
@@ -83,8 +113,12 @@ int main(int argc, char* argv[]) {
         else abs_source = input_file;
     }
 
+    bool has_rla = !ext_descs.empty();
+
     rpg::CodeGen codegen;
     if (debug_mode) codegen.setDebugMode(true, abs_source);
+    codegen.setExtFileDescs(std::move(ext_descs));
+    if (!conf.db_dsn.empty()) codegen.setConfDsn(conf.db_dsn);
     std::string cpp_code = codegen.generate(*program);
 
     if (emit_only) {
@@ -122,7 +156,7 @@ int main(int argc, char* argv[]) {
         out << cpp_code;
     }
 
-    // Detect SQL source by .sqlrpgle extension
+    // Detect SQL/RLA source: .sqlrpgle extension or source contains DCL-F DISK
     std::string input_str(input_file);
     bool is_sql = false;
     if (input_str.size() >= 9) {
@@ -130,6 +164,8 @@ int main(int argc, char* argv[]) {
         for (auto& c : ext) c = tolower(static_cast<unsigned char>(c));
         if (ext == ".sqlrpgle") is_sql = true;
     }
+    // Also flag as SQL if any DCL-F DISK file was found (needs ODBC link)
+    if (has_rla) is_sql = true;
 
     // Find runtime headers: check relative to binary, cwd, then install prefix
     auto dir_exists = [](const std::string& path) {

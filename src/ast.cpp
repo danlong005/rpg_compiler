@@ -190,4 +190,46 @@ void CallpStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
 void Program::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+// --- File I/O opcode constructors ---
+
+ChainStmt::ChainStmt(std::vector<std::unique_ptr<Expression>> k, std::string f, std::string e)
+    : keys(std::move(k)), filename(std::move(f)), extender(std::move(e)) {}
+void ChainStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+ReadStmt::ReadStmt(std::string f, std::string e)
+    : filename(std::move(f)), extender(std::move(e)) {}
+void ReadStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+ReadeStmt::ReadeStmt(std::vector<std::unique_ptr<Expression>> k, std::string f, std::string e)
+    : keys(std::move(k)), filename(std::move(f)), extender(std::move(e)) {}
+void ReadeStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+ReadpStmt::ReadpStmt(std::string f, std::string e)
+    : filename(std::move(f)), extender(std::move(e)) {}
+void ReadpStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+ReadpeStmt::ReadpeStmt(std::vector<std::unique_ptr<Expression>> k, std::string f, std::string e)
+    : keys(std::move(k)), filename(std::move(f)), extender(std::move(e)) {}
+void ReadpeStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+WriteStmt::WriteStmt(std::string f, std::string e)
+    : filename(std::move(f)), extender(std::move(e)) {}
+void WriteStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+UpdateStmt::UpdateStmt(std::string f, std::string e)
+    : filename(std::move(f)), extender(std::move(e)) {}
+void UpdateStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+DeleteStmt::DeleteStmt(std::string f, std::string e)
+    : filename(std::move(f)), extender(std::move(e)) {}
+void DeleteStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+SetllStmt::SetllStmt(std::vector<std::unique_ptr<Expression>> k, std::string f)
+    : keys(std::move(k)), filename(std::move(f)) {}
+void SetllStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+SetgtStmt::SetgtStmt(std::vector<std::unique_ptr<Expression>> k, std::string f)
+    : keys(std::move(k)), filename(std::move(f)) {}
+void SetgtStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
 } // namespace rpg

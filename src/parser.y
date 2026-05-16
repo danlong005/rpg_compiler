@@ -57,6 +57,12 @@ extern bool ctlopt_nomain;
 // Set line number on AST node
 #define SET_LINE(node) do { if (node) (node)->line = yylineno; } while(0)
 
+// DCL-F option globals (reset at start of each dclf_opts parse)
+static bool g_dclf_keyed = false;
+static bool g_dclf_usropn = false;
+static char* g_dclf_extdesc = nullptr;
+static char* g_dclf_usages = nullptr;
+
 static rpg::BIFCall* make_bif(const char* name, std::vector<rpg::Expression*>* raw_args) {
     std::vector<std::unique_ptr<rpg::Expression>> args;
     for (auto* e : *raw_args) {
@@ -100,7 +106,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 
 %token KW_FREE
 %token KW_DCL_F KW_DCL_S KW_DCL_C
-%token KW_DISK KW_PRINTER KW_WORKSTN KW_USAGE
+%token KW_DISK KW_PRINTER KW_WORKSTN KW_USAGE KW_KEYED KW_EXTDESC KW_USROPN
 %token KW_CHAR KW_VARCHAR KW_INT KW_PACKED KW_ZONED
 %token KW_DATE KW_TIME KW_TIMESTAMP KW_IND KW_POINTER KW_NULL
 %token KW_DAYS KW_MONTHS KW_YEARS KW_HOURS KW_MINUTES KW_SECONDS KW_MSECONDS
@@ -159,6 +165,9 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_DIM_VAR KW_DIM_AUTO
 %token KW_FOR_EACH KW_IN KW_XML_INTO KW_DATA_INTO KW_DATA_GEN KW_SND_MSG
 %token KW_STAR_INFO KW_STAR_DIAG KW_STAR_ESCAPE KW_TYPE
+%token KW_READ KW_READE KW_READP KW_READPE KW_CHAIN KW_WRITE KW_UPDATE KW_DELETE KW_SETLL KW_SETGT
+%token <sval> KW_READ_EXT KW_READE_EXT KW_READP_EXT KW_READPE_EXT KW_CHAIN_EXT
+%token <sval> KW_WRITE_EXT KW_UPDATE_EXT KW_DELETE_EXT
 %token <sval> IDENTIFIER
 %token <ival> INTEGER_LITERAL
 %token <fval> FLOAT_LITERAL
@@ -174,8 +183,10 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
 %type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt xml_into_stmt
 %type <stmt> in_da_stmt out_da_stmt unlock_da_stmt data_into_stmt data_gen_stmt snd_msg_stmt
+%type <stmt> chain_stmt read_stmt reade_stmt readp_stmt readpe_stmt
+%type <stmt> write_stmt update_stmt delete_stmt setll_stmt setgt_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
-%type <expr_list> arg_list call_arg_list call_args_opt
+%type <expr_list> arg_list call_arg_list call_args_opt rla_keys rla_key_list
 %type <stmt_list> statement_list
 %type <elseif_list> elseif_clauses
 %type <elseif_data> elseif_clause
@@ -271,15 +282,34 @@ statement:
     | in_da_stmt    { $$ = $1; SET_LINE($$); }
     | out_da_stmt   { $$ = $1; SET_LINE($$); }
     | unlock_da_stmt { $$ = $1; SET_LINE($$); }
+    | chain_stmt   { $$ = $1; SET_LINE($$); }
+    | read_stmt    { $$ = $1; SET_LINE($$); }
+    | reade_stmt   { $$ = $1; SET_LINE($$); }
+    | readp_stmt   { $$ = $1; SET_LINE($$); }
+    | readpe_stmt  { $$ = $1; SET_LINE($$); }
+    | write_stmt   { $$ = $1; SET_LINE($$); }
+    | update_stmt  { $$ = $1; SET_LINE($$); }
+    | delete_stmt  { $$ = $1; SET_LINE($$); }
+    | setll_stmt   { $$ = $1; SET_LINE($$); }
+    | setgt_stmt   { $$ = $1; SET_LINE($$); }
     | expr_stmt   { $$ = $1; SET_LINE($$); }
     | error SEMICOLON { $$ = nullptr; yyerrok; }
     ;
 
 /* DCL-F: file declaration */
 dcl_f_stmt:
-    KW_DCL_F IDENTIFIER KW_DISK SEMICOLON {
-        $$ = new rpg::DclF($2, "DISK");
+    KW_DCL_F IDENTIFIER KW_DISK dclf_opts SEMICOLON {
+        auto* n = new rpg::DclF($2, "DISK");
         free($2);
+        // opts encoded in g_dclf_* globals set by dclf_opts
+        n->keyed   = g_dclf_keyed;
+        n->extdesc = g_dclf_extdesc ? g_dclf_extdesc : "";
+        if (g_dclf_extdesc) { free(g_dclf_extdesc); g_dclf_extdesc = nullptr; }
+        n->usages  = g_dclf_usages ? g_dclf_usages : "";
+        if (g_dclf_usages) { free(g_dclf_usages); g_dclf_usages = nullptr; }
+        n->usropn  = g_dclf_usropn;
+        g_dclf_keyed = false; g_dclf_usropn = false;
+        $$ = n;
     }
     | KW_DCL_F IDENTIFIER KW_PRINTER SEMICOLON {
         $$ = new rpg::DclF($2, "PRINTER");
@@ -289,9 +319,179 @@ dcl_f_stmt:
         $$ = new rpg::DclF($2, "WORKSTN");
         free($2);
     }
-    | KW_DCL_F IDENTIFIER KW_DISK KW_USAGE LPAREN STAR COLON STAR RPAREN SEMICOLON {
-        $$ = new rpg::DclF($2, "DISK");
+    ;
+
+/* DCL-F option keywords (zero or more before the semicolon) */
+dclf_opts:
+    /* empty */ {
+        g_dclf_keyed = false; g_dclf_usropn = false;
+        if (g_dclf_extdesc) { free(g_dclf_extdesc); g_dclf_extdesc = nullptr; }
+        if (g_dclf_usages)  { free(g_dclf_usages);  g_dclf_usages  = nullptr; }
+    }
+    | dclf_opts KW_KEYED       { g_dclf_keyed = true; }
+    | dclf_opts KW_USROPN      { g_dclf_usropn = true; }
+    | dclf_opts KW_EXTDESC LPAREN STRING_LITERAL RPAREN {
+        if (g_dclf_extdesc) free(g_dclf_extdesc);
+        g_dclf_extdesc = $4;
+    }
+    | dclf_opts KW_USAGE LPAREN IDENTIFIER RPAREN {
+        if (g_dclf_usages) free(g_dclf_usages);
+        g_dclf_usages = $4;
+    }
+    | dclf_opts KW_USAGE LPAREN IDENTIFIER COLON IDENTIFIER RPAREN {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "%s:%s", $4, $6);
+        if (g_dclf_usages) free(g_dclf_usages);
+        g_dclf_usages = strdup(buf);
+        free($4); free($6);
+    }
+    ;
+
+/* ---------- File I/O opcodes ---------- */
+
+/* Key list: single expr or (expr:expr:...) */
+rla_keys:
+    expression {
+        $$ = new std::vector<rpg::Expression*>();
+        $$->push_back($1);
+    }
+    | LPAREN rla_key_list RPAREN { $$ = $2; }
+    ;
+
+rla_key_list:
+    expression {
+        $$ = new std::vector<rpg::Expression*>();
+        $$->push_back($1);
+    }
+    | rla_key_list COLON expression {
+        $$ = $1;
+        $$->push_back($3);
+    }
+    ;
+
+chain_stmt:
+    KW_CHAIN rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::ChainStmt(std::move(keys), $3, "");
+        free($3);
+    }
+    | KW_CHAIN_EXT rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::ChainStmt(std::move(keys), $3, $1);
+        free($1); free($3);
+    }
+    ;
+
+read_stmt:
+    KW_READ IDENTIFIER SEMICOLON {
+        $$ = new rpg::ReadStmt($2, "");
         free($2);
+    }
+    | KW_READ_EXT IDENTIFIER SEMICOLON {
+        $$ = new rpg::ReadStmt($2, $1);
+        free($1); free($2);
+    }
+    ;
+
+reade_stmt:
+    KW_READE rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::ReadeStmt(std::move(keys), $3, "");
+        free($3);
+    }
+    | KW_READE_EXT rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::ReadeStmt(std::move(keys), $3, $1);
+        free($1); free($3);
+    }
+    ;
+
+readp_stmt:
+    KW_READP IDENTIFIER SEMICOLON {
+        $$ = new rpg::ReadpStmt($2, "");
+        free($2);
+    }
+    | KW_READP_EXT IDENTIFIER SEMICOLON {
+        $$ = new rpg::ReadpStmt($2, $1);
+        free($1); free($2);
+    }
+    ;
+
+readpe_stmt:
+    KW_READPE rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::ReadpeStmt(std::move(keys), $3, "");
+        free($3);
+    }
+    | KW_READPE_EXT rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::ReadpeStmt(std::move(keys), $3, $1);
+        free($1); free($3);
+    }
+    ;
+
+write_stmt:
+    KW_WRITE IDENTIFIER SEMICOLON {
+        $$ = new rpg::WriteStmt($2, "");
+        free($2);
+    }
+    | KW_WRITE_EXT IDENTIFIER SEMICOLON {
+        $$ = new rpg::WriteStmt($2, $1);
+        free($1); free($2);
+    }
+    ;
+
+update_stmt:
+    KW_UPDATE IDENTIFIER SEMICOLON {
+        $$ = new rpg::UpdateStmt($2, "");
+        free($2);
+    }
+    | KW_UPDATE_EXT IDENTIFIER SEMICOLON {
+        $$ = new rpg::UpdateStmt($2, $1);
+        free($1); free($2);
+    }
+    ;
+
+delete_stmt:
+    KW_DELETE IDENTIFIER SEMICOLON {
+        $$ = new rpg::DeleteStmt($2, "");
+        free($2);
+    }
+    | KW_DELETE_EXT IDENTIFIER SEMICOLON {
+        $$ = new rpg::DeleteStmt($2, $1);
+        free($1); free($2);
+    }
+    ;
+
+setll_stmt:
+    KW_SETLL rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::SetllStmt(std::move(keys), $3);
+        free($3);
+    }
+    ;
+
+setgt_stmt:
+    KW_SETGT rla_keys IDENTIFIER SEMICOLON {
+        std::vector<std::unique_ptr<rpg::Expression>> keys;
+        for (auto* e : *$2) keys.emplace_back(e);
+        delete $2;
+        $$ = new rpg::SetgtStmt(std::move(keys), $3);
+        free($3);
     }
     ;
 
@@ -2244,9 +2444,21 @@ primary_expr:
         auto* empty = new std::vector<rpg::Expression*>();
         $$ = make_bif("FOUND", empty);
     }
+    | BIF_FOUND LPAREN IDENTIFIER RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back(new rpg::Identifier($3));
+        free($3);
+        $$ = make_bif("FOUND", args);
+    }
     | BIF_EOF LPAREN RPAREN {
         auto* empty = new std::vector<rpg::Expression*>();
         $$ = make_bif("EOF", empty);
+    }
+    | BIF_EOF LPAREN IDENTIFIER RPAREN {
+        auto* args = new std::vector<rpg::Expression*>();
+        args->push_back(new rpg::Identifier($3));
+        free($3);
+        $$ = make_bif("EOF", args);
     }
     | BIF_ALLOC LPAREN arg_list RPAREN {
         $$ = make_bif("ALLOC", $3);

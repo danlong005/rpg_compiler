@@ -196,6 +196,75 @@ static void parse_ctlopt(const char* text) {
 "PRINTER"           { return KW_PRINTER; }
 "WORKSTN"           { return KW_WORKSTN; }
 "USAGE"             { return KW_USAGE; }
+"KEYED"             { return KW_KEYED; }
+"EXTDESC"           { return KW_EXTDESC; }
+"USROPN"            { return KW_USROPN; }
+"READE("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_READE_EXT;
+}
+"READE"             { return KW_READE; }
+"READPE("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_READPE_EXT;
+}
+"READPE"            { return KW_READPE; }
+"READP("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_READP_EXT;
+}
+"READP"             { return KW_READP; }
+"READ("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_READ_EXT;
+}
+"READ"              { return KW_READ; }
+"CHAIN("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_CHAIN_EXT;
+}
+"CHAIN"             { return KW_CHAIN; }
+"WRITE("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_WRITE_EXT;
+}
+"WRITE"             { return KW_WRITE; }
+"UPDATE("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_UPDATE_EXT;
+}
+"UPDATE"            { return KW_UPDATE; }
+"DELETE("[EHMNRP]+")" {
+    char *p = strchr(yytext, '(') + 1;
+    char ext[16] = {0}; int i = 0;
+    while (*p && *p != ')') ext[i++] = (char)toupper((unsigned char)*p++);
+    yylval.sval = strdup(ext);
+    return KW_DELETE_EXT;
+}
+"DELETE"            { return KW_DELETE; }
+"SETLL"             { return KW_SETLL; }
+"SETGT"             { return KW_SETGT; }
 "TYPE"              { return KW_TYPE; }
 "INZ"               { return KW_INZ; }
 "DSPLY"             { return KW_DSPLY; }

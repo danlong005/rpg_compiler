@@ -1,0 +1,40 @@
+**FREE
+// Test 103: RLA — CHAIN by key, %FOUND, field access
+
+DCL-F CUSTFL103 DISK KEYED EXTDESC('custfl103');
+
+DCL-S connStr VARCHAR(200);
+DCL-S key     VARCHAR(10);
+
+connStr = 'Driver={SQLite3};Database=/tmp/rpgc_test103.sqlite;';
+EXEC SQL CONNECT USING :connStr;
+
+EXEC SQL CREATE TABLE custfl103 (
+  CUSTNO VARCHAR(10) PRIMARY KEY,
+  CUSTNAME VARCHAR(50),
+  CUSTBAL DECIMAL(9,2)
+);
+
+EXEC SQL INSERT INTO custfl103 VALUES('C001','Alice Smith',1500.00);
+EXEC SQL INSERT INTO custfl103 VALUES('C002','Bob Jones',2750.50);
+EXEC SQL INSERT INTO custfl103 VALUES('C003','Carol White',900.00);
+
+// CHAIN to find existing customer
+key = 'C002';
+CHAIN key CUSTFL103;
+IF %FOUND(CUSTFL103);
+  DSPLY CUSTFL103_CUSTNO;
+  DSPLY CUSTFL103_CUSTNAME;
+ENDIF;
+
+// CHAIN for non-existent key
+key = 'C999';
+CHAIN key CUSTFL103;
+IF NOT %FOUND(CUSTFL103);
+  DSPLY 'not found';
+ENDIF;
+
+EXEC SQL DROP TABLE custfl103;
+EXEC SQL DISCONNECT;
+
+*INLR = *ON;

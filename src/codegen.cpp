@@ -535,7 +535,7 @@ void CodeGen::visit(Program& node) {
     // *USER constant requires PSDS initialization
     if (node.uses_user_const) uses_psds_ = true;
 
-    // Scan for EXEC SQL / XML-INTO / PSDS usage to set feature flags
+    // Scan for EXEC SQL / XML-INTO / PSDS / RLA usage to set feature flags
     for (auto& stmt : node.statements) {
         if (dynamic_cast<ExecSqlStmt*>(stmt.get())) uses_sql_ = true;
         if (dynamic_cast<XmlIntoStmt*>(stmt.get())) uses_xml_ = true;
@@ -543,6 +543,8 @@ void CodeGen::visit(Program& node) {
         if (dynamic_cast<DataGenStmt*>(stmt.get())) uses_json_ = true;
         auto* ds = dynamic_cast<DclDS*>(stmt.get());
         if (ds && ds->is_psds) uses_psds_ = true;
+        auto* dclf = dynamic_cast<DclF*>(stmt.get());
+        if (dclf && dclf->usage == "DISK") uses_rla_ = true;
         // Also check inside procedures
         auto* proc = dynamic_cast<DclProc*>(stmt.get());
         if (proc) {
@@ -553,8 +555,20 @@ void CodeGen::visit(Program& node) {
                 if (dynamic_cast<DataGenStmt*>(s.get())) uses_json_ = true;
             }
         }
-        if (uses_sql_ && uses_xml_ && uses_json_ && uses_psds_) break;
     }
+    if (uses_rla_) {
+        // Only activate RLA if at least one file has a schema in ext_file_descs_
+        bool has_schema = false;
+        for (auto& stmt : node.statements) {
+            auto* dclf = dynamic_cast<DclF*>(stmt.get());
+            if (dclf && dclf->usage == "DISK" && ext_file_descs_.count(dclf->name)) {
+                has_schema = true;
+                break;
+            }
+        }
+        uses_rla_ = has_schema;
+    }
+    if (uses_rla_) uses_sql_ = true; // RLA piggybacks on SQL runtime
 
     out_ << "#include \"rpg_runtime.h\"\n";
     if (uses_sql_) {
@@ -702,10 +716,22 @@ void CodeGen::visit(Program& node) {
         }
     }
 
-    // 1. Emit declarations
+    // 1. Emit declarations (includes DCL-F which registers file structs)
     for (auto* s : decl_stmts) {
         emitLineDirective(s->line);
         s->accept(*this);
+    }
+
+    // 1.5 Auto-connect from rpgc.conf (if DSN provided and program uses SQL or RLA)
+    if (!conf_dsn_.empty() && uses_sql_) {
+        emitIndent();
+        out_ << "__sql_env.connectStr(\"" << conf_dsn_ << "\");\n";
+    }
+
+    // Emit RAII auto-disconnect guard (fires before any return, including *INLR = *ON)
+    if (uses_sql_) {
+        emitIndent();
+        out_ << "struct __SqlGuard { ~__SqlGuard() { __sql_env.disconnect(); } } __sql_guard;\n";
     }
 
     // 2. Emit subroutine lambdas (so they can be called later)
@@ -900,8 +926,48 @@ void CodeGen::visit(ExprStmt& node) {
 }
 
 void CodeGen::visit(DclF& node) {
+    if (node.usage != "DISK") {
+        emitIndent();
+        out_ << "// DCL-F " << node.name << " " << node.usage << "\n";
+        return;
+    }
+
+    // Register for opcode lookup
+    file_defs_[node.name] = &node;
+
+    auto it = ext_file_descs_.find(node.name);
+    if (it == ext_file_descs_.end()) {
+        emitIndent();
+        out_ << "// DCL-F " << node.name << " DISK — no schema found (add " << node.name << ".extdesc)\n";
+        return;
+    }
+    const ExternalFileDesc& desc = it->second;
+
+    // Emit per-file state variables
     emitIndent();
-    out_ << "// DCL-F " << node.name << " " << node.usage << " (file I/O not yet implemented)\n";
+    out_ << "// --- File " << node.name << " (table: " << desc.tableName << ") ---\n";
+
+    // Per-field variables (act as the "record buffer")
+    for (auto& f : desc.fields) {
+        emitIndent();
+        if (f.cppType == "std::string") {
+            out_ << "std::string " << node.name << "_" << f.name << ";\n";
+        } else if (f.cppType == "long") {
+            out_ << "long " << node.name << "_" << f.name << " = 0;\n";
+        } else {
+            out_ << "double " << node.name << "_" << f.name << " = 0.0;\n";
+        }
+    }
+
+    // Per-file flags and handles
+    emitIndent(); out_ << "bool " << node.name << "_eof   = false;\n";
+    emitIndent(); out_ << "bool " << node.name << "_found = false;\n";
+    emitIndent(); out_ << "SQLHSTMT " << node.name << "_scroll = SQL_NULL_HSTMT;\n";
+    emitIndent(); out_ << "SQLHSTMT " << node.name << "_chain  = SQL_NULL_HSTMT;\n";
+    emitIndent(); out_ << "SQLHSTMT " << node.name << "_ins    = SQL_NULL_HSTMT;\n";
+    emitIndent(); out_ << "SQLHSTMT " << node.name << "_upd    = SQL_NULL_HSTMT;\n";
+    emitIndent(); out_ << "SQLHSTMT " << node.name << "_del    = SQL_NULL_HSTMT;\n";
+    emitIndent(); out_ << "bool " << node.name << "_open  = false;\n";
 }
 
 void CodeGen::visit(DclC& node) {
@@ -2231,9 +2297,21 @@ void CodeGen::visit(BIFCall& node) {
             expr_ << "false";
         }
     } else if (node.name == "FOUND") {
-        expr_ << "rpg_found()";
+        if (!node.args.empty()) {
+            auto* id = dynamic_cast<Identifier*>(node.args[0].get());
+            if (id) expr_ << id->name << "_found";
+            else expr_ << "rpg_found()";
+        } else {
+            expr_ << "rpg_found()";
+        }
     } else if (node.name == "EOF") {
-        expr_ << "rpg_eof()";
+        if (!node.args.empty()) {
+            auto* id = dynamic_cast<Identifier*>(node.args[0].get());
+            if (id) expr_ << id->name << "_eof";
+            else expr_ << "rpg_eof()";
+        } else {
+            expr_ << "rpg_eof()";
+        }
     } else if (node.name == "BITAND") {
         expr_ << "(static_cast<unsigned int>(";
         node.args[0]->accept(*this);
@@ -2835,6 +2913,385 @@ void CodeGen::visit(InExpr& node) {
         node.collection->accept(*this);
         expr_ << ")";
     }
+}
+
+// ============================================================
+// RLA helper methods
+// ============================================================
+
+std::string CodeGen::rlaColumnList(const ExternalFileDesc& desc) const {
+    std::string s;
+    for (size_t i = 0; i < desc.fields.size(); i++) {
+        if (i > 0) s += ",";
+        s += desc.fields[i].name;
+    }
+    return s;
+}
+
+std::string CodeGen::rlaParamList(const ExternalFileDesc& /*desc*/, size_t count) const {
+    std::string s;
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0) s += ",";
+        s += "?";
+    }
+    return s;
+}
+
+std::string CodeGen::rlaKeyColName(const std::string& fname) const {
+    auto it = ext_file_descs_.find(fname);
+    if (it == ext_file_descs_.end() || it->second.fields.empty()) return "";
+    return it->second.fields[0].name; // first field is the key
+}
+
+// Emit the lazy-open block for a file (prepares all ODBC statements on first use)
+void CodeGen::emitRlaFileOpen(const std::string& fname, const ExternalFileDesc& desc, bool keyed) {
+    std::string cols = rlaColumnList(desc);
+    std::string tbl  = desc.tableName;
+    std::string keyCol = desc.fields.empty() ? "1" : desc.fields[0].name;
+
+    emitIndent(); out_ << "if (!" << fname << "_open) {\n";
+    indent_++;
+    emitIndent(); out_ << fname << "_open = true;\n";
+
+    // Scroll cursor: SELECT cols FROM tbl ORDER BY keycol (static, scrollable)
+    std::string scrollSql = "SELECT " + cols + " FROM " + tbl + " ORDER BY " + keyCol;
+    emitIndent(); out_ << fname << "_scroll = __sql_env.allocStmt();\n";
+    emitIndent(); out_ << "SQLSetStmtAttr(" << fname << "_scroll, SQL_ATTR_CURSOR_TYPE, "
+                       << "(SQLPOINTER)SQL_CURSOR_STATIC, 0);\n";
+    emitIndent(); out_ << "SQLPrepare(" << fname << "_scroll, (SQLCHAR*)\"" << scrollSql << "\", SQL_NTS);\n";
+    emitIndent(); out_ << "SQLExecute(" << fname << "_scroll);\n";
+
+    if (keyed && !desc.fields.empty()) {
+        // CHAIN: SELECT by key
+        std::string chainSql = "SELECT " + cols + " FROM " + tbl + " WHERE " + keyCol + "=?";
+        emitIndent(); out_ << fname << "_chain = __sql_env.allocStmt();\n";
+        emitIndent(); out_ << "SQLPrepare(" << fname << "_chain, (SQLCHAR*)\"" << chainSql << "\", SQL_NTS);\n";
+    }
+
+    // INSERT
+    std::string insSql = "INSERT INTO " + tbl + "(" + cols + ") VALUES(" + rlaParamList(desc, desc.fields.size()) + ")";
+    emitIndent(); out_ << fname << "_ins = __sql_env.allocStmt();\n";
+    emitIndent(); out_ << "SQLPrepare(" << fname << "_ins, (SQLCHAR*)\"" << insSql << "\", SQL_NTS);\n";
+
+    if (!desc.fields.empty()) {
+        // UPDATE: SET all non-key fields WHERE key=?
+        std::string updSet;
+        for (size_t i = 1; i < desc.fields.size(); i++) {
+            if (i > 1) updSet += ",";
+            updSet += desc.fields[i].name + "=?";
+        }
+        if (!updSet.empty()) {
+            std::string updSql = "UPDATE " + tbl + " SET " + updSet + " WHERE " + keyCol + "=?";
+            emitIndent(); out_ << fname << "_upd = __sql_env.allocStmt();\n";
+            emitIndent(); out_ << "SQLPrepare(" << fname << "_upd, (SQLCHAR*)\"" << updSql << "\", SQL_NTS);\n";
+        }
+
+        // DELETE: WHERE key=?
+        std::string delSql = "DELETE FROM " + tbl + " WHERE " + keyCol + "=?";
+        emitIndent(); out_ << fname << "_del = __sql_env.allocStmt();\n";
+        emitIndent(); out_ << "SQLPrepare(" << fname << "_del, (SQLCHAR*)\"" << delSql << "\", SQL_NTS);\n";
+    }
+
+    indent_--;
+    emitIndent(); out_ << "}\n";
+}
+
+// Emit SQLBindCol calls + string buffers for all fields of a file
+void CodeGen::emitRlaFetchBind(const std::string& fname, const ExternalFileDesc& desc,
+                                const std::string& stmtVar) {
+    for (size_t i = 0; i < desc.fields.size(); i++) {
+        auto& f = desc.fields[i];
+        int col = static_cast<int>(i) + 1;
+        std::string fvar = fname + "_" + f.name;
+        if (f.bindKind == "str") {
+            emitIndent(); out_ << "char __rla_buf_" << i << "[4096] = {};\n";
+            emitIndent(); out_ << "SQLLEN __rla_ind_" << i << " = 0;\n";
+            emitIndent(); out_ << "SQLBindCol(" << stmtVar << ", " << col
+                               << ", SQL_C_CHAR, __rla_buf_" << i
+                               << ", sizeof(__rla_buf_" << i << "), &__rla_ind_" << i << ");\n";
+        } else if (f.bindKind == "int") {
+            emitIndent(); out_ << "SQLLEN __rla_ind_" << i << " = 0;\n";
+            emitIndent(); out_ << "SQLINTEGER __rla_int_" << i << " = 0;\n";
+            emitIndent(); out_ << "SQLBindCol(" << stmtVar << ", " << col
+                               << ", SQL_C_SLONG, &__rla_int_" << i
+                               << ", 0, &__rla_ind_" << i << ");\n";
+        } else {
+            emitIndent(); out_ << "SQLLEN __rla_ind_" << i << " = 0;\n";
+            emitIndent(); out_ << "SQLDOUBLE __rla_dbl_" << i << " = 0;\n";
+            emitIndent(); out_ << "SQLBindCol(" << stmtVar << ", " << col
+                               << ", SQL_C_DOUBLE, &__rla_dbl_" << i
+                               << ", 0, &__rla_ind_" << i << ");\n";
+        }
+    }
+}
+
+// Emit copy-back from temp vars to per-file field variables
+void CodeGen::emitRlaCopyBack(const std::string& fname, const ExternalFileDesc& desc,
+                               const std::string& /*stmtVar*/, const std::string& rcVar) {
+    for (size_t i = 0; i < desc.fields.size(); i++) {
+        auto& f = desc.fields[i];
+        std::string fvar = fname + "_" + f.name;
+        emitIndent();
+        if (f.bindKind == "str") {
+            out_ << "if (" << rcVar << " == SQL_SUCCESS || " << rcVar
+                 << " == SQL_SUCCESS_WITH_INFO) " << fvar << " = std::string(__rla_buf_" << i << ");\n";
+        } else if (f.bindKind == "int") {
+            out_ << "if (" << rcVar << " == SQL_SUCCESS || " << rcVar
+                 << " == SQL_SUCCESS_WITH_INFO) " << fvar << " = (long)__rla_int_" << i << ";\n";
+        } else {
+            out_ << "if (" << rcVar << " == SQL_SUCCESS || " << rcVar
+                 << " == SQL_SUCCESS_WITH_INFO) " << fvar << " = (double)__rla_dbl_" << i << ";\n";
+        }
+    }
+}
+
+// ============================================================
+// RLA opcode visitors
+// ============================================================
+
+void CodeGen::visit(ReadStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// READ " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    emitRlaFetchBind(node.filename, desc, node.filename + "_scroll");
+    emitIndent(); out_ << "SQLRETURN __rla_rc = SQLFetchScroll(" << node.filename
+                       << "_scroll, SQL_FETCH_NEXT, 0);\n";
+    emitIndent(); out_ << node.filename << "_eof   = (__rla_rc == SQL_NO_DATA);\n";
+    emitIndent(); out_ << node.filename << "_found = (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO);\n";
+    emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
+    indent_--; emitIndent(); out_ << "}\n";
+}
+
+void CodeGen::visit(ReadpStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// READP " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    emitRlaFetchBind(node.filename, desc, node.filename + "_scroll");
+    emitIndent(); out_ << "SQLRETURN __rla_rc = SQLFetchScroll(" << node.filename
+                       << "_scroll, SQL_FETCH_PRIOR, 0);\n";
+    emitIndent(); out_ << node.filename << "_eof   = (__rla_rc == SQL_NO_DATA);\n";
+    emitIndent(); out_ << node.filename << "_found = (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO);\n";
+    emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
+    indent_--; emitIndent(); out_ << "}\n";
+}
+
+void CodeGen::visit(ReadeStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// READE " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    std::string keyVar = node.keys.empty() ? "" : emitExpr(*node.keys[0]);
+    std::string keyCol = rlaKeyColName(node.filename);
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    emitRlaFetchBind(node.filename, desc, node.filename + "_scroll");
+    emitIndent(); out_ << "SQLRETURN __rla_rc = SQLFetchScroll(" << node.filename
+                       << "_scroll, SQL_FETCH_NEXT, 0);\n";
+    // Post-check key equality
+    if (!keyVar.empty() && !keyCol.empty()) {
+        std::string fvar = node.filename + "_" + keyCol;
+        emitIndent(); out_ << "if (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO) {\n";
+        indent_++;
+        emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
+        emitIndent(); out_ << "if (!(" << fvar << " == " << keyVar << ")) __rla_rc = SQL_NO_DATA;\n";
+        indent_--;
+        emitIndent(); out_ << "}\n";
+    } else {
+        emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
+    }
+    emitIndent(); out_ << node.filename << "_eof   = (__rla_rc == SQL_NO_DATA);\n";
+    emitIndent(); out_ << node.filename << "_found = (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO);\n";
+    indent_--; emitIndent(); out_ << "}\n";
+}
+
+void CodeGen::visit(ReadpeStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// READPE " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    std::string keyVar = node.keys.empty() ? "" : emitExpr(*node.keys[0]);
+    std::string keyCol = rlaKeyColName(node.filename);
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    emitRlaFetchBind(node.filename, desc, node.filename + "_scroll");
+    emitIndent(); out_ << "SQLRETURN __rla_rc = SQLFetchScroll(" << node.filename
+                       << "_scroll, SQL_FETCH_PRIOR, 0);\n";
+    if (!keyVar.empty() && !keyCol.empty()) {
+        std::string fvar = node.filename + "_" + keyCol;
+        emitIndent(); out_ << "if (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO) {\n";
+        indent_++;
+        emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
+        emitIndent(); out_ << "if (!(" << fvar << " == " << keyVar << ")) __rla_rc = SQL_NO_DATA;\n";
+        indent_--;
+        emitIndent(); out_ << "}\n";
+    } else {
+        emitRlaCopyBack(node.filename, desc, node.filename + "_scroll", "__rla_rc");
+    }
+    emitIndent(); out_ << node.filename << "_eof   = (__rla_rc == SQL_NO_DATA);\n";
+    emitIndent(); out_ << node.filename << "_found = (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO);\n";
+    indent_--; emitIndent(); out_ << "}\n";
+}
+
+void CodeGen::visit(ChainStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// CHAIN " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    std::string keyExpr = node.keys.empty() ? "" : emitExpr(*node.keys[0]);
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
+    if (!keyExpr.empty()) {
+        emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_chain, 1, " << keyExpr << ");\n";
+    }
+    emitIndent(); out_ << "SQLFreeStmt(" << node.filename << "_chain, SQL_CLOSE);\n";
+    emitIndent(); out_ << "SQLExecute(" << node.filename << "_chain);\n";
+    emitRlaFetchBind(node.filename, desc, node.filename + "_chain");
+    emitIndent(); out_ << "SQLRETURN __rla_rc = SQLFetch(" << node.filename << "_chain);\n";
+    emitIndent(); out_ << node.filename << "_found = (__rla_rc == SQL_SUCCESS || __rla_rc == SQL_SUCCESS_WITH_INFO);\n";
+    emitIndent(); out_ << node.filename << "_eof   = false;\n";
+    emitRlaCopyBack(node.filename, desc, node.filename + "_chain", "__rla_rc");
+    indent_--; emitIndent(); out_ << "}\n";
+}
+
+void CodeGen::visit(WriteStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// WRITE " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
+    for (size_t i = 0; i < desc.fields.size(); i++) {
+        std::string fvar = node.filename + "_" + desc.fields[i].name;
+        emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_ins, "
+                           << (i+1) << ", " << fvar << ");\n";
+    }
+    emitIndent(); out_ << "SQLExecute(" << node.filename << "_ins);\n";
+    indent_--; emitIndent(); out_ << "}\n";
+}
+
+void CodeGen::visit(UpdateStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// UPDATE " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    if (desc.fields.size() < 2) {
+        emitIndent(); out_ << "// UPDATE: need at least 2 fields (key + data)\n";
+        indent_--; emitIndent(); out_ << "}\n"; return;
+    }
+    emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
+    // Bind non-key fields first, then key last
+    for (size_t i = 1; i < desc.fields.size(); i++) {
+        std::string fvar = node.filename + "_" + desc.fields[i].name;
+        emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_upd, "
+                           << i << ", " << fvar << ");\n";
+    }
+    // Key field last
+    std::string keyFvar = node.filename + "_" + desc.fields[0].name;
+    emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_upd, "
+                       << desc.fields.size() << ", " << keyFvar << ");\n";
+    emitIndent(); out_ << "SQLExecute(" << node.filename << "_upd);\n";
+    indent_--; emitIndent(); out_ << "}\n";
+    (void)dclf;
+}
+
+void CodeGen::visit(DeleteStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// DELETE " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
+    if (!desc.fields.empty()) {
+        std::string keyFvar = node.filename + "_" + desc.fields[0].name;
+        emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_del, 1, "
+                           << keyFvar << ");\n";
+    }
+    emitIndent(); out_ << "SQLExecute(" << node.filename << "_del);\n";
+    indent_--; emitIndent(); out_ << "}\n";
+    (void)dclf;
+}
+
+void CodeGen::visit(SetllStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// SETLL " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    std::string keyExpr = node.keys.empty() ? "" : emitExpr(*node.keys[0]);
+    std::string keyCol = desc.fields.empty() ? "1" : desc.fields[0].name;
+    std::string cols = rlaColumnList(desc);
+    std::string tbl  = desc.tableName;
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    // Close + re-prepare scroll cursor with WHERE key >= ?
+    emitIndent(); out_ << "SQLFreeStmt(" << node.filename << "_scroll, SQL_CLOSE);\n";
+    std::string sql = "SELECT " + cols + " FROM " + tbl + " WHERE " + keyCol + ">=? ORDER BY " + keyCol;
+    emitIndent(); out_ << "SQLPrepare(" << node.filename << "_scroll, (SQLCHAR*)\"" << sql << "\", SQL_NTS);\n";
+    if (!keyExpr.empty()) {
+        emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
+        emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_scroll, 1, " << keyExpr << ");\n";
+    }
+    emitIndent(); out_ << "SQLExecute(" << node.filename << "_scroll);\n";
+    emitIndent(); out_ << node.filename << "_eof   = false;\n";
+    emitIndent(); out_ << node.filename << "_found = false;\n";
+    indent_--; emitIndent(); out_ << "}\n";
+    (void)dclf;
+}
+
+void CodeGen::visit(SetgtStmt& node) {
+    auto it = ext_file_descs_.find(node.filename);
+    if (it == ext_file_descs_.end()) {
+        emitIndent(); out_ << "// SETGT " << node.filename << " — no schema\n"; return;
+    }
+    auto* dclf = file_defs_.count(node.filename) ? file_defs_[node.filename] : nullptr;
+    const ExternalFileDesc& desc = it->second;
+    std::string keyExpr = node.keys.empty() ? "" : emitExpr(*node.keys[0]);
+    std::string keyCol = desc.fields.empty() ? "1" : desc.fields[0].name;
+    std::string cols = rlaColumnList(desc);
+    std::string tbl  = desc.tableName;
+    emitIndent(); out_ << "{\n"; indent_++;
+    emitRlaFileOpen(node.filename, desc, dclf && dclf->keyed);
+    // Close + re-prepare scroll cursor with WHERE key > ?
+    emitIndent(); out_ << "SQLFreeStmt(" << node.filename << "_scroll, SQL_CLOSE);\n";
+    std::string sql = "SELECT " + cols + " FROM " + tbl + " WHERE " + keyCol + ">? ORDER BY " + keyCol;
+    emitIndent(); out_ << "SQLPrepare(" << node.filename << "_scroll, (SQLCHAR*)\"" << sql << "\", SQL_NTS);\n";
+    if (!keyExpr.empty()) {
+        emitIndent(); out_ << "__sql_env.clearParamBufs();\n";
+        emitIndent(); out_ << "__sql_env.bindParam(" << node.filename << "_scroll, 1, " << keyExpr << ");\n";
+    }
+    emitIndent(); out_ << "SQLExecute(" << node.filename << "_scroll);\n";
+    emitIndent(); out_ << node.filename << "_eof   = false;\n";
+    emitIndent(); out_ << node.filename << "_found = false;\n";
+    indent_--; emitIndent(); out_ << "}\n";
+    (void)dclf;
 }
 
 } // namespace rpg

@@ -1,0 +1,47 @@
+**FREE
+// Test 106: RLA — SETLL to position, READE for key range
+
+DCL-F CUSTFL106 DISK KEYED EXTDESC('custfl106');
+
+DCL-S connStr VARCHAR(200);
+DCL-S key     VARCHAR(10);
+
+connStr = 'Driver={SQLite3};Database=/tmp/rpgc_test106.sqlite;';
+EXEC SQL CONNECT USING :connStr;
+
+EXEC SQL CREATE TABLE custfl106 (
+  CUSTNO VARCHAR(10),
+  CUSTNAME VARCHAR(50),
+  CUSTBAL DECIMAL(9,2)
+);
+
+EXEC SQL INSERT INTO custfl106 VALUES('B001','Bob1',10.00);
+EXEC SQL INSERT INTO custfl106 VALUES('B002','Bob2',20.00);
+EXEC SQL INSERT INTO custfl106 VALUES('B003','Bob3',30.00);
+EXEC SQL INSERT INTO custfl106 VALUES('C001','Carol',40.00);
+
+// SETLL to position at key >= 'B002'
+key = 'B002';
+SETLL key CUSTFL106;
+
+// READE reads next record with same key prefix (here: exact key match)
+READE key CUSTFL106;
+IF %FOUND(CUSTFL106);
+  DSPLY CUSTFL106_CUSTNAME;
+ENDIF;
+
+// SETLL to 'B' range, then sequential READ from position
+key = 'B001';
+SETLL key CUSTFL106;
+READ CUSTFL106;
+DOW NOT %EOF(CUSTFL106);
+  IF CUSTFL106_CUSTNO >= 'B001' AND CUSTFL106_CUSTNO <= 'B003';
+    DSPLY CUSTFL106_CUSTNO;
+  ENDIF;
+  READ CUSTFL106;
+ENDDO;
+
+EXEC SQL DROP TABLE custfl106;
+EXEC SQL DISCONNECT;
+
+*INLR = *ON;

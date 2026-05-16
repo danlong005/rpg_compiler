@@ -21,6 +21,7 @@ public:
     int sqlcode = 0;
     std::string sqlstate = "00000";
     SQLLEN row_count = 0; // last statement's row count (for GET DIAGNOSTICS)
+    bool isConnected_ = false;
 
     // Named cursors: cursor name → statement handle
     std::map<std::string, SQLHSTMT> cursors;
@@ -56,15 +57,21 @@ public:
     void connect(const std::string& dsn,
                  const std::string& user = "",
                  const std::string& password = "") {
+        if (isConnected_) { SQLDisconnect(hdbc); isConnected_ = false; }
         SQLRETURN rc = SQLConnect(hdbc,
             (SQLCHAR*)dsn.c_str(), SQL_NTS,
             user.empty() ? nullptr : (SQLCHAR*)user.c_str(), SQL_NTS,
             password.empty() ? nullptr : (SQLCHAR*)password.c_str(), SQL_NTS);
         updateDiag(SQL_HANDLE_DBC, hdbc, rc);
+        if (rc == SQL_SUCCESS || rc == SQL_SUCCESS_WITH_INFO) isConnected_ = true;
     }
 
     // Connect using connection string
     void connectStr(const std::string& connStr) {
+        if (isConnected_) {
+            SQLDisconnect(hdbc);
+            isConnected_ = false;
+        }
         SQLCHAR outConn[1024];
         SQLSMALLINT outLen;
         SQLRETURN rc = SQLDriverConnect(hdbc, nullptr,
@@ -72,11 +79,14 @@ public:
             outConn, sizeof(outConn), &outLen,
             SQL_DRIVER_NOPROMPT);
         updateDiag(SQL_HANDLE_DBC, hdbc, rc);
+        if (rc == SQL_SUCCESS || rc == SQL_SUCCESS_WITH_INFO) isConnected_ = true;
     }
 
     void disconnect() {
+        if (!isConnected_) return;
         SQLRETURN rc = SQLDisconnect(hdbc);
         updateDiag(SQL_HANDLE_DBC, hdbc, rc);
+        isConnected_ = false;
     }
 
     // Allocate a new statement handle

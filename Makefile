@@ -12,6 +12,8 @@ SRCS := $(BUILDDIR)/lexer.cpp \
         $(SRCDIR)/ast.cpp \
         $(SRCDIR)/codegen.cpp \
         $(SRCDIR)/sql_utils.cpp \
+        $(SRCDIR)/conf.cpp \
+        $(SRCDIR)/extdesc.cpp \
         $(SRCDIR)/main.cpp
 
 OBJS := $(BUILDDIR)/lexer.o \
@@ -19,6 +21,8 @@ OBJS := $(BUILDDIR)/lexer.o \
         $(BUILDDIR)/ast.o \
         $(BUILDDIR)/codegen.o \
         $(BUILDDIR)/sql_utils.o \
+        $(BUILDDIR)/conf.o \
+        $(BUILDDIR)/extdesc.o \
         $(BUILDDIR)/main.o
 
 all: $(TARGET)
@@ -41,19 +45,25 @@ $(BUILDDIR)/ast.o: $(SRCDIR)/ast.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(BUILDDIR)/codegen.o: $(SRCDIR)/codegen.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -I/opt/homebrew/include -c -o $@ $<
 
 $(BUILDDIR)/sql_utils.o: $(SRCDIR)/sql_utils.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
-$(BUILDDIR)/main.o: $(SRCDIR)/main.cpp $(SRCDIR)/ast.h $(SRCDIR)/codegen.h
+$(BUILDDIR)/conf.o: $(SRCDIR)/conf.cpp $(SRCDIR)/conf.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
+
+$(BUILDDIR)/extdesc.o: $(SRCDIR)/extdesc.cpp $(SRCDIR)/extdesc.h $(SRCDIR)/conf.h
+	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -I/opt/homebrew/include -c -o $@ $<
+
+$(BUILDDIR)/main.o: $(SRCDIR)/main.cpp $(SRCDIR)/ast.h $(SRCDIR)/codegen.h $(SRCDIR)/conf.h $(SRCDIR)/extdesc.h
+	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -I/opt/homebrew/include -c -o $@ $<
 
 $(BUILDDIR)/parser.o: $(BUILDDIR)/parser.cpp $(SRCDIR)/ast.h
 	$(CXX) $(CXXFLAGS) -I$(SRCDIR) -I$(BUILDDIR) -c -o $@ $<
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -I/opt/homebrew/include -L/opt/homebrew/lib -o $@ $^ -lodbc
 
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)

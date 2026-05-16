@@ -178,6 +178,51 @@ run_test() {
                 PASS=$((PASS + 1))
             fi
             ;;
+        run-sql-conf)
+            # Like run-sql, but injects DB_DSN via RPGC_DSN env var instead of EXEC SQL CONNECT
+            rm -f "/tmp/rpgc_test${testnum}.sqlite"
+            local dsn="Driver={SQLite3};Database=/tmp/rpgc_test${testnum}.sqlite;"
+
+            if ! RPGC_DSN="$dsn" $RPGC -S "$src" -o "$TMPDIR/test${testnum}.cpp" 2>"$TMPDIR/test${testnum}_err.txt"; then
+                echo -e "${RED}FAIL${NC} (transpile failed)"
+                cat "$TMPDIR/test${testnum}_err.txt"
+                FAIL=$((FAIL + 1))
+                FAILURES="$FAILURES\n  Test $testnum ($label)"
+                return
+            fi
+
+            if ! $CXX $CXXFLAGS_SQL -o "$TMPDIR/test${testnum}" "$TMPDIR/test${testnum}.cpp" $extra 2>"$TMPDIR/test${testnum}_err.txt"; then
+                echo -e "${RED}FAIL${NC} (compile failed)"
+                cat "$TMPDIR/test${testnum}_err.txt"
+                FAIL=$((FAIL + 1))
+                FAILURES="$FAILURES\n  Test $testnum ($label)"
+                return
+            fi
+
+            local actual="$TMPDIR/test${testnum}.actual"
+            "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
+            rm -f "/tmp/rpgc_test${testnum}.sqlite"
+
+            local expected="$EXPECTED_OUT/test${testnum}.out"
+            if $UPDATE_MODE; then
+                cp "$actual" "$expected"
+                echo -e "${YELLOW}UPDATED${NC}"
+                PASS=$((PASS + 1))
+            elif [ -f "$expected" ]; then
+                if diff -q "$actual" "$expected" > /dev/null 2>&1; then
+                    echo -e "${GREEN}PASS${NC}"
+                    PASS=$((PASS + 1))
+                else
+                    echo -e "${RED}FAIL${NC} (output mismatch)"
+                    diff --unified=3 "$expected" "$actual" | head -20
+                    FAIL=$((FAIL + 1))
+                    FAILURES="$FAILURES\n  Test $testnum ($label)"
+                fi
+            else
+                echo -e "${GREEN}PASS${NC} (no output check)"
+                PASS=$((PASS + 1))
+            fi
+            ;;
     esac
 }
 
@@ -335,6 +380,16 @@ run_test "101" "*USER figurative constant" "$TESTDIR/test101_user.rpgle" "run"
 
 # 102: SND-MSG
 run_test "102" "SND-MSG" "$TESTDIR/test102_snd_msg.rpgle" "run"
+
+# 103-106: Record Level Access (RLA) — file I/O opcodes via ODBC
+run_test "103" "RLA CHAIN / %FOUND" "$TESTDIR/test103_rla_chain.rpgle" "run-sql"
+run_test "104" "RLA READ sequential" "$TESTDIR/test104_rla_read.rpgle" "run-sql"
+run_test "105" "RLA WRITE/UPDATE/DELETE" "$TESTDIR/test105_rla_write_upd_del.rpgle" "run-sql"
+run_test "106" "RLA SETLL/READE" "$TESTDIR/test106_rla_setll_reade.rpgle" "run-sql"
+
+# 107-108: rpgc.conf implicit connection (no EXEC SQL CONNECT in source)
+run_test "107" "SQL via rpgc.conf (no CONNECT)" "$TESTDIR/test107_sql_conf.sqlrpgle" "run-sql-conf"
+run_test "108" "RLA via rpgc.conf (no CONNECT)" "$TESTDIR/test108_rla_conf.rpgle" "run-sql-conf"
 
 echo ""
 echo "========================================"

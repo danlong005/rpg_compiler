@@ -1,2 +1,10 @@
 rpgc
 .DS_Store
+build/*.o
+build/*.o.tmp
+build/lexer.cpp
+build/parser.cpp
+build/parser.h
+*.dSYM/
+.vscode/
+test99_data_into

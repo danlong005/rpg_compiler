@@ -2,6 +2,7 @@
 #define CODEGEN_H
 
 #include "ast.h"
+#include "extdesc.h"
 #include "sql_utils.h"
 #include <map>
 #include <set>
@@ -17,6 +18,10 @@ public:
         debug_mode_ = on;
         source_file_ = src_file;
     }
+    void setExtFileDescs(std::map<std::string, ExternalFileDesc> descs) {
+        ext_file_descs_ = std::move(descs);
+    }
+    void setConfDsn(std::string dsn) { conf_dsn_ = std::move(dsn); }
 
     void visit(Identifier& node) override;
     void visit(IntLiteral& node) override;
@@ -69,6 +74,16 @@ public:
     void visit(DataOutStmt& node) override;
     void visit(DataUnlockStmt& node) override;
     void visit(CallpStmt& node) override;
+    void visit(ChainStmt& node) override;
+    void visit(ReadStmt& node) override;
+    void visit(ReadeStmt& node) override;
+    void visit(ReadpStmt& node) override;
+    void visit(ReadpeStmt& node) override;
+    void visit(WriteStmt& node) override;
+    void visit(UpdateStmt& node) override;
+    void visit(DeleteStmt& node) override;
+    void visit(SetllStmt& node) override;
+    void visit(SetgtStmt& node) override;
     void visit(Program& node) override;
 
 private:
@@ -89,6 +104,11 @@ private:
     bool uses_xml_ = false;   // program contains XML-INTO statements
     bool uses_json_ = false;  // program contains DATA-INTO / DATA-GEN statements
     bool uses_psds_ = false;  // program declares a PSDS
+    bool uses_rla_ = false;   // program uses file I/O opcodes or DCL-F DISK
+
+    std::map<std::string, ExternalFileDesc> ext_file_descs_; // from pre-pass
+    std::map<std::string, DclF*> file_defs_;  // DCL-F nodes by name
+    std::string conf_dsn_;    // from rpgc.conf, for auto-connect
 
     void emitIndent();
     void emitLineDirective(int line);
@@ -115,6 +135,16 @@ private:
     std::vector<std::string> expandSqlIntoVars(const std::vector<std::string>& vars);
     static std::string escapeSqlForCpp(const std::string& sql);
     static std::string sqlCommentText(const std::string& sql);
+
+    // RLA codegen helpers
+    void emitRlaFileOpen(const std::string& fname, const ExternalFileDesc& desc, bool keyed);
+    std::string rlaKeyColName(const std::string& fname) const;
+    std::string rlaColumnList(const ExternalFileDesc& desc) const;
+    std::string rlaParamList(const ExternalFileDesc& desc, size_t count) const;
+    void emitRlaFetchBind(const std::string& fname, const ExternalFileDesc& desc,
+                          const std::string& stmtVar);
+    void emitRlaCopyBack(const std::string& fname, const ExternalFileDesc& desc,
+                         const std::string& stmtVar, const std::string& rcVar);
 
     // Track DS definitions for LIKEDS resolution
     std::map<std::string, DclDS*> ds_defs_;

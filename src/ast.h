@@ -116,12 +116,104 @@ enum class RPGType {
     OBJECT     // Java object reference (stub)
 };
 
-// File declaration (DCL-F) - stub
+// File declaration (DCL-F)
 class DclF : public Statement {
 public:
     std::string name;
-    std::string usage; // DISK, PRINTER, etc.
+    std::string usage;    // DISK, PRINTER, WORKSTN
+    bool keyed = false;
+    std::string extdesc;  // EXTDESC('tablename') override
+    std::string usages;   // *INPUT, *OUTPUT, *UPDATE, etc.
+    bool usropn = false;
     DclF(std::string name, std::string usage);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// --- File I/O opcodes ---
+
+class ChainStmt : public Statement {
+public:
+    std::vector<std::unique_ptr<Expression>> keys;
+    std::string filename;
+    std::string extender;
+    ChainStmt(std::vector<std::unique_ptr<Expression>> keys,
+              std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class ReadStmt : public Statement {
+public:
+    std::string filename;
+    std::string extender;
+    ReadStmt(std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class ReadeStmt : public Statement {
+public:
+    std::vector<std::unique_ptr<Expression>> keys;
+    std::string filename;
+    std::string extender;
+    ReadeStmt(std::vector<std::unique_ptr<Expression>> keys,
+              std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class ReadpStmt : public Statement {
+public:
+    std::string filename;
+    std::string extender;
+    ReadpStmt(std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class ReadpeStmt : public Statement {
+public:
+    std::vector<std::unique_ptr<Expression>> keys;
+    std::string filename;
+    std::string extender;
+    ReadpeStmt(std::vector<std::unique_ptr<Expression>> keys,
+               std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class WriteStmt : public Statement {
+public:
+    std::string filename;
+    std::string extender;
+    WriteStmt(std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class UpdateStmt : public Statement {
+public:
+    std::string filename;
+    std::string extender;
+    UpdateStmt(std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class DeleteStmt : public Statement {
+public:
+    std::string filename;
+    std::string extender;
+    DeleteStmt(std::string filename, std::string extender);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class SetllStmt : public Statement {
+public:
+    std::vector<std::unique_ptr<Expression>> keys;
+    std::string filename;
+    SetllStmt(std::vector<std::unique_ptr<Expression>> keys, std::string filename);
+    void accept(ASTVisitor& visitor) override;
+};
+
+class SetgtStmt : public Statement {
+public:
+    std::vector<std::unique_ptr<Expression>> keys;
+    std::string filename;
+    SetgtStmt(std::vector<std::unique_ptr<Expression>> keys, std::string filename);
     void accept(ASTVisitor& visitor) override;
 };
 
@@ -675,6 +767,16 @@ public:
     virtual void visit(DataOutStmt& node) = 0;
     virtual void visit(DataUnlockStmt& node) = 0;
     virtual void visit(CallpStmt& node) = 0;
+    virtual void visit(ChainStmt& node) = 0;
+    virtual void visit(ReadStmt& node) = 0;
+    virtual void visit(ReadeStmt& node) = 0;
+    virtual void visit(ReadpStmt& node) = 0;
+    virtual void visit(ReadpeStmt& node) = 0;
+    virtual void visit(WriteStmt& node) = 0;
+    virtual void visit(UpdateStmt& node) = 0;
+    virtual void visit(DeleteStmt& node) = 0;
+    virtual void visit(SetllStmt& node) = 0;
+    virtual void visit(SetgtStmt& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 
