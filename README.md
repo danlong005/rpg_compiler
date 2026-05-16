@@ -118,14 +118,26 @@ clang++ -std=c++17 -Iruntime -o program main.cpp module.o
 
 ### Database connectivity (rpgc.conf)
 
-For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file in the same directory where you invoke the compiler:
+For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file in your home directory or in the directory where you invoke the compiler:
 
 ```ini
-# rpgc.conf
+# ~/.rpgc.conf  (or ./rpgc.conf for a project-specific override)
 DB_DSN=Driver={SQLite3};Database=/path/to/myapp.db;
 ```
 
-With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — the compiler wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes priority over the conf file.
+With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — the compiler wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes highest priority over any conf file.
+
+`rpgc` uses ODBC, so it works with any database that has an ODBC driver. Install the driver for your database, then set the appropriate connection string:
+
+| Database | Driver package | Example DSN |
+|----------|---------------|-------------|
+| **SQLite** | macOS: `brew install sqliteodbc`<br>Linux: `sudo apt install libsqliteodbc` | `Driver={SQLite3};Database=/path/to/file.db;` |
+| **PostgreSQL** | macOS: `brew install psqlodbc`<br>Linux: `sudo apt install odbc-postgresql` | `Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=mydb;Uid=user;Pwd=pass;` |
+| **MySQL / MariaDB** | macOS: `brew install mysql-connector-odbc`<br>Linux: `sudo apt install odbc-mariadb` | `Driver={MySQL ODBC 8.0 Unicode Driver};Server=localhost;Port=3306;Database=mydb;User=user;Password=pass;` |
+| **SQL Server** | [Microsoft ODBC Driver](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server) | `Driver={ODBC Driver 18 for SQL Server};Server=localhost;Database=mydb;Uid=user;Pwd=pass;` |
+| **IBM Db2** | [IBM Data Server Driver](https://www.ibm.com/support/pages/db2-odbc-cli-driver-download-and-installation-information) | `Driver={IBM DB2 ODBC DRIVER};Database=mydb;Hostname=localhost;Port=50000;Protocol=TCPIP;Uid=user;Pwd=pass;` |
+
+After installing a driver you may need to register it with `odbcinst`. Check your driver's documentation for the exact driver name to use in the DSN string.
 
 ## Example
 
