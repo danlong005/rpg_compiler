@@ -1,6 +1,6 @@
-# rpgc — RPG IV to C++ Transpiler
+# rpgc — RPG Compiler
 
-`rpgc` transpiles IBM RPG IV free-format source code into portable C++17. The generated C++ can be compiled and run on macOS, Linux, or Windows — no IBM i required.
+`rpgc` compiles IBM RPG IV free-format source code into executables that run on macOS, Linux, or Windows — no IBM i required.
 
 ## Prerequisites
 
@@ -51,31 +51,29 @@ This installs the `rpgc` binary and runtime headers. `rpgc` automatically locate
 
 ## Usage
 
-By default, `rpgc` compiles the RPG source all the way to an executable:
-
 ```bash
 # Compile to executable (default)
 ./rpgc program.rpgle              # produces ./program
 ./rpgc program.rpgle -o myapp     # produces ./myapp
 
-# Emit C++ only, do not compile
+# Emit intermediate source only, do not compile
 ./rpgc program.rpgle -S           # produces ./program.cpp
-./rpgc program.rpgle -S -o out.cpp  # C++ to file
+./rpgc program.rpgle -S -o out.cpp
 
-# Compile to executable and keep the intermediate .cpp file
-./rpgc program.rpgle --keep-cpp   # produces ./program and ./program.cpp
+# Compile and keep the intermediate source file
+./rpgc program.rpgle --keep-cpp
 ```
 
 | Flag | Description |
 |------|-------------|
-| `-o file` | Output file (executable by default, or C++ file with `-S`) |
-| `-S` | Emit C++ source only, do not compile |
+| `-o file` | Output file |
+| `-S` | Emit intermediate source only, do not compile |
 | `-g` | Compile with debug symbols for source-level debugging |
-| `--keep-cpp` | Keep the intermediate `.cpp` file after compiling |
+| `--keep-cpp` | Keep the intermediate source file after compiling |
 
 ### Debugging in VS Code
 
-`rpgc -g` compiles your program with full debug symbols and generates a `.vscode/launch.json` configured for the **CodeLLDB** extension. The debugger maps execution back to your original `.rpgle` source, so you step through RPG — not generated C++.
+`rpgc -g` compiles your program with full debug symbols and generates a `.vscode/launch.json` configured for the **CodeLLDB** extension. The debugger maps execution back to your original `.rpgle` source, so you step through RPG — not generated code.
 
 **One-time setup:**
 
@@ -86,12 +84,9 @@ Install the appropriate VS Code extension for your platform:
 | macOS / Linux | [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) (`vadimcn.vscode-lldb`) |
 | Windows | [C/C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) (`ms-vscode.cpptools`) |
 
-`rpgc -g` automatically generates the correct `launch.json` for your platform.
-
 **Per-program workflow:**
 
 ```bash
-# Compile with debug info
 ./rpgc -g program.rpgle -o program
 ```
 
@@ -112,7 +107,7 @@ You can step through your RPG source line by line, inspect variable values by ho
 For programs using NOMAIN modules with EXPORT/IMPORT:
 
 ```bash
-# Emit and compile the module (no main)
+# Compile the module (no main)
 ./rpgc module.rpgle -S -o module.cpp
 clang++ -std=c++17 -Iruntime -c -o module.o module.cpp
 
@@ -120,6 +115,17 @@ clang++ -std=c++17 -Iruntime -c -o module.o module.cpp
 ./rpgc main.rpgle -S -o main.cpp
 clang++ -std=c++17 -Iruntime -o program main.cpp module.o
 ```
+
+### Database connectivity (rpgc.conf)
+
+For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file in the same directory where you invoke the compiler:
+
+```ini
+# rpgc.conf
+DB_DSN=Driver={SQLite3};Database=/path/to/myapp.db;
+```
+
+With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — the compiler wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes priority over the conf file.
 
 ## Example
 
@@ -155,21 +161,24 @@ make update-expected   # Regenerate expected output baselines
 ```
 rpgc/
   src/
-    lexer.l        Flex lexer (tokenizer)
-    parser.y       Bison parser (grammar)
-    ast.h / ast.cpp  Abstract syntax tree definitions
-    codegen.h / codegen.cpp  C++ code generator
-    main.cpp       Entry point
+    lexer.l            Lexer
+    parser.y           Parser
+    ast.h / ast.cpp    Abstract syntax tree
+    codegen.h / codegen.cpp  Code generator
+    conf.h / conf.cpp  rpgc.conf reader
+    extdesc.h / extdesc.cpp  External file description (schema pre-pass)
+    main.cpp           Entry point
   runtime/
-    rpg_runtime.h  Runtime support library (included by generated code)
+    rpg_runtime.h      Runtime support library
+    rpg_sql_runtime.h  SQL/ODBC runtime support
+    rpg_xml_runtime.h  XML runtime support
   tests/
     test*.rpgle         RPG test source files
     test*.sqlrpgle      SQL test source files
     expected_output/    Expected runtime output for each test
     run_tests.sh        Test runner script
-  build/           Generated lexer/parser files and object files
   Makefile
-  TODO.md          Feature tracker
+  TODO.md              Feature tracker
 ```
 
 ## Documentation
@@ -191,6 +200,8 @@ rpgc/
 - Multi-module support (NOMAIN, EXPORT, IMPORT, EXTPROC)
 - Conditional compilation (/IF, /DEFINE, /COPY)
 - Embedded SQL via ODBC (SQLite, PostgreSQL, MySQL, SQL Server, Db2)
+- Record-level access (READ, WRITE, CHAIN, UPDATE, DELETE, SETLL, SETGT) via ODBC
+- Externally-described files with `.extdesc` schema cache
 - DATA-INTO / DATA-GEN for JSON parsing and generation
 - Source-level debugging in VS Code via CodeLLDB (`rpgc -g`)
 
