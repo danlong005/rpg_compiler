@@ -7,7 +7,7 @@ A three-program workflow that demonstrates record-level access (RLA) and the `rp
 | Program | Description |
 |---------|-------------|
 | `CUST01R` | Reads the orders table for orders placed today, looks up each customer by key, and writes a thank-you message to the messages table |
-| `CUST02R` | Reads pending messages, chains to the customers table to get the email address, updates the message with the email, and marks it sent (`status = 'X'`) |
+| `CUST02R` | Reads pending messages via SQL cursor, fetches the customer email address, updates the message with the email, and marks it sent (`status = 'X'`) |
 | `CUST03R` | Reads completed messages (`status = 'X'`) and updates the orders table to mark each order as thanked (`thanked = 'Y'`) |
 
 ## Tables
@@ -67,7 +67,7 @@ From the project root:
 
 ```bash
 rpgc examples/CUST01R.rpgle -o CUST01R
-rpgc examples/CUST02R.rpgle -o CUST02R
+rpgc examples/CUST02R.sqlrpgle -o CUST02R
 rpgc examples/CUST03R.rpgle -o CUST03R
 ```
 
