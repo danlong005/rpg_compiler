@@ -1,4 +1,5 @@
 rpgc
+rpgc_debug
 .DS_Store
 build/*.o
 build/*.o.tmp
