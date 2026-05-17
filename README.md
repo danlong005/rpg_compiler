@@ -1,6 +1,6 @@
 # openrpg
 
-![openrpg logo](assets/rpgc_logo.svg)
+![openrpg logo](assets/openrpg_logo.svg)
 
 openrpg is an open-source, clean-room compiler for IBM RPG IV free-format source code. The `rpgc` binary compiles `.rpgle` source into executables that run on macOS, Linux, or Windows — no IBM i required.
 

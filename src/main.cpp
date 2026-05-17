@@ -12,6 +12,15 @@
 #include "conf.h"
 #include "extdesc.h"
 
+#ifdef _WIN32
+#  include <direct.h>
+#  define rpgc_realpath(p,b) _fullpath(b, p, PATH_MAX)
+#  define rpgc_mkdir(p)      _mkdir(p)
+#else
+#  define rpgc_realpath(p,b) realpath(p, b)
+#  define rpgc_mkdir(p)      mkdir(p, 0755)
+#endif
+
 #ifndef RPGC_RUNTIME_DIR
 #define RPGC_RUNTIME_DIR "/usr/local/share/rpgc/runtime"
 #endif
@@ -119,7 +128,7 @@ int main(int argc, char* argv[]) {
     std::string abs_source;
     {
         char buf[PATH_MAX];
-        if (realpath(input_file, buf)) abs_source = buf;
+        if (rpgc_realpath(input_file, buf)) abs_source = buf;
         else abs_source = input_file;
     }
 
@@ -232,14 +241,14 @@ int main(int argc, char* argv[]) {
         std::string abs_exe;
         {
             char buf[PATH_MAX];
-            if (realpath(exe_path.c_str(), buf)) abs_exe = buf;
+            if (rpgc_realpath(exe_path.c_str(), buf)) abs_exe = buf;
             else abs_exe = exe_path;
         }
 
         // Create .vscode directory if needed
         struct stat st;
         if (stat(".vscode", &st) != 0) {
-            mkdir(".vscode", 0755);
+            rpgc_mkdir(".vscode");
         }
 
         // Choose debugger type based on platform
