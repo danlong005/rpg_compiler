@@ -20,7 +20,7 @@ messages    id, customer_id, order_id, message, email, status
 
 ## Prerequisites
 
-- `rpgc` installed and on your PATH (see main README)
+- OpenRPG installed and `rpgc` on your PATH (see main README)
 - SQLite ODBC driver
   - macOS: `brew install sqliteodbc`
   - Linux: `sudo apt install libsqliteodbc`
@@ -35,7 +35,7 @@ sqlite3 /tmp/example.db < examples/setup.sql
 
 **2. Configure the database connection.**
 
-`rpgc` looks for a connection string in three places, in priority order:
+OpenRPG looks for a connection string in three places, in priority order:
 
 1. `RPGC_DSN` environment variable
 2. `rpgc.conf` in the current directory

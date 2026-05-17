@@ -1,6 +1,6 @@
-# rpgc User's Guide
+# OpenRPG User's Guide
 
-`rpgc` transpiles IBM RPG IV free-format source code into portable C++17 and optionally compiles it to a native executable. Programs can run on macOS, Linux, or any platform with a C++ compiler — no IBM i required.
+OpenRPG transpiles IBM RPG IV free-format source code into portable C++17 and optionally compiles it to a native executable. Programs can run on macOS, Linux, or any platform with a C++ compiler — no IBM i required.
 
 ---
 
@@ -87,7 +87,7 @@ This produces the `rpgc` executable.
 
 ### Install (optional)
 
-To install `rpgc` system-wide:
+To install OpenRPG system-wide:
 
 ```bash
 sudo make install              # installs to /usr/local/bin
@@ -98,7 +98,7 @@ This installs:
 - `rpgc` binary to `$PREFIX/bin/`
 - Runtime headers to `$PREFIX/share/rpgc/runtime/`
 
-When compiling RPG programs, `rpgc` automatically finds the runtime headers — it checks relative to the binary, the current directory, and the install prefix.
+When compiling RPG programs, OpenRPG automatically finds the runtime headers — it checks relative to the binary, the current directory, and the install prefix.
 
 To uninstall:
 ```bash
@@ -145,7 +145,7 @@ rpgc <source-file> [options]
 | `.rpgle` | Standard RPG IV source |
 | `.sqlrpgle` | RPG IV with embedded SQL (automatically links ODBC) |
 
-When the input file has a `.sqlrpgle` extension, `rpgc` automatically adds ODBC include paths and linker flags during compilation.
+When the input file has a `.sqlrpgle` extension, OpenRPG automatically adds ODBC include paths and linker flags during compilation.
 
 ### Examples
 
@@ -537,7 +537,7 @@ END-PROC;
 
 ## Embedded SQL
 
-Programs using embedded SQL should use the `.sqlrpgle` file extension. This tells `rpgc` to automatically link the ODBC library.
+Programs using embedded SQL should use the `.sqlrpgle` file extension. This tells OpenRPG to automatically link the ODBC library.
 
 ### Basic SQL Operations
 
@@ -770,7 +770,7 @@ ENDIF;
 
 ## Database Connections
 
-`rpgc` uses ODBC for database access, making it portable across databases. You connect using a connection string with `EXEC SQL CONNECT USING`.
+OpenRPG uses ODBC for database access, making it portable across databases. You connect using a connection string with `EXEC SQL CONNECT USING`.
 
 ### Prerequisites
 
@@ -1026,7 +1026,7 @@ EXEC SQL DISCONNECT;
 EXEC SQL CONNECT RESET;
 ```
 
-**Note:** `rpgc` supports one database connection per program. You must disconnect before connecting to a different database.
+**Note:** OpenRPG supports one database connection per program. You must disconnect before connecting to a different database.
 
 ---
 

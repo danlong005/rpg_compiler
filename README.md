@@ -1,8 +1,8 @@
-# openrpg
+# OpenRPG
 
-![openrpg logo](assets/openrpg_logo.svg)
+![OpenRPG logo](assets/openrpg_logo.svg)
 
-openrpg is an open-source, clean-room compiler for IBM RPG IV free-format source code. The `rpgc` binary compiles `.rpgle` source into executables that run on macOS, Linux, or Windows — no IBM i required.
+OpenRPG is an open-source, clean-room compiler for IBM RPG IV free-format source code. The `rpgc` binary compiles `.rpgle` source into executables that run on macOS, Linux, or Windows — no IBM i required.
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ make install PREFIX=~/.local   # install without sudo
 sudo make uninstall            # remove
 ```
 
-This installs the `rpgc` binary and runtime headers. `rpgc` automatically locates the runtime whether run from the source tree or after installation.
+This installs the `rpgc` binary and runtime headers. OpenRPG automatically locates the runtime whether run from the source tree or after installation.
 
 #### macOS installer (.pkg)
 
@@ -59,7 +59,7 @@ Pre-built `.pkg` installers are available on the [Releases](../../releases) page
 brew install unixodbc
 ```
 
-Because openrpg is not code-signed with an Apple Developer certificate, macOS Gatekeeper will block the installer with an "unidentified developer" warning. To work around it, run this command in Terminal before opening the file:
+Because OpenRPG is not code-signed with an Apple Developer certificate, macOS Gatekeeper will block the installer with an "unidentified developer" warning. To work around it, run this command in Terminal before opening the file:
 
 ```bash
 xattr -cr ~/Downloads/rpgc-*.pkg
@@ -136,16 +136,16 @@ clang++ -std=c++17 -Iruntime -o program main.cpp module.o
 
 ### Database connectivity (rpgc.conf)
 
-For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file in your home directory or in the directory where you invoke the compiler:
+For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file in your home directory or in the directory where you invoke `rpgc`:
 
 ```ini
 # ~/.rpgc.conf  (or ./rpgc.conf for a project-specific override)
 DB_DSN=Driver={SQLite3};Database=/path/to/myapp.db;
 ```
 
-With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — the compiler wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes highest priority over any conf file.
+With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — OpenRPG wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes highest priority over any conf file.
 
-`rpgc` uses ODBC, so it works with any database that has an ODBC driver. Install the driver for your database, then set the appropriate connection string:
+OpenRPG uses ODBC, so it works with any database that has an ODBC driver. Install the driver for your database, then set the appropriate connection string:
 
 | Database | Driver package | Example DSN |
 |----------|---------------|-------------|
@@ -189,7 +189,7 @@ make update-expected   # Regenerate expected output baselines
 ## Project Structure
 
 ```
-openrpg/
+OpenRPG/
   src/
     lexer.l            Lexer
     parser.y           Parser
