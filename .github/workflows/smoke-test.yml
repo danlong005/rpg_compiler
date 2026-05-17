@@ -94,3 +94,46 @@ jobs:
           ODBC_FLAGS="-lodbc" \
           CXX=clang++ \
           bash tests/run_tests.sh
+
+  # ── Windows .exe ─────────────────────────────────────────────────────────
+  smoke-windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc
+
+      - name: Install SQLite ODBC driver
+        shell: pwsh
+        run: choco install sqliteodbc --no-progress -y
+
+      - name: Download release installer
+        shell: pwsh
+        run: gh release download "${{ github.ref_name }}" --pattern "openrpg-*-windows-x64.exe"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install OpenRPG
+        shell: pwsh
+        run: |
+          $exe = Get-Item "openrpg-*-windows-x64.exe"
+          Start-Process -Wait -FilePath $exe.FullName -ArgumentList "/S"
+
+      - name: Run tests
+        run: |
+          export PATH="/c/Program Files/openrpg:$PATH"
+          RPGC=rpgc \
+          RUNTIME_DIR="/c/Program Files/openrpg/runtime" \
+          ODBC_FLAGS="-lodbc32" \
+          CXX=g++ \
+          bash tests/run_tests.sh
