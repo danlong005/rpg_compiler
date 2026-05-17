@@ -4,160 +4,49 @@
 
 OpenRPG is an open-source, clean-room compiler for IBM RPG IV free-format source code. The `rpgc` binary compiles `.rpgle` source into executables that run on macOS, Linux, or Windows — no IBM i required.
 
-## Prerequisites
+## Installation
 
-- **C++17 compiler** (clang++ or g++)
-- **Flex** (lexer generator)
-- **Bison** (parser generator)
+Pre-built packages are available on the [Releases](../../releases) page.
 
-On macOS with Homebrew:
-```bash
-brew install flex bison
-```
+### macOS
 
-On Linux (Debian/Ubuntu):
-```bash
-sudo apt install flex bison g++
-```
-
-On Windows (via [MSYS2](https://www.msys2.org/) MINGW64 shell):
-```bash
-pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-flex mingw-w64-x86_64-bison make
-```
-
-> **Alternative:** Use [winflexbison](https://github.com/nicehash/winflexbison) with Visual Studio or `choco install winflexbison`. Adjust `FLEX` and `BISON` paths in the Makefile accordingly.
-
-## Building
-
-```bash
-make
-```
-
-This produces the `rpgc` executable in the project root.
-
-If your `flex` and `bison` are in non-standard locations, edit the `FLEX` and `BISON` paths in the `Makefile`.
-
-```bash
-make clean   # Remove build artifacts
-```
-
-### Installing
-
-```bash
-sudo make install              # installs to /usr/local
-make install PREFIX=~/.local   # install without sudo
-sudo make uninstall            # remove
-```
-
-This installs the `rpgc` binary and runtime headers. OpenRPG automatically locates the runtime whether run from the source tree or after installation.
-
-#### macOS installer (.pkg)
-
-Pre-built `.pkg` installers are available on the [Releases](../../releases) page. The installer requires **unixodbc**, which you can install with Homebrew before running the `.pkg`:
+Download `rpgc-<version>.pkg` from the Releases page. Before installation, `unixodbc` must be installed:
 
 ```bash
 brew install unixodbc
 ```
 
-Because OpenRPG is not code-signed with an Apple Developer certificate, macOS Gatekeeper will block the installer with an "unidentified developer" warning. To work around it, run this command in Terminal before opening the file:
+Because OpenRPG is not code-signed with an Apple Developer certificate, macOS Gatekeeper will block the installer. Clear the quarantine flag before opening it:
 
 ```bash
 xattr -cr ~/Downloads/rpgc-*.pkg
 ```
 
-Then double-click the `.pkg` to proceed with installation normally.
+Then double-click the `.pkg` to install. This puts `rpgc` on your PATH system-wide.
 
-## Usage
+### Linux
 
+Download the `.deb` (Debian/Ubuntu) or `.rpm` (RHEL/Fedora) from the Releases page.
+
+**Debian/Ubuntu:**
 ```bash
-# Compile to executable (default)
-./rpgc program.rpgle              # produces ./program
-./rpgc program.rpgle -o myapp     # produces ./myapp
-
-# Emit intermediate source only, do not compile
-./rpgc program.rpgle -S           # produces ./program.cpp
-./rpgc program.rpgle -S -o out.cpp
-
-# Compile and keep the intermediate source file
-./rpgc program.rpgle --keep-cpp
+sudo apt install unixodbc
+sudo dpkg -i rpgc_*.deb
 ```
 
-| Flag | Description |
-|------|-------------|
-| `-o file` | Output file |
-| `-S` | Emit intermediate source only, do not compile |
-| `-g` | Compile with debug symbols for source-level debugging |
-| `--keep-cpp` | Keep the intermediate source file after compiling |
-
-### Debugging in VS Code
-
-`rpgc -g` compiles your program with full debug symbols and generates a `.vscode/launch.json` configured for the **CodeLLDB** extension. The debugger maps execution back to your original `.rpgle` source, so you step through RPG — not generated code.
-
-**One-time setup:**
-
-Install the appropriate VS Code extension for your platform:
-
-| Platform | Extension |
-|----------|-----------|
-| macOS / Linux | [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) (`vadimcn.vscode-lldb`) |
-| Windows | [C/C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) (`ms-vscode.cpptools`) |
-
-**Per-program workflow:**
-
+**RHEL/Fedora:**
 ```bash
-./rpgc -g program.rpgle -o program
+sudo dnf install unixODBC
+sudo rpm -i rpgc-*.rpm
 ```
 
-This produces the `program` binary and writes `.vscode/launch.json`. Then in VS Code:
+### Windows
 
-1. Open the folder containing your `.rpgle` files.
-2. Set breakpoints by clicking in the gutter of any `.rpgle` file.
-3. Press **F5** to launch the debugger.
-
-You can step through your RPG source line by line, inspect variable values by hovering, and view the call stack — all anchored to your `.rpgle` file.
-
-> **Note:** If you recompile without `-g`, remove `.vscode/launch.json` or the debugger will still try to attach.
+Download `openrpg-<version>-windows-x64.exe` from the Releases page and run the installer. It adds `rpgc` to your PATH automatically.
 
 ---
 
-### Multi-module programs
-
-For programs using NOMAIN modules with EXPORT/IMPORT:
-
-```bash
-# Compile the module (no main)
-./rpgc module.rpgle -S -o module.cpp
-clang++ -std=c++17 -Iruntime -c -o module.o module.cpp
-
-# Compile the main program and link with the module
-./rpgc main.rpgle -S -o main.cpp
-clang++ -std=c++17 -Iruntime -o program main.cpp module.o
-```
-
-### Database connectivity (rpgc.conf)
-
-For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file in your home directory or in the directory where you invoke `rpgc`:
-
-```ini
-# ~/.rpgc.conf  (or ./rpgc.conf for a project-specific override)
-DB_DSN=Driver={SQLite3};Database=/path/to/myapp.db;
-```
-
-With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — OpenRPG wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes highest priority over any conf file.
-
-OpenRPG uses ODBC, so it works with any database that has an ODBC driver. Install the driver for your database, then set the appropriate connection string:
-
-| Database | Driver package | Example DSN |
-|----------|---------------|-------------|
-| **SQLite** | macOS: `brew install sqliteodbc`<br>Linux: `sudo apt install libsqliteodbc` | `Driver={SQLite3};Database=/path/to/file.db;` |
-| **PostgreSQL** | macOS: `brew install psqlodbc`<br>Linux: `sudo apt install odbc-postgresql` | `Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=mydb;Uid=user;Pwd=pass;` |
-| **MySQL / MariaDB** | macOS: `brew install mysql-connector-odbc`<br>Linux: `sudo apt install odbc-mariadb` | `Driver={MySQL ODBC 8.0 Unicode Driver};Server=localhost;Port=3306;Database=mydb;User=user;Password=pass;` |
-| **SQL Server** | [Microsoft ODBC Driver](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server) | `Driver={ODBC Driver 18 for SQL Server};Server=localhost;Database=mydb;Uid=user;Pwd=pass;` |
-| **IBM Db2** | [IBM Data Server Driver](https://www.ibm.com/support/pages/db2-odbc-cli-driver-download-and-installation-information) | `Driver={IBM DB2 ODBC DRIVER};Database=mydb;Hostname=localhost;Port=50000;Protocol=TCPIP;Uid=user;Pwd=pass;` |
-
-After installing a driver you may need to register it with `odbcinst`. Check your driver's documentation for the exact driver name to use in the DSN string.
-
-## Example
+## Quick Start
 
 **hello.rpgle:**
 ```rpgle
@@ -168,9 +57,8 @@ DSPLY msg;
 *INLR = *ON;
 ```
 
-**Compile and run:**
 ```bash
-./rpgc hello.rpgle
+rpgc hello.rpgle
 ./hello
 ```
 
@@ -179,44 +67,96 @@ DSPLY msg;
 Hello from RPG!
 ```
 
-## Running Tests
+---
+
+## Usage
+
+```
+rpgc <source-file> [options]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-o file` | Output file |
+| `-S` | Emit intermediate C++ source only, do not compile |
+| `-g` | Compile with debug symbols for source-level debugging |
+| `--keep-cpp` | Keep the intermediate source file after compiling |
 
 ```bash
-make test              # Run all tests (validates runtime output)
-make update-expected   # Regenerate expected output baselines
+rpgc program.rpgle              # produces ./program
+rpgc program.rpgle -o myapp     # produces ./myapp
+rpgc program.rpgle -S           # produces ./program.cpp (no compile)
+rpgc program.rpgle --keep-cpp   # produces ./program and ./program.cpp
 ```
 
-## Project Structure
+SQL programs (`.sqlrpgle`) are linked with ODBC automatically — no extra flags needed.
 
+---
+
+## Database Connectivity
+
+For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file:
+
+```ini
+# ~/.rpgc.conf  (or ./rpgc.conf for a project-specific override)
+DB_DSN=Driver={SQLite3};Database=/path/to/myapp.db;
 ```
-OpenRPG/
-  src/
-    lexer.l            Lexer
-    parser.y           Parser
-    ast.h / ast.cpp    Abstract syntax tree
-    codegen.h / codegen.cpp  Code generator
-    conf.h / conf.cpp  rpgc.conf reader
-    extdesc.h / extdesc.cpp  External file description (schema pre-pass)
-    main.cpp           Entry point
-  runtime/
-    rpg_runtime.h      Runtime support library
-    rpg_sql_runtime.h  SQL/ODBC runtime support
-    rpg_xml_runtime.h  XML runtime support
-  tests/
-    test*.rpgle         RPG test source files
-    test*.sqlrpgle      SQL test source files
-    expected_output/    Expected runtime output for each test
-    run_tests.sh        Test runner script
-  Makefile
-  TODO.md              Feature tracker
+
+With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — OpenRPG wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes highest priority over any conf file.
+
+OpenRPG uses ODBC, so it works with any database that has an ODBC driver:
+
+| Database | Driver package | Example DSN |
+|----------|---------------|-------------|
+| **SQLite** | macOS: `brew install sqliteodbc`<br>Linux: `sudo apt install libsqliteodbc` | `Driver={SQLite3};Database=/path/to/file.db;` |
+| **PostgreSQL** | macOS: `brew install psqlodbc`<br>Linux: `sudo apt install odbc-postgresql` | `Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=mydb;Uid=user;Pwd=pass;` |
+| **MySQL / MariaDB** | macOS: `brew install mysql-connector-odbc`<br>Linux: `sudo apt install odbc-mariadb` | `Driver={MySQL ODBC 8.0 Unicode Driver};Server=localhost;Port=3306;Database=mydb;User=user;Password=pass;` |
+| **SQL Server** | [Microsoft ODBC Driver](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server) | `Driver={ODBC Driver 18 for SQL Server};Server=localhost;Database=mydb;Uid=user;Pwd=pass;` |
+| **IBM Db2** | [IBM Data Server Driver](https://www.ibm.com/support/pages/db2-odbc-cli-driver-download-and-installation-information) | `Driver={IBM DB2 ODBC DRIVER};Database=mydb;Hostname=localhost;Port=50000;Protocol=TCPIP;Uid=user;Pwd=pass;` |
+
+---
+
+## Debugging in VS Code
+
+`rpgc -g` compiles with full debug symbols and generates `.vscode/launch.json` for the **CodeLLDB** extension. The debugger maps execution back to your original `.rpgle` source.
+
+**One-time setup** — install the VS Code extension for your platform:
+
+| Platform | Extension |
+|----------|-----------|
+| macOS / Linux | [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) (`vadimcn.vscode-lldb`) |
+| Windows | [C/C++](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) (`ms-vscode.cpptools`) |
+
+**Per-program:**
+```bash
+rpgc -g program.rpgle -o program
 ```
+
+Then open the folder in VS Code, set breakpoints in your `.rpgle` file, and press **F5**.
+
+---
+
+## Multi-Module Programs
+
+For programs using NOMAIN modules with EXPORT/IMPORT:
+
+```bash
+rpgc module.rpgle -S -o module.cpp
+clang++ -std=c++17 -Iruntime -c -o module.o module.cpp
+
+rpgc main.rpgle -S -o main.cpp
+clang++ -std=c++17 -Iruntime -o program main.cpp module.o
+```
+
+---
 
 ## Documentation
 
-- **[User's Guide](docs/GUIDE.md)** — Full language guide with database connection examples
-- **[TODO.md](TODO.md)** — Feature tracker (implemented, remaining, not planned)
+- **[User's Guide](docs/GUIDE.md)** — Full language reference with examples
+- **[TODO.md](TODO.md)** — Feature tracker
 
 ### Highlights
+
 - Full free-format RPG IV support (declarations, control flow, expressions)
 - 90+ built-in functions
 - Data structures (QUALIFIED, DIM, LIKEDS, OVERLAY, POS, PREFIX)
@@ -224,16 +164,41 @@ OpenRPG/
 - Enumerations (DCL-ENUM) and BOOLEAN type
 - Varying-dimension arrays (DIM(*VAR), DIM(*AUTO))
 - Date/time arithmetic with all format constants
-- MONITOR/ON-ERROR error handling
-- *PSSR global exception handler
-- ON-EXIT cleanup blocks
+- MONITOR/ON-ERROR error handling, *PSSR, ON-EXIT
 - Multi-module support (NOMAIN, EXPORT, IMPORT, EXTPROC)
 - Conditional compilation (/IF, /DEFINE, /COPY)
 - Embedded SQL via ODBC (SQLite, PostgreSQL, MySQL, SQL Server, Db2)
 - Record-level access (READ, WRITE, CHAIN, UPDATE, DELETE, SETLL, SETGT) via ODBC
-- Externally-described files with `.extdesc` schema cache
 - DATA-INTO / DATA-GEN for JSON parsing and generation
-- Source-level debugging in VS Code via CodeLLDB (`rpgc -g`)
+- Source-level debugging in VS Code (`rpgc -g`)
+
+---
+
+## Building from Source
+
+If you prefer to build from source rather than using a pre-built package:
+
+**Prerequisites:** C++17 compiler (clang++ or g++), Flex, Bison.
+
+```bash
+# macOS
+brew install flex bison
+
+# Linux (Debian/Ubuntu)
+sudo apt install flex bison g++
+
+# Windows — use MSYS2 MINGW64 shell
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-flex mingw-w64-x86_64-bison make
+```
+
+```bash
+git clone https://github.com/danlong005/OpenRPG.git
+cd OpenRPG
+make
+sudo make install        # installs to /usr/local
+```
+
+---
 
 ## Trademarks
 
