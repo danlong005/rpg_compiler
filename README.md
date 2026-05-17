@@ -78,15 +78,13 @@ rpgc <source-file> [options]
 | Flag | Description |
 |------|-------------|
 | `-o file` | Output file |
-| `-S` | Emit intermediate C++ source only, do not compile |
 | `-g` | Compile with debug symbols for source-level debugging |
-| `--keep-cpp` | Keep the intermediate source file after compiling |
+| `-v` | Print version and exit |
 
 ```bash
 rpgc program.rpgle              # produces ./program
 rpgc program.rpgle -o myapp     # produces ./myapp
-rpgc program.rpgle -S           # produces ./program.cpp (no compile)
-rpgc program.rpgle --keep-cpp   # produces ./program and ./program.cpp
+rpgc -v                         # print version
 ```
 
 SQL programs (`.sqlrpgle`) are linked with ODBC automatically — no extra flags needed.

@@ -34,7 +34,7 @@ extern rpg::Program* get_parsed_program();
 extern int get_parse_error_count();
 
 int main(int argc, char* argv[]) {
-    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+    if (argc == 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
         std::cout << "rpgc " << RPGC_VERSION << "\n";
         return 0;
     }
@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "  -g           Compile with debug info (for GDB/LLDB/VS Code)\n";
         std::cerr << "  -o file      Output file (executable, or C++ file with -S)\n";
         std::cerr << "  --keep-cpp   Keep the intermediate .cpp file after compiling\n";
-        std::cerr << "  --version    Print version and exit\n";
+        std::cerr << "  -v, --version  Print version and exit\n";
         return 1;
     }
 
