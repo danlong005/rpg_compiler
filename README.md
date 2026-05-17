@@ -1,6 +1,8 @@
-# rpgc — RPG Compiler
+# openrpg
 
-`rpgc` compiles IBM RPG IV free-format source code into executables that run on macOS, Linux, or Windows — no IBM i required.
+![openrpg logo](assets/rpgc_logo.svg)
+
+openrpg is an open-source, clean-room compiler for IBM RPG IV free-format source code. The `rpgc` binary compiles `.rpgle` source into executables that run on macOS, Linux, or Windows — no IBM i required.
 
 ## Prerequisites
 
@@ -48,6 +50,22 @@ sudo make uninstall            # remove
 ```
 
 This installs the `rpgc` binary and runtime headers. `rpgc` automatically locates the runtime whether run from the source tree or after installation.
+
+#### macOS installer (.pkg)
+
+Pre-built `.pkg` installers are available on the [Releases](../../releases) page. The installer requires **unixodbc**, which you can install with Homebrew before running the `.pkg`:
+
+```bash
+brew install unixodbc
+```
+
+Because openrpg is not code-signed with an Apple Developer certificate, macOS Gatekeeper will block the installer with an "unidentified developer" warning. To work around it, run this command in Terminal before opening the file:
+
+```bash
+xattr -cr ~/Downloads/rpgc-*.pkg
+```
+
+Then double-click the `.pkg` to proceed with installation normally.
 
 ## Usage
 
@@ -171,7 +189,7 @@ make update-expected   # Regenerate expected output baselines
 ## Project Structure
 
 ```
-rpgc/
+openrpg/
   src/
     lexer.l            Lexer
     parser.y           Parser
@@ -217,6 +235,19 @@ rpgc/
 - DATA-INTO / DATA-GEN for JSON parsing and generation
 - Source-level debugging in VS Code via CodeLLDB (`rpgc -g`)
 
+## Trademarks
+
+RPG, RPG IV, ILE, ILE RPG, RPG/400, IBM i, AS/400, and Db2 are trademarks
+or registered trademarks of International Business Machines Corporation in
+the United States, other countries, or both. Other product and service
+names might be trademarks of IBM or other companies.
+
+This project is an independent, clean-room implementation. It is not
+affiliated with, endorsed by, sponsored by, or otherwise associated with
+IBM. References to IBM products and technologies are made solely for the
+purpose of describing compatibility and interoperability (nominative fair
+use).
+
 ## License
 
-This project is not yet licensed. All rights reserved.
+MIT — see [LICENSE](LICENSE) for details.

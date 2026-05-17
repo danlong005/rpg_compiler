@@ -16,17 +16,27 @@
 #define RPGC_RUNTIME_DIR "/usr/local/share/rpgc/runtime"
 #endif
 
+#ifndef RPGC_VERSION
+#define RPGC_VERSION "dev"
+#endif
+
 extern FILE* yyin;
 extern rpg::Program* get_parsed_program();
 extern int get_parse_error_count();
 
 int main(int argc, char* argv[]) {
+    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+        std::cout << "rpgc " << RPGC_VERSION << "\n";
+        return 0;
+    }
+
     if (argc < 2) {
         std::cerr << "Usage: rpgc <input.rpgle> [-S] [-g] [-o output] [--keep-cpp]\n";
         std::cerr << "  -S           Emit C++ source only, do not compile\n";
         std::cerr << "  -g           Compile with debug info (for GDB/LLDB/VS Code)\n";
         std::cerr << "  -o file      Output file (executable, or C++ file with -S)\n";
         std::cerr << "  --keep-cpp   Keep the intermediate .cpp file after compiling\n";
+        std::cerr << "  --version    Print version and exit\n";
         return 1;
     }
 
@@ -176,7 +186,7 @@ int main(int argc, char* argv[]) {
     std::string runtime_dir;
     // 1) Relative to the rpgc binary (e.g. ./runtime when run from source tree)
     std::string self(argv[0]);
-    auto last_slash = self.rfind('/');
+    size_t last_slash = self.find_last_of("/\\");
     if (last_slash != std::string::npos) {
         std::string bin_dir = self.substr(0, last_slash);
         if (dir_exists(bin_dir + "/runtime"))

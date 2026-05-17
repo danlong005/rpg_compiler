@@ -244,7 +244,7 @@ run_test "09" "Data Structures" "$TESTDIR/test09_datastructs.rpgle" "run"
 run_test "10" "Expanded BIFs" "$TESTDIR/test10_bifs_expanded.rpgle" "run"
 
 # Test 11: Error reporting (multiple sub-tests)
-for errfile in $TESTDIR/test11*.rpgle; do
+for errfile in $TESTDIR/test11[a-z]*.rpgle; do
     name=$(basename "$errfile" .rpgle)
     run_test "${name#test}" "$name" "$errfile" "error"
 done
@@ -390,6 +390,15 @@ run_test "106" "RLA SETLL/READE" "$TESTDIR/test106_rla_setll_reade.rpgle" "run-s
 # 107-108: rpgc.conf implicit connection (no EXEC SQL CONNECT in source)
 run_test "107" "SQL via rpgc.conf (no CONNECT)" "$TESTDIR/test107_sql_conf.sqlrpgle" "run-sql-conf"
 run_test "108" "RLA via rpgc.conf (no CONNECT)" "$TESTDIR/test108_rla_conf.rpgle" "run-sql-conf"
+
+# 109: SQL indicator variables
+run_test "109" "SQL indicator variables" "$TESTDIR/test109_sql_indicator.sqlrpgle" "run-sql"
+
+# 110: OVERLOAD — procedure overloading
+run_test "110" "OVERLOAD procedures" "$TESTDIR/test110_overload.rpgle" "run"
+
+# 111: %ELEM(*ALLOC) / %ELEM(*KEEP) — varying array capacity control
+run_test "111" "%ELEM(*ALLOC)/%ELEM(*KEEP)" "$TESTDIR/test111_elem_alloc.rpgle" "run"
 
 echo ""
 echo "========================================"

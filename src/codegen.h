@@ -130,9 +130,11 @@ private:
 
     // SQL codegen helpers
     void emitSqlBindParam(const std::string& var, int index, const std::string& handle = "__hstmt");
+    void emitSqlBindParamWithInd(const std::string& var, const std::string& ind_var, int index, const std::string& handle = "__hstmt");
     void emitSqlBindCol(const std::string& var, int index, const std::string& handle = "__hstmt");
     // Expand DS host variables into qualified field names (e.g., :row → ROW.ID, ROW.NAME, ...)
     std::vector<std::string> expandSqlIntoVars(const std::vector<std::string>& vars);
+    std::vector<HostVarWithInd> expandSqlIntoVarsWithInd(const std::vector<HostVarWithInd>& vars);
     static std::string escapeSqlForCpp(const std::string& sql);
     static std::string sqlCommentText(const std::string& sql);
 
@@ -158,6 +160,7 @@ private:
     std::set<std::string> nopass_procs_; // procs with *NOPASS params
     std::map<std::string, std::vector<ParamDecl>> nopass_proc_params_; // full param info
     std::map<std::string, std::string> extproc_map_; // RPG name → C++ name (EXTPROC/EXTPGM)
+    std::map<std::string, ProcInterface> proc_sigs_; // all proc/prototype signatures (for OVERLOAD)
     std::map<std::string, std::string> dtaara_vars_; // varname → data area name
     std::map<std::string, std::vector<std::string>> cursor_host_vars_; // cursor name → host vars for binding at OPEN
 };

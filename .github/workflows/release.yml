@@ -39,6 +39,7 @@ jobs:
               --description "RPG IV compiler — run RPG programs on Linux without IBM i" \
               --url "https://github.com/${{ github.repository }}" \
               --maintainer "${{ github.repository_owner }}" \
+              --license MIT \
               --depends unixodbc \
               -C /tmp/rpgc-root \
               usr/
@@ -51,6 +52,7 @@ jobs:
               --description "RPG IV compiler — run RPG programs on Linux without IBM i" \
               --url "https://github.com/${{ github.repository }}" \
               --maintainer "${{ github.repository_owner }}" \
+              --license MIT \
               --depends unixODBC \
               -C /tmp/rpgc-root \
               usr/
@@ -81,23 +83,71 @@ jobs:
       - name: Build .pkg installer
         run: |
           VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p /tmp/rpgc-scripts
+          cat > /tmp/rpgc-scripts/preinstall << 'EOF'
+          #!/bin/bash
+          if [ ! -f /opt/homebrew/lib/libodbc.dylib ] && [ ! -f /usr/local/lib/libodbc.dylib ]; then
+              echo "Error: unixodbc is required but not installed."
+              echo "Install it with: brew install unixodbc"
+              exit 1
+          fi
+          exit 0
+          EOF
+          chmod +x /tmp/rpgc-scripts/preinstall
           pkgbuild \
             --root /tmp/rpgc-root \
             --identifier com.rpgc.compiler \
             --version "$VERSION" \
             --install-location / \
+            --scripts /tmp/rpgc-scripts \
             "rpgc-${VERSION}.pkg"
 
-      - name: Wrap .pkg in .dmg
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          hdiutil create \
-            -volname "rpgc ${VERSION}" \
-            -srcfolder "rpgc-${VERSION}.pkg" \
-            -ov -format UDZO \
-            "rpgc-${VERSION}-macos.dmg"
-
-      - name: Upload DMG to release
+      - name: Upload PKG to release
         uses: softprops/action-gh-release@v2
         with:
-          files: rpgc-*-macos.dmg
+          files: rpgc-*.pkg
+
+  # ── Windows: build NSIS installer ──────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-flex
+            mingw-w64-x86_64-bison
+            mingw-w64-x86_64-unixodbc
+            make
+
+      - name: Build
+        shell: msys2 {0}
+        run: make
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis --no-progress -y
+
+      - name: Stage installer files
+        shell: pwsh
+        run: |
+          Copy-Item rpgc.exe installer\
+          Copy-Item runtime\rpg_runtime.h installer\
+          Copy-Item runtime\rpg_sql_runtime.h installer\
+          Copy-Item runtime\rpg_xml_runtime.h installer\
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $VERSION = "${{ github.ref_name }}".TrimStart("v")
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$VERSION installer\openrpg.nsi
+
+      - name: Upload installer
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/openrpg-*-windows-x64.exe

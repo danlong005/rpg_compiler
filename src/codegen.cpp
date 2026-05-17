@@ -116,6 +116,11 @@ void CodeGen::emitSqlBindParam(const std::string& var, int index, const std::str
     out_ << "__sql_env.bindParam(" << handle << ", " << index << ", " << var << ");\n";
 }
 
+void CodeGen::emitSqlBindParamWithInd(const std::string& var, const std::string& ind_var, int index, const std::string& handle) {
+    emitIndent();
+    out_ << "__sql_env.bindParamWithInd(" << handle << ", " << index << ", " << var << ", (int)" << ind_var << ");\n";
+}
+
 void CodeGen::emitSqlBindCol(const std::string& var, int index, const std::string& handle) {
     emitIndent();
     out_ << "SQLLEN __sql_ind_" << index << " = 0;\n";
@@ -136,6 +141,21 @@ std::vector<std::string> CodeGen::expandSqlIntoVars(const std::vector<std::strin
             }
         } else {
             expanded.push_back(v);
+        }
+    }
+    return expanded;
+}
+
+std::vector<HostVarWithInd> CodeGen::expandSqlIntoVarsWithInd(const std::vector<HostVarWithInd>& vars) {
+    std::vector<HostVarWithInd> expanded;
+    for (auto& hvwi : vars) {
+        auto dit = ds_defs_.find(hvwi.var);
+        if (dit != ds_defs_.end() && hvwi.ind_var.empty()) {
+            for (auto& f : dit->second->fields) {
+                expanded.push_back({hvwi.var + "." + f.name, ""});
+            }
+        } else {
+            expanded.push_back(hvwi);
         }
     }
     return expanded;
@@ -223,7 +243,10 @@ void CodeGen::visit(ExecSqlStmt& node) {
         }
         case SqlStmtKind::FETCH: {
             std::string cursor_name = extractCursorName(node.sql_text);
-            std::vector<std::string> into_vars = expandSqlIntoVars(extractFetchIntoVars(node.sql_text));
+            std::vector<HostVarWithInd> into_hvwi = expandSqlIntoVarsWithInd(extractFetchIntoWithInd(node.sql_text));
+            // For multi-row FETCH, fall back to plain var names (indicators not supported with FOR :n ROWS)
+            std::vector<std::string> into_vars;
+            for (auto& h : into_hvwi) into_vars.push_back(h.var);
             std::string rows_var;
             bool multi_row = parseFetchForRows(node.sql_text, rows_var);
 
@@ -284,6 +307,10 @@ void CodeGen::visit(ExecSqlStmt& node) {
                     emitIndent();
                     out_ << "RpgSqlEnv::copyStrBuf(" << into_vars[i]
                          << ", __sql_strbuf_" << (i+1) << ", __frc);\n";
+                    if (!into_hvwi[i].ind_var.empty()) {
+                        emitIndent();
+                        out_ << into_hvwi[i].ind_var << " = (__sql_ind_" << (i+1) << " < 0) ? -1 : 0;\n";
+                    }
                 }
             }
 
@@ -294,11 +321,11 @@ void CodeGen::visit(ExecSqlStmt& node) {
         }
         case SqlStmtKind::SELECT_INTO: {
             // Strip INTO clause and bind result columns
-            std::vector<std::string> raw_into_vars;
-            std::string stripped = stripSelectInto(node.sql_text, raw_into_vars);
-            std::vector<std::string> into_vars = expandSqlIntoVars(raw_into_vars);
+            std::string stripped;
+            std::vector<HostVarWithInd> raw_into_hvwi = extractSelectIntoWithInd(node.sql_text, stripped);
+            std::vector<HostVarWithInd> into_hvwi = expandSqlIntoVarsWithInd(raw_into_hvwi);
             std::string parameterized = replaceHostVarsWithMarkers(stripped);
-            std::vector<std::string> host_vars = extractHostVariables(stripped);
+            std::vector<HostVarWithInd> host_hvwi = extractHostVarsWithInd(stripped);
 
             emitIndent();
             out_ << "{\n";
@@ -311,19 +338,23 @@ void CodeGen::visit(ExecSqlStmt& node) {
             out_ << "SQLPrepare(__hstmt, (SQLCHAR*)\"" << escapeSqlForCpp(parameterized) << "\", SQL_NTS);\n";
 
             // Bind input parameters
-            for (size_t i = 0; i < host_vars.size(); i++) {
-                emitSqlBindParam(host_vars[i], static_cast<int>(i + 1));
+            for (size_t i = 0; i < host_hvwi.size(); i++) {
+                if (host_hvwi[i].ind_var.empty()) {
+                    emitSqlBindParam(host_hvwi[i].var, static_cast<int>(i + 1));
+                } else {
+                    emitSqlBindParamWithInd(host_hvwi[i].var, host_hvwi[i].ind_var, static_cast<int>(i + 1));
+                }
             }
 
             // Declare string buffers for output columns (needed since bind happens before fetch)
-            for (size_t i = 0; i < into_vars.size(); i++) {
+            for (size_t i = 0; i < into_hvwi.size(); i++) {
                 emitIndent();
                 out_ << "char __sql_strbuf_" << (i+1) << "[4096] = {};\n";
             }
 
             // Bind output columns
-            for (size_t i = 0; i < into_vars.size(); i++) {
-                emitSqlBindCol(into_vars[i], static_cast<int>(i + 1));
+            for (size_t i = 0; i < into_hvwi.size(); i++) {
+                emitSqlBindCol(into_hvwi[i].var, static_cast<int>(i + 1));
             }
 
             // Execute and fetch
@@ -334,11 +365,15 @@ void CodeGen::visit(ExecSqlStmt& node) {
             emitIndent();
             out_ << "__sql_env.updateStmtDiag(__hstmt, __frc);\n";
 
-            // Copy string buffers back to string variables after fetch
-            for (size_t i = 0; i < into_vars.size(); i++) {
+            // Copy string buffers back to string variables after fetch; assign indicator vars
+            for (size_t i = 0; i < into_hvwi.size(); i++) {
                 emitIndent();
-                out_ << "RpgSqlEnv::copyStrBuf(" << into_vars[i]
+                out_ << "RpgSqlEnv::copyStrBuf(" << into_hvwi[i].var
                      << ", __sql_strbuf_" << (i+1) << ", __frc);\n";
+                if (!into_hvwi[i].ind_var.empty()) {
+                    emitIndent();
+                    out_ << into_hvwi[i].ind_var << " = (__sql_ind_" << (i+1) << " < 0) ? -1 : 0;\n";
+                }
             }
 
             emitIndent();
@@ -457,15 +492,15 @@ void CodeGen::visit(ExecSqlStmt& node) {
             std::string sql_text = multi_row ? stripped_sql : node.sql_text;
 
             // General case: prepare + bind params + execute (INSERT/UPDATE/DELETE/other)
-            std::vector<std::string> host_vars = extractHostVariables(sql_text);
+            std::vector<HostVarWithInd> host_hvwi = extractHostVarsWithInd(sql_text);
             std::string parameterized = replaceHostVarsWithMarkers(sql_text);
 
-            if (host_vars.empty() && !multi_row) {
+            if (host_hvwi.empty() && !multi_row) {
                 // Simple execution, no host variables
                 emitIndent();
                 out_ << "__sql_env.execDirect(\"" << escapeSqlForCpp(parameterized) << "\");\n";
-            } else if (multi_row && !host_vars.empty()) {
-                // Multi-row INSERT: loop N times with array element bindings
+            } else if (multi_row && !host_hvwi.empty()) {
+                // Multi-row INSERT: loop N times with array element bindings (indicators not supported)
                 emitIndent();
                 out_ << "{\n";
                 indent_++;
@@ -478,10 +513,10 @@ void CodeGen::visit(ExecSqlStmt& node) {
                 indent_++;
                 emitIndent();
                 out_ << "__sql_env.clearParamBufs();\n";
-                for (size_t i = 0; i < host_vars.size(); i++) {
+                for (size_t i = 0; i < host_hvwi.size(); i++) {
                     emitIndent();
                     out_ << "__sql_env.bindParam(__hstmt, " << (i+1) << ", "
-                         << host_vars[i] << "[__ri]);\n";
+                         << host_hvwi[i].var << "[__ri]);\n";
                 }
                 emitIndent();
                 out_ << "SQLRETURN __erc = SQLExecute(__hstmt);\n";
@@ -508,8 +543,12 @@ void CodeGen::visit(ExecSqlStmt& node) {
                 emitIndent();
                 out_ << "SQLPrepare(__hstmt, (SQLCHAR*)\"" << escapeSqlForCpp(parameterized) << "\", SQL_NTS);\n";
 
-                for (size_t i = 0; i < host_vars.size(); i++) {
-                    emitSqlBindParam(host_vars[i], static_cast<int>(i + 1));
+                for (size_t i = 0; i < host_hvwi.size(); i++) {
+                    if (host_hvwi[i].ind_var.empty()) {
+                        emitSqlBindParam(host_hvwi[i].var, static_cast<int>(i + 1));
+                    } else {
+                        emitSqlBindParamWithInd(host_hvwi[i].var, host_hvwi[i].ind_var, static_cast<int>(i + 1));
+                    }
                 }
 
                 emitIndent();
@@ -631,6 +670,15 @@ void CodeGen::visit(Program& node) {
     // Emit global SQL env if needed
     if (uses_sql_) {
         out_ << "static RpgSqlEnv __sql_env;\n\n";
+    }
+
+    // Pre-collect all procedure/prototype signatures (needed for OVERLOAD wrapper generation)
+    for (auto* s : proc_stmts) {
+        if (auto* pr = dynamic_cast<DclPR*>(s)) {
+            if (pr->overload_impls.empty()) proc_sigs_[pr->name] = pr->interface;
+        } else if (auto* proc = dynamic_cast<DclProc*>(s)) {
+            proc_sigs_[proc->name] = proc->interface;
+        }
     }
 
     // Emit prototypes and procedures
@@ -773,6 +821,30 @@ void CodeGen::visit(Program& node) {
 }
 
 void CodeGen::visit(DclPR& node) {
+    // OVERLOAD: emit inline C++ wrapper functions, one per implementation
+    if (!node.overload_impls.empty()) {
+        for (auto& impl : node.overload_impls) {
+            auto it = proc_sigs_.find(impl);
+            if (it == proc_sigs_.end()) continue;
+            const ProcInterface& sig = it->second;
+            std::string ret = sig.has_return ? typeToString(sig.return_type) : "void";
+            out_ << "inline " << ret << " " << node.name << "(";
+            for (size_t i = 0; i < sig.params.size(); i++) {
+                if (i > 0) out_ << ", ";
+                out_ << paramTypeToString(sig.params[i]) << " __p" << i;
+            }
+            out_ << ") { ";
+            if (sig.has_return) out_ << "return ";
+            out_ << impl << "(";
+            for (size_t i = 0; i < sig.params.size(); i++) {
+                if (i > 0) out_ << ", ";
+                out_ << "__p" << i;
+            }
+            out_ << "); }\n";
+        }
+        return;
+    }
+
     bool has_nopass = std::any_of(node.interface.params.begin(), node.interface.params.end(),
                                   [](const ParamDecl& p) { return p.nopass; });
     bool has_omit = std::any_of(node.interface.params.begin(), node.interface.params.end(),
@@ -1179,7 +1251,17 @@ void CodeGen::visit(EvalStmt& node) {
         emitIndent();
         std::string arr = emitExpr(*lhs_bif->args[0]);
         std::string val = emitExpr(*node.value);
-        out_ << arr << ".resize(" << val << ");";
+        // Check second arg: *ALLOC → reserve, *KEEP → resize (keep capacity), default → resize
+        bool is_alloc = false;
+        if (lhs_bif->args.size() >= 2) {
+            auto* second = dynamic_cast<rpg::Identifier*>(lhs_bif->args[1].get());
+            is_alloc = second && second->name == "__ALLOC";
+            // *KEEP: resize without shrink — C++ .resize() already preserves capacity, same as default
+        }
+        if (is_alloc)
+            out_ << arr << ".reserve(" << val << ");";
+        else
+            out_ << arr << ".resize(" << val << ");";
         if (node.line > 0) out_ << " // line " << node.line;
         out_ << "\n";
         return;
@@ -1823,10 +1905,13 @@ void CodeGen::visit(BIFCall& node) {
         node.args[0]->accept(*this);
         expr_ << ")";
     } else if (node.name == "ELEM") {
-        // %ELEM(array) → array size
+        // %ELEM(array) → size; %ELEM(array:*ALLOC) → capacity
+        bool is_alloc = node.args.size() >= 2 &&
+            [&]{ auto* id = dynamic_cast<rpg::Identifier*>(node.args[1].get());
+                 return id && id->name == "__ALLOC"; }();
         expr_ << "static_cast<int>(";
         node.args[0]->accept(*this);
-        expr_ << ".size())";
+        expr_ << (is_alloc ? ".capacity())" : ".size())");
     } else if (node.name == "MAX") {
         if (node.args.size() == 2) {
             expr_ << "std::max(";

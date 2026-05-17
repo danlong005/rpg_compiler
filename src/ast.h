@@ -386,6 +386,7 @@ public:
     std::string extproc;  // EXTPROC('name') — external procedure
     bool rtnparm = false; // RTNPARM keyword
     bool opdesc = false;  // OPDESC keyword
+    std::vector<std::string> overload_impls; // OVERLOAD(impl1 : impl2 : ...)
     DclPR(std::string name, ProcInterface iface);
     void accept(ASTVisitor& visitor) override;
 };

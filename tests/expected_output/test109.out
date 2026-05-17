@@ -1,0 +1,6 @@
+name=Alice nameInd=0
+noteInd=-1
+name=Bob noteInd=0
+note=Manager
+Fetch: Alice note=NULL
+Fetch: Bob note=Manager

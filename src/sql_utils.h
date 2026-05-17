@@ -7,7 +7,14 @@
 
 namespace rpg {
 
+// Host variable paired with its optional indicator variable
+struct HostVarWithInd {
+    std::string var;     // host variable name (uppercase, no colon)
+    std::string ind_var; // indicator variable name (empty if none)
+};
+
 // Extract host variable names from SQL text (e.g., ":varName" → "VARNAME")
+// Indicator variables (:var :ind syntax) are skipped — only value vars are returned.
 std::vector<std::string> extractHostVariables(const std::string& sql);
 
 // Replace :varName references with ? parameter markers
@@ -75,6 +82,16 @@ bool parseFetchForRows(const std::string& sql, std::string& rows_var);
 // e.g. "INSERT INTO tbl VALUES(:a, :b) FOR :nRows ROWS" → rows_var="NROWS", returns true
 // Also strips the "FOR :n ROWS" from the SQL
 bool parseInsertForRows(const std::string& sql, std::string& rows_var, std::string& stripped_sql);
+
+// Extract host variables with optional indicator variables from general SQL
+// (for INSERT/UPDATE/DELETE parameter binding)
+std::vector<HostVarWithInd> extractHostVarsWithInd(const std::string& sql);
+
+// Extract SELECT INTO variables with optional indicators; also strips the INTO clause
+std::vector<HostVarWithInd> extractSelectIntoWithInd(const std::string& sql, std::string& stripped);
+
+// Extract FETCH INTO variables with optional indicators
+std::vector<HostVarWithInd> extractFetchIntoWithInd(const std::string& sql);
 
 } // namespace rpg
 

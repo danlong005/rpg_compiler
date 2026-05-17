@@ -103,6 +103,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
     DSFieldList* ds_field_list;
     rpg::DSField* ds_field;
     std::vector<rpg::EnumConstant>* enum_const_list;
+    std::vector<std::string>* str_list;
 }
 
 %token KW_FREE
@@ -116,7 +117,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_EVAL KW_EVAL_CORR KW_EVALR KW_CALLP KW_LEAVESR KW_ON_EXIT KW_DEALLOC KW_TEST
 %token <sval> KW_EVAL_EXT KW_EVALR_EXT KW_CALLP_EXT
 %token KW_STATIC KW_TEMPLATE KW_BASED KW_OPTIONS KW_NOPASS KW_OMIT
-%token KW_EXPORT KW_IMPORT KW_EXTPGM KW_EXTPROC KW_CTLOPT
+%token KW_EXPORT KW_IMPORT KW_EXTPGM KW_EXTPROC KW_CTLOPT KW_OVERLOAD
 %token KW_RETURN
 %token KW_INLR KW_ON
 %token KW_BLANKS KW_ZEROS KW_HIVAL KW_LOVAL KW_USER
@@ -166,6 +167,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_DIM_VAR KW_DIM_AUTO
 %token KW_FOR_EACH KW_IN KW_XML_INTO KW_DATA_INTO KW_DATA_GEN KW_SND_MSG
 %token KW_STAR_INFO KW_STAR_DIAG KW_STAR_ESCAPE KW_TYPE
+%token KW_STAR_ALLOC KW_STAR_KEEP
 %token KW_READ KW_READE KW_READP KW_READPE KW_CHAIN KW_WRITE KW_UPDATE KW_DELETE KW_SETLL KW_SETGT
 %token <sval> KW_READ_EXT KW_READE_EXT KW_READP_EXT KW_READPE_EXT KW_CHAIN_EXT
 %token <sval> KW_WRITE_EXT KW_UPDATE_EXT KW_DELETE_EXT
@@ -202,6 +204,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %type <ival> pi_return_type dcl_s_keywords proc_export
 %type <sval> ident
 %type <enum_const_list> enum_constants enum_constant
+%type <str_list> overload_list
 
 %start program
 
@@ -1067,6 +1070,27 @@ dcl_pr_stmt:
         free($5);
         $$ = pr;
     }
+    /* OVERLOAD variant */
+    | KW_DCL_PR IDENTIFIER KW_OVERLOAD LPAREN overload_list RPAREN SEMICOLON KW_END_PR SEMICOLON {
+        auto* pr = new rpg::DclPR($2, rpg::ProcInterface{});
+        pr->overload_impls = std::move(*$5);
+        delete $5;
+        free($2);
+        $$ = pr;
+    }
+    ;
+
+overload_list:
+    IDENTIFIER {
+        $$ = new std::vector<std::string>();
+        $$->push_back($1);
+        free($1);
+    }
+    | overload_list COLON IDENTIFIER {
+        $1->push_back($3);
+        free($3);
+        $$ = $1;
+    }
     ;
 
 /* DCL-PROC with embedded DCL-PI */
@@ -1188,6 +1212,9 @@ pi_return_type:
     | KW_CHAR LPAREN INTEGER_LITERAL RPAREN { $$ = (int)rpg::RPGType::CHAR; }
     | KW_VARCHAR LPAREN INTEGER_LITERAL RPAREN { $$ = (int)rpg::RPGType::VARCHAR; }
     | KW_PACKED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN { $$ = (int)rpg::RPGType::PACKED; }
+    | KW_FLOAT_TYPE LPAREN INTEGER_LITERAL RPAREN {
+        $$ = ($3 <= 4) ? (int)rpg::RPGType::FLOAT4 : (int)rpg::RPGType::FLOAT8;
+    }
     ;
 
 /* Parameters for DCL-PI */
@@ -1233,6 +1260,16 @@ pi_param:
     }
     | IDENTIFIER KW_PACKED LPAREN INTEGER_LITERAL COLON INTEGER_LITERAL RPAREN KW_VALUE SEMICOLON {
         $$ = new rpg::ParamDecl{$1, rpg::RPGType::PACKED, 0, $4, $6, true};
+        free($1);
+    }
+    | IDENTIFIER KW_FLOAT_TYPE LPAREN INTEGER_LITERAL RPAREN SEMICOLON {
+        auto type = ($4 <= 4) ? rpg::RPGType::FLOAT4 : rpg::RPGType::FLOAT8;
+        $$ = new rpg::ParamDecl{$1, type, 0, 0, 0, false};
+        free($1);
+    }
+    | IDENTIFIER KW_FLOAT_TYPE LPAREN INTEGER_LITERAL RPAREN KW_VALUE SEMICOLON {
+        auto type = ($4 <= 4) ? rpg::RPGType::FLOAT4 : rpg::RPGType::FLOAT8;
+        $$ = new rpg::ParamDecl{$1, type, 0, 0, 0, true};
         free($1);
     }
     /* DCL-PARM alternatives */
@@ -1379,6 +1416,16 @@ pr_param:
         free($1);
     }
     /* DCL-PARM alternatives */
+    | IDENTIFIER KW_FLOAT_TYPE LPAREN INTEGER_LITERAL RPAREN SEMICOLON {
+        auto type = ($4 <= 4) ? rpg::RPGType::FLOAT4 : rpg::RPGType::FLOAT8;
+        $$ = new rpg::ParamDecl{$1, type, 0, 0, 0, false};
+        free($1);
+    }
+    | IDENTIFIER KW_FLOAT_TYPE LPAREN INTEGER_LITERAL RPAREN KW_VALUE SEMICOLON {
+        auto type = ($4 <= 4) ? rpg::RPGType::FLOAT4 : rpg::RPGType::FLOAT8;
+        $$ = new rpg::ParamDecl{$1, type, 0, 0, 0, true};
+        free($1);
+    }
     | KW_DCL_PARM IDENTIFIER KW_INT LPAREN INTEGER_LITERAL RPAREN SEMICOLON {
         $$ = new rpg::ParamDecl{$2, rpg::RPGType::INT10, 0, 0, 0, false};
         free($2);
@@ -2682,6 +2729,12 @@ primary_expr:
     }
     | KW_LOVAL {
         $$ = new rpg::Identifier("RPG_LOVAL");
+    }
+    | KW_STAR_ALLOC {
+        $$ = new rpg::Identifier("__ALLOC");
+    }
+    | KW_STAR_KEEP {
+        $$ = new rpg::Identifier("__KEEP");
     }
     | LPAREN expression RPAREN {
         $$ = $2;

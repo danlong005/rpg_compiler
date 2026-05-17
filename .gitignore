@@ -10,4 +10,4 @@ build/parser.h
 .vscode/
 /*.cpp
 /*.o
-test99_data_into
+/test[0-9]*

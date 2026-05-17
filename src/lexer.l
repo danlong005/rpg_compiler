@@ -306,6 +306,7 @@ static void parse_ctlopt(const char* text) {
 "IMPORT"            { return KW_IMPORT; }
 "EXTPGM"            { return KW_EXTPGM; }
 "EXTPROC"           { return KW_EXTPROC; }
+"OVERLOAD"          { return KW_OVERLOAD; }
 "DEALLOC"           { return KW_DEALLOC; }
 "OPTIONS"           { return KW_OPTIONS; }
 "*NOPASS"           { return KW_NOPASS; }
@@ -506,6 +507,8 @@ static void parse_ctlopt(const char* text) {
 "*SECONDS"          { return KW_SECONDS; }
 "*MSECONDS"         { return KW_MSECONDS; }
 "*IN"[0-9][0-9]     { yylval.ival = atoi(yytext + 3); return INDICATOR; }
+"*ALLOC"            { return KW_STAR_ALLOC; }
+"*KEEP"             { return KW_STAR_KEEP; }
 
 ";"                 { return SEMICOLON; }
 "="                 { return EQUALS; }

@@ -251,11 +251,24 @@ public:
         }
     }
 
+    // Bind a parameter with an SQL indicator variable (ind < 0 → SQL NULL)
+    template<typename T>
+    void bindParamWithInd(SQLHSTMT hstmt, int idx, T& val, int ind_val) {
+        if (ind_val < 0) {
+            null_ind_bufs_.push_back(SQL_NULL_DATA);
+            SQLBindParameter(hstmt, idx, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR,
+                             0, 0, nullptr, 0, &null_ind_bufs_.back());
+        } else {
+            bindParam(hstmt, idx, val);
+        }
+    }
+
     // Clear parameter buffers (call before binding a new statement)
     void clearParamBufs() {
         param_bufs_.clear();
         param_int_bufs_.clear();
         param_dbl_bufs_.clear();
+        null_ind_bufs_.clear();
     }
 
     // Parameter buffers (persist until next statement execution)
@@ -263,6 +276,7 @@ public:
     std::deque<std::string> param_bufs_;
     std::deque<SQLINTEGER> param_int_bufs_;
     std::deque<SQLDOUBLE> param_dbl_bufs_;
+    std::deque<SQLLEN> null_ind_bufs_;
 
 private:
     void updateDiag(SQLSMALLINT handleType, SQLHANDLE handle, SQLRETURN rc) {
