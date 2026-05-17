@@ -9,6 +9,12 @@ ifeq ($(UNAME_S),Darwin)
     BISON       ?= $(BREW_PREFIX)/opt/bison/bin/bison
     ODBC_CFLAGS ?= -I$(BREW_PREFIX)/include
     ODBC_LIBS   ?= -L$(BREW_PREFIX)/lib -lodbc
+else ifneq (,$(findstring MINGW,$(UNAME_S)))
+    FLEX        ?= flex
+    BISON       ?= bison
+    ODBC_CFLAGS ?=
+    ODBC_LIBS   ?= -lodbc32
+    CXX         := g++
 else
     FLEX        ?= flex
     BISON       ?= bison

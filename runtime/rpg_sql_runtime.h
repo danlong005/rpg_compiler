@@ -4,6 +4,10 @@
 // ODBC SQL runtime support for RPG-generated C++ programs
 // Only included when the RPG source contains EXEC SQL statements
 
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#endif
 #include <sql.h>
 #include <sqlext.h>
 #include <cstring>

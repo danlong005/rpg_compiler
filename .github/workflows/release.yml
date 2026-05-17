@@ -120,7 +120,6 @@ jobs:
           update: true
           install: >-
             mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-unixodbc
             flex
             bison
             make
