@@ -94,7 +94,7 @@ jobs:
 
       - name: Install ODBC dependencies
         run: |
-          dnf install -y unixODBC libsqliteodbc gh clang
+          dnf install -y unixODBC sqliteodbc gh clang
 
       - name: Download release package
         run: gh release download "${{ needs.check.outputs.tag }}" --pattern "rpgc-*.rpm"
