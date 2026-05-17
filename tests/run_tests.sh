@@ -9,10 +9,12 @@ if [ "$1" = "--update" ]; then
     UPDATE_MODE=true
 fi
 
-RPGC="./rpgc"
-CXX="clang++"
-CXXFLAGS="-std=c++17 -Iruntime"
-CXXFLAGS_SQL="-std=c++17 -Iruntime -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc"
+RPGC="${RPGC:-./rpgc}"
+RUNTIME_DIR="${RUNTIME_DIR:-runtime}"
+CXX="${CXX:-clang++}"
+CXXFLAGS="-std=c++17 -I${RUNTIME_DIR}"
+ODBC_FLAGS="${ODBC_FLAGS:--I/opt/homebrew/include -L/opt/homebrew/lib -lodbc}"
+CXXFLAGS_SQL="-std=c++17 -I${RUNTIME_DIR} ${ODBC_FLAGS}"
 TESTDIR="tests"
 EXPECTED_OUT="$TESTDIR/expected_output"
 TMPDIR="/tmp/rpgc_test"
