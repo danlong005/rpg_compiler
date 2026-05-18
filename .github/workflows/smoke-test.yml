@@ -55,6 +55,8 @@ jobs:
 
       - name: Run tests
         timeout-minutes: 20
+        env:
+          ODBCSYSINI: /opt/homebrew/etc
         run: |
           RPGC=rpgc \
           RUNTIME_DIR=/usr/local/share/rpgc/runtime \

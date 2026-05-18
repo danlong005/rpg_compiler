@@ -14,7 +14,8 @@ RUNTIME_DIR="${RUNTIME_DIR:-runtime}"
 CXX="${CXX:-clang++}"
 CXXFLAGS="-std=c++17 -I${RUNTIME_DIR}"
 ODBC_FLAGS="${ODBC_FLAGS:--I/opt/homebrew/include -L/opt/homebrew/lib -lodbc}"
-CXXFLAGS_SQL="-std=c++17 -I${RUNTIME_DIR} ${ODBC_FLAGS}"
+# ODBC_FLAGS appended AFTER the source file so -l flags follow the object (GNU ld ordering)
+CXXFLAGS_SQL="-std=c++17 -I${RUNTIME_DIR}"
 TESTDIR="tests"
 EXPECTED_OUT="$TESTDIR/expected_output"
 TMPDIR="/tmp/rpgc_test"
@@ -144,7 +145,7 @@ run_test() {
             fi
 
             # Compile with ODBC flags
-            if ! $CXX $CXXFLAGS_SQL -o "$TMPDIR/test${testnum}" "$TMPDIR/test${testnum}.cpp" $extra 2>"$TMPDIR/test${testnum}_err.txt"; then
+            if ! $CXX $CXXFLAGS_SQL -o "$TMPDIR/test${testnum}" "$TMPDIR/test${testnum}.cpp" $extra $ODBC_FLAGS 2>"$TMPDIR/test${testnum}_err.txt"; then
                 echo -e "${RED}FAIL${NC} (compile failed)"
                 cat "$TMPDIR/test${testnum}_err.txt"
                 FAIL=$((FAIL + 1))
@@ -193,7 +194,7 @@ run_test() {
                 return
             fi
 
-            if ! $CXX $CXXFLAGS_SQL -o "$TMPDIR/test${testnum}" "$TMPDIR/test${testnum}.cpp" $extra 2>"$TMPDIR/test${testnum}_err.txt"; then
+            if ! $CXX $CXXFLAGS_SQL -o "$TMPDIR/test${testnum}" "$TMPDIR/test${testnum}.cpp" $extra $ODBC_FLAGS 2>"$TMPDIR/test${testnum}_err.txt"; then
                 echo -e "${RED}FAIL${NC} (compile failed)"
                 cat "$TMPDIR/test${testnum}_err.txt"
                 FAIL=$((FAIL + 1))
