@@ -97,7 +97,7 @@ jobs:
           dnf install -y unixODBC sqliteodbc gh clang
 
       - name: Download release package
-        run: gh release download "${{ needs.check.outputs.tag }}" --pattern "rpgc-*.rpm"
+        run: gh release download "${{ needs.check.outputs.tag }}" --repo "${{ github.repository }}" --pattern "rpgc-*.rpm"
         env:
           GH_TOKEN: ${{ github.token }}
 
