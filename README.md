@@ -136,7 +136,14 @@ Then open the folder in VS Code, set breakpoints in your `.rpgle` file, and pres
 
 ## Multi-Module Programs
 
-OpenRPG supports splitting programs across multiple source files using `CTL-OPT NOMAIN` with `EXPORT`/`IMPORT` and `EXTPROC`. See the [User's Guide](docs/GUIDE.md#multi-module-programs) for details.
+OpenRPG supports splitting programs across multiple source files using `CTL-OPT NOMAIN` with `EXPORT`/`IMPORT` and `EXTPROC`:
+
+```bash
+rpgc -c module.rpgle          # compile module to module.o
+rpgc main.rpgle module.o      # compile main and link with module
+```
+
+See the [User's Guide](docs/GUIDE.md#multi-module-programs) for details.
 
 ---
 

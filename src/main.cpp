@@ -40,11 +40,10 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc < 2) {
-        std::cerr << "Usage: rpgc <input.rpgle> [-S] [-g] [-o output] [--keep-cpp]\n";
-        std::cerr << "  -S           Emit C++ source only, do not compile\n";
+        std::cerr << "Usage: rpgc <input.rpgle> [-c] [-g] [-o output] [file.o ...]\n";
+        std::cerr << "  -c           Compile to object file, do not link\n";
         std::cerr << "  -g           Compile with debug info (for GDB/LLDB/VS Code)\n";
-        std::cerr << "  -o file      Output file (executable, or C++ file with -S)\n";
-        std::cerr << "  --keep-cpp   Keep the intermediate .cpp file after compiling\n";
+        std::cerr << "  -o file      Output file\n";
         std::cerr << "  -v, --version  Print version and exit\n";
         return 1;
     }
@@ -54,10 +53,14 @@ int main(int argc, char* argv[]) {
     bool emit_only = false;
     bool keep_cpp = false;
     bool debug_mode = false;
+    bool compile_only = false;
+    std::vector<std::string> extra_objs;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-S") == 0) {
             emit_only = true;
+        } else if (strcmp(argv[i], "-c") == 0) {
+            compile_only = true;
         } else if (strcmp(argv[i], "-g") == 0) {
             debug_mode = true;
         } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
@@ -66,6 +69,9 @@ int main(int argc, char* argv[]) {
             keep_cpp = true;
         } else if (!input_file) {
             input_file = argv[i];
+        } else {
+            // Extra arguments after the source file: collect .o files for linking
+            extra_objs.push_back(argv[i]);
         }
     }
 
@@ -154,27 +160,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    // Default: compile to executable
-    std::string exe_path = output_file ? output_file : base;
-
-    // Write C++ to temp file (or kept file)
-    std::string cpp_path;
-    if (keep_cpp) {
-        cpp_path = base + ".cpp";
-    } else {
-        cpp_path = "/tmp/" + base + ".cpp";
-    }
-
-    {
-        std::ofstream out(cpp_path);
-        if (!out) {
-            std::cerr << "Error: cannot write to " << cpp_path << "\n";
-            delete program;
-            return 1;
-        }
-        out << cpp_code;
-    }
-
     // Detect SQL/RLA source: .sqlrpgle extension or source contains DCL-F DISK
     std::string input_str(input_file);
     bool is_sql = false;
@@ -215,6 +200,48 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (compile_only) {
+        // -c: transpile then compile to object file, do not link
+        std::string obj_path = output_file ? output_file : base + ".o";
+        std::string cpp_path = "/tmp/" + base + ".cpp";
+        {
+            std::ofstream out(cpp_path);
+            if (!out) {
+                std::cerr << "Error: cannot write to " << cpp_path << "\n";
+                delete program;
+                return 1;
+            }
+            out << cpp_code;
+        }
+        std::string cmd = "clang++ -std=c++17 -I" + runtime_dir +
+                          " -c -o " + obj_path + " " + cpp_path;
+        int rc = system(cmd.c_str());
+        std::remove(cpp_path.c_str());
+        delete program;
+        return rc == 0 ? 0 : 1;
+    }
+
+    // Default: compile to executable
+    std::string exe_path = output_file ? output_file : base;
+
+    // Write C++ to temp file (or kept file)
+    std::string cpp_path;
+    if (keep_cpp) {
+        cpp_path = base + ".cpp";
+    } else {
+        cpp_path = "/tmp/" + base + ".cpp";
+    }
+
+    {
+        std::ofstream out(cpp_path);
+        if (!out) {
+            std::cerr << "Error: cannot write to " << cpp_path << "\n";
+            delete program;
+            return 1;
+        }
+        out << cpp_code;
+    }
+
     std::string cmd = "clang++ -std=c++17 -I" + runtime_dir;
     if (debug_mode) {
         cmd += " -g -O0";
@@ -223,6 +250,7 @@ int main(int argc, char* argv[]) {
         cmd += " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc";
     }
     cmd += " -o " + exe_path + " " + cpp_path;
+    for (const auto& obj : extra_objs) cmd += " " + obj;
     int rc = system(cmd.c_str());
 
     if (!keep_cpp) {

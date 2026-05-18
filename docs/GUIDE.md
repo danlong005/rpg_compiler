@@ -1066,11 +1066,8 @@ RETURN;
 
 **Build:**
 ```bash
-./rpgc -S mathlib.rpgle -o mathlib.cpp
-clang++ -std=c++17 -Iruntime -c -o mathlib.o mathlib.cpp
-
-./rpgc -S main.rpgle -o main.cpp
-clang++ -std=c++17 -Iruntime -o myapp main.cpp mathlib.o
+rpgc -c mathlib.rpgle              # produces mathlib.o
+rpgc main.rpgle mathlib.o -o myapp # compiles main and links with module
 ```
 
 ---
