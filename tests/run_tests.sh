@@ -108,7 +108,7 @@ run_test() {
 
             # Run and check output
             local actual="$TMPDIR/test${testnum}.actual"
-            "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
+            timeout 30 "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
 
             local expected="$EXPECTED_OUT/test${testnum}.out"
             if $UPDATE_MODE; then
@@ -116,12 +116,12 @@ run_test() {
                 echo -e "${YELLOW}UPDATED${NC}"
                 PASS=$((PASS + 1))
             elif [ -f "$expected" ]; then
-                if diff -q "$actual" "$expected" > /dev/null 2>&1; then
+                if diff -q --strip-trailing-cr "$actual" "$expected" > /dev/null 2>&1; then
                     echo -e "${GREEN}PASS${NC}"
                     PASS=$((PASS + 1))
                 else
                     echo -e "${RED}FAIL${NC} (output mismatch)"
-                    diff --unified=3 "$expected" "$actual" | head -20
+                    diff --unified=3 --strip-trailing-cr "$expected" "$actual" | head -20
                     FAIL=$((FAIL + 1))
                     FAILURES="$FAILURES\n  Test $testnum ($label)"
                 fi
@@ -155,7 +155,7 @@ run_test() {
 
             # Run and check output
             local actual="$TMPDIR/test${testnum}.actual"
-            "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
+            timeout 30 "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
 
             # Clean up temp database
             rm -f "/tmp/rpgc_test${testnum}.sqlite"
@@ -166,12 +166,12 @@ run_test() {
                 echo -e "${YELLOW}UPDATED${NC}"
                 PASS=$((PASS + 1))
             elif [ -f "$expected" ]; then
-                if diff -q "$actual" "$expected" > /dev/null 2>&1; then
+                if diff -q --strip-trailing-cr "$actual" "$expected" > /dev/null 2>&1; then
                     echo -e "${GREEN}PASS${NC}"
                     PASS=$((PASS + 1))
                 else
                     echo -e "${RED}FAIL${NC} (output mismatch)"
-                    diff --unified=3 "$expected" "$actual" | head -20
+                    diff --unified=3 --strip-trailing-cr "$expected" "$actual" | head -20
                     FAIL=$((FAIL + 1))
                     FAILURES="$FAILURES\n  Test $testnum ($label)"
                 fi
@@ -203,7 +203,7 @@ run_test() {
             fi
 
             local actual="$TMPDIR/test${testnum}.actual"
-            "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
+            timeout 30 "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
             rm -f "/tmp/rpgc_test${testnum}.sqlite"
 
             local expected="$EXPECTED_OUT/test${testnum}.out"
@@ -212,12 +212,12 @@ run_test() {
                 echo -e "${YELLOW}UPDATED${NC}"
                 PASS=$((PASS + 1))
             elif [ -f "$expected" ]; then
-                if diff -q "$actual" "$expected" > /dev/null 2>&1; then
+                if diff -q --strip-trailing-cr "$actual" "$expected" > /dev/null 2>&1; then
                     echo -e "${GREEN}PASS${NC}"
                     PASS=$((PASS + 1))
                 else
                     echo -e "${RED}FAIL${NC} (output mismatch)"
-                    diff --unified=3 "$expected" "$actual" | head -20
+                    diff --unified=3 --strip-trailing-cr "$expected" "$actual" | head -20
                     FAIL=$((FAIL + 1))
                     FAILURES="$FAILURES\n  Test $testnum ($label)"
                 fi
@@ -361,9 +361,16 @@ rm -f "$_DA_DIR/NOSUCHDA96"
 run_test "96" "DA Status 401 (not found)" "$TESTDIR/test96_da_status401.rpgle" "run"
 
 # 97: status 415 — file exists but no read permission
+# Skip when running as root (chmod 000 has no effect) or on Windows (chmod is a no-op on NTFS)
 printf '%-10s' 'TESTDATA' > "$_DA_DIR/RPGCTEST97DA"
 chmod 000 "$_DA_DIR/RPGCTEST97DA"
-run_test "97" "DA Status 415 (cannot read)" "$TESTDIR/test97_da_status415.rpgle" "run"
+if [ -r "$_DA_DIR/RPGCTEST97DA" ]; then
+    printf "Test %s: %-35s " "97" "DA Status 415 (cannot read)"
+    echo -e "${YELLOW}SKIP${NC} (cannot restrict permissions in this environment)"
+    PASS=$((PASS + 1))
+else
+    run_test "97" "DA Status 415 (cannot read)" "$TESTDIR/test97_da_status415.rpgle" "run"
+fi
 chmod 644 "$_DA_DIR/RPGCTEST97DA" 2>/dev/null; rm -f "$_DA_DIR/RPGCTEST97DA"
 
 # 98: status 413 — file exists but no write permission
