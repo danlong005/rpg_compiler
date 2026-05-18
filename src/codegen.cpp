@@ -1059,6 +1059,7 @@ void CodeGen::visit(DclS& node) {
     // Track variable info for RESET/CLEAR
     var_types_[node.name] = node.type;
     var_lengths_[node.name] = node.length;
+    var_digits_[node.name] = node.digits;
     if (node.inz_value) has_inz_.insert(node.name);
     if (node.dim > 0) array_vars_.insert(node.name);
     if (!node.dtaara_name.empty()) dtaara_vars_[node.name] = node.dtaara_name;
@@ -1953,9 +1954,31 @@ void CodeGen::visit(BIFCall& node) {
             expr_ << current_proc_parm_count_;
         }
     } else if (node.name == "SIZE") {
-        expr_ << "static_cast<int>(sizeof(";
-        node.args[0]->accept(*this);
-        expr_ << "))";
+        // Return RPG-declared size, not C++ sizeof (which varies by platform/stdlib).
+        // CHAR(N)/VARCHAR(N) → N bytes; PACKED(N:D) → ceil((N+1)/2); others → sizeof.
+        auto* id = dynamic_cast<Identifier*>(node.args[0].get());
+        bool emitted = false;
+        if (id) {
+            auto tit = var_types_.find(id->name);
+            auto lit = var_lengths_.find(id->name);
+            if (tit != var_types_.end() && lit != var_lengths_.end()) {
+                if (tit->second == RPGType::CHAR || tit->second == RPGType::VARCHAR ||
+                    tit->second == RPGType::UCS2) {
+                    expr_ << lit->second;
+                    emitted = true;
+                } else if (tit->second == RPGType::PACKED || tit->second == RPGType::ZONED) {
+                    auto dit = var_digits_.find(id->name);
+                    int digits = (dit != var_digits_.end()) ? dit->second : lit->second;
+                    expr_ << ((digits + 1) / 2);
+                    emitted = true;
+                }
+            }
+        }
+        if (!emitted) {
+            expr_ << "static_cast<int>(sizeof(";
+            node.args[0]->accept(*this);
+            expr_ << "))";
+        }
     } else if (node.name == "ADDR") {
         expr_ << "static_cast<void*>(&";
         node.args[0]->accept(*this);

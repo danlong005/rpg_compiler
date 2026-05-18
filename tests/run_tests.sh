@@ -12,6 +12,11 @@ fi
 RPGC="${RPGC:-./rpgc}"
 RUNTIME_DIR="${RUNTIME_DIR:-runtime}"
 CXX="${CXX:-clang++}"
+# timeout is GNU coreutils (not available on macOS by default; gtimeout is the Homebrew alias)
+TIMEOUT_CMD=""
+if command -v timeout >/dev/null 2>&1; then TIMEOUT_CMD="timeout 30"
+elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_CMD="gtimeout 30"
+fi
 CXXFLAGS="-std=c++17 -I${RUNTIME_DIR}"
 ODBC_FLAGS="${ODBC_FLAGS:--I/opt/homebrew/include -L/opt/homebrew/lib -lodbc}"
 # ODBC_FLAGS appended AFTER the source file so -l flags follow the object (GNU ld ordering)
@@ -108,7 +113,7 @@ run_test() {
 
             # Run and check output
             local actual="$TMPDIR/test${testnum}.actual"
-            timeout 30 "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
+            $TIMEOUT_CMD "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
 
             local expected="$EXPECTED_OUT/test${testnum}.out"
             if $UPDATE_MODE; then
@@ -155,7 +160,7 @@ run_test() {
 
             # Run and check output
             local actual="$TMPDIR/test${testnum}.actual"
-            timeout 30 "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
+            $TIMEOUT_CMD "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
 
             # Clean up temp database
             rm -f "/tmp/rpgc_test${testnum}.sqlite"
@@ -203,7 +208,7 @@ run_test() {
             fi
 
             local actual="$TMPDIR/test${testnum}.actual"
-            timeout 30 "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
+            $TIMEOUT_CMD "$TMPDIR/test${testnum}" > "$actual" 2>&1 || true
             rm -f "/tmp/rpgc_test${testnum}.sqlite"
 
             local expected="$EXPECTED_OUT/test${testnum}.out"
