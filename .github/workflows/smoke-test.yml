@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install ODBC dependencies
-        run: sudo apt-get install -y unixodbc libsqliteodbc
+        run: sudo apt-get install -y unixodbc unixodbc-dev libsqliteodbc
 
       - name: Download release package
         run: gh release download "${{ needs.check.outputs.tag }}" --pattern "rpgc_*.deb"

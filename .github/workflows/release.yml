@@ -41,6 +41,7 @@ jobs:
               --maintainer "${{ github.repository_owner }}" \
               --license MIT \
               --depends unixodbc \
+              --depends unixodbc-dev \
               -C /tmp/rpgc-root \
               usr/
 
@@ -54,6 +55,7 @@ jobs:
               --maintainer "${{ github.repository_owner }}" \
               --license MIT \
               --depends unixODBC \
+              --depends unixODBC-devel \
               -C /tmp/rpgc-root \
               usr/
 
