@@ -134,7 +134,7 @@ jobs:
       - name: Install SQLite ODBC driver
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://www.ch-werner.de/sqliteodbc/sqliteodbc_w64.exe" -OutFile "$env:TEMP\sqliteodbc_w64.exe"
+          Invoke-WebRequest -Uri "https://www.ch-werner.de/sqliteodbc/sqliteodbc_w64.exe" -OutFile "$env:TEMP\sqliteodbc_w64.exe" -SkipCertificateCheck
           Start-Process -Wait -FilePath "$env:TEMP\sqliteodbc_w64.exe" -ArgumentList "/S"
 
       - name: Download release installer
