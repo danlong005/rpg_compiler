@@ -3,6 +3,7 @@
 
 #include <string>
 #include <array>
+#include <vector>
 #include <algorithm>
 #include <cmath>
 #include <climits>

@@ -133,7 +133,9 @@ jobs:
 
       - name: Install SQLite ODBC driver
         shell: pwsh
-        run: choco install sqliteodbc --no-progress -y
+        run: |
+          Invoke-WebRequest -Uri "https://www.ch-werner.de/sqliteodbc/sqliteodbc_w64.exe" -OutFile "$env:TEMP\sqliteodbc_w64.exe"
+          Start-Process -Wait -FilePath "$env:TEMP\sqliteodbc_w64.exe" -ArgumentList "/S"
 
       - name: Download release installer
         shell: pwsh
