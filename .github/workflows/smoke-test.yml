@@ -100,7 +100,7 @@ jobs:
 
       - name: Install ODBC dependencies
         run: |
-          dnf install -y unixODBC sqliteodbc gh clang
+          dnf install -y unixODBC unixODBC-devel sqliteodbc diffutils gh clang
 
       - name: Download release package
         run: gh release download "${{ needs.check.outputs.tag }}" --repo "${{ github.repository }}" --pattern "rpgc-*.rpm"
@@ -108,7 +108,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Install package
-        run: rpm -i rpgc-*.rpm
+        run: dnf install -y ./rpgc-*.rpm
 
       - name: Run tests
         run: |
@@ -153,13 +153,14 @@ jobs:
         shell: pwsh
         run: |
           $exe = Get-Item "openrpg-*-windows-x64.exe"
-          Start-Process -Wait -FilePath $exe.FullName -ArgumentList "/S"
+          # /D overrides install dir — use a space-free path so MSYS2 -I flags work
+          Start-Process -Wait -FilePath $exe.FullName -ArgumentList "/S /D=C:\openrpg"
 
       - name: Run tests
         run: |
-          export PATH="/c/Program Files/openrpg:$PATH"
+          export PATH="/c/openrpg:$PATH"
           RPGC=rpgc \
-          RUNTIME_DIR="/c/Program Files/openrpg/runtime" \
+          RUNTIME_DIR="/c/openrpg/runtime" \
           ODBC_FLAGS="-lodbc32" \
           CXX=g++ \
           bash tests/run_tests.sh
