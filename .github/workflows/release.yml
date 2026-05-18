@@ -137,10 +137,8 @@ jobs:
       - name: Stage installer files
         shell: pwsh
         run: |
-          Copy-Item rpgc.exe installer\
-          Copy-Item runtime\rpg_runtime.h installer\
-          Copy-Item runtime\rpg_sql_runtime.h installer\
-          Copy-Item runtime\rpg_xml_runtime.h installer\
+          Copy-Item rpgc.exe installer\ -ErrorAction Stop
+          Copy-Item runtime\*.h installer\ -ErrorAction Stop
 
       - name: Build installer
         shell: pwsh
