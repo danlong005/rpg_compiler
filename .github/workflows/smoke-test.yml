@@ -40,7 +40,14 @@ jobs:
         timeout-minutes: 10
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
-        run: brew install unixodbc sqliteodbc
+        run: |
+          brew install unixodbc sqliteodbc coreutils
+          # Homebrew installs the sqliteodbc library but does NOT register it with
+          # unixODBC.  Register it manually so Driver={SQLite3} works at runtime.
+          DRIVER=$(brew --prefix)/lib/libsqlite3odbc.dylib
+          printf '[SQLite3]\nDescription=SQLite3 ODBC Driver\nDriver=%s\nSetup=%s\n' \
+            "$DRIVER" "$DRIVER" \
+            | ODBCSYSINI=/opt/homebrew/etc odbcinst -i -d -f /dev/stdin
 
       - name: Download release package
         timeout-minutes: 5
