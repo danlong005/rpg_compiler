@@ -14,15 +14,25 @@ OpenRPG transpiles IBM RPG IV free-format source code into portable C++17 and op
 6. [Variables and Constants](#variables-and-constants)
 7. [Data Structures](#data-structures)
 8. [Arrays](#arrays)
-9. [Control Flow](#control-flow)
-10. [Procedures](#procedures)
-11. [Built-In Functions](#built-in-functions)
-12. [Error Handling](#error-handling)
-13. [Embedded SQL](#embedded-sql)
-14. [Database Connections](#database-connections)
-15. [Multi-Module Programs](#multi-module-programs)
-16. [Environment Variables](#environment-variables)
-17. [Testing](#testing)
+9. [Varying-Dimension Arrays](#varying-dimension-arrays)
+10. [Control Flow](#control-flow)
+11. [Procedures](#procedures)
+12. [Procedure Overloading](#procedure-overloading)
+13. [Built-In Functions](#built-in-functions)
+14. [Error Handling](#error-handling)
+15. [Operation Extenders](#operation-extenders)
+16. [Enumerations](#enumerations)
+17. [Program Status Data Structure](#program-status-data-structure)
+18. [Data Areas](#data-areas)
+19. [SND-MSG](#snd-msg)
+20. [Embedded SQL](#embedded-sql)
+21. [Record-Level Access](#record-level-access)
+22. [DATA-INTO and DATA-GEN](#data-into-and-data-gen)
+23. [XML-INTO](#xml-into)
+24. [Database Connections](#database-connections)
+25. [Multi-Module Programs](#multi-module-programs)
+26. [Environment Variables](#environment-variables)
+27. [Testing](#testing)
 
 ---
 
@@ -1103,7 +1113,858 @@ make test
 make update-expected
 ```
 
-The test suite includes 86 tests covering language features, built-in functions, error handling, and embedded SQL operations. SQL tests use SQLite databases that are automatically created and cleaned up during testing.
+The test suite includes 115 tests covering language features, built-in functions, error handling, embedded SQL, and record-level access. SQL and RLA tests use SQLite databases that are automatically created and cleaned up during testing.
+
+---
+
+## Varying-Dimension Arrays
+
+### DIM(\*VAR) — Fixed Capacity, Variable Size
+
+Declare an array with a maximum capacity but let the active size grow at runtime:
+
+```rpgle
+DCL-S scores INT(10) DIM(*VAR: 100);   // up to 100 elements
+
+// Set the active size
+%ELEM(scores) = 5;
+scores(1) = 90;
+scores(2) = 85;
+// ...
+
+DSPLY 'Count: ' + %CHAR(%ELEM(scores));   // 5
+```
+
+### DIM(\*AUTO) — Grows Automatically
+
+`DIM(*AUTO: max)` behaves like `DIM(*VAR: max)` but the array expands as you assign to
+higher indices — no explicit `%ELEM(arr) = n` required:
+
+```rpgle
+DCL-S tags VARCHAR(20) DIM(*AUTO: 50);
+
+tags(1) = 'alpha';
+tags(2) = 'beta';
+tags(3) = 'gamma';
+// %ELEM(tags) is now 3 automatically
+DSPLY %CHAR(%ELEM(tags));    // 3
+```
+
+### %ELEM(\*ALLOC) and %ELEM(\*KEEP)
+
+Control the underlying buffer capacity separately from the active element count:
+
+```rpgle
+DCL-S nums INT(10) DIM(*VAR: 10);
+
+// Expand allocation beyond the declared max
+%ELEM(nums : *ALLOC) = 50;
+DSPLY %CHAR(%ELEM(nums : *ALLOC));   // 50 — capacity
+DSPLY %CHAR(%ELEM(nums));            // 0  — active size unchanged
+
+// Populate 5 elements
+%ELEM(nums) = 5;
+FOR i = 1 TO 5;
+  nums(i) = i * 10;
+ENDFOR;
+
+// Shrink active count without releasing the buffer
+%ELEM(nums : *KEEP) = 3;
+DSPLY %CHAR(%ELEM(nums));            // 3  — active size
+DSPLY %CHAR(%ELEM(nums : *ALLOC));   // 50 — capacity still intact
+```
+
+Use `*KEEP` when you want to reuse the same buffer across iterations without
+repeated reallocations.
+
+### Arrays of Data Structures
+
+```rpgle
+DCL-DS employee QUALIFIED DIM(*VAR: 50);
+  id   INT(10);
+  name VARCHAR(40);
+END-DS;
+
+%ELEM(employee) = 2;
+employee(1).id = 101;
+employee(1).name = 'Alice';
+employee(2).id = 102;
+employee(2).name = 'Bob';
+
+DSPLY employee(1).name;
+```
+
+---
+
+## Operation Extenders
+
+Operation extenders modify the behavior of `EVAL`, `EVALR`, and `CALLP`. They are
+written in parentheses after the opcode.
+
+### (H) — Half-Adjust (Round)
+
+Rounds the result to the target precision before assignment:
+
+```rpgle
+DCL-S a PACKED(7:1) INZ(7.0);
+DCL-S b PACKED(7:0) INZ(2);
+DCL-S result INT(10);
+
+EVAL(H) result = a / b;   // 7.0 / 2 = 3.5, rounds to 4
+DSPLY %CHAR(result);       // 4
+```
+
+### (R) — Round
+
+Synonym for `(H)`:
+
+```rpgle
+EVAL(R) result = a / b;
+```
+
+### (E) — Error Capture
+
+Prevents a runtime error from halting the program. After the operation, check
+`%ERROR` to see if it failed:
+
+```rpgle
+CALLP(E) riskProc(arg);
+IF %ERROR;
+  DSPLY 'Call failed: ' + %CHAR(%STATUS);
+ENDIF;
+
+EVAL(E) x = someCalc();
+IF %ERROR;
+  DSPLY 'Calc error';
+ENDIF;
+```
+
+### (M) — Move (multiple extenders)
+
+Extenders can be combined — e.g., `EVAL(MH)` means move with half-adjust:
+
+```rpgle
+EVAL(MH) result = a / b;
+```
+
+### (P) — Pad
+
+For string assignments, pads the target with blanks. For numeric, same as no
+extender. Primarily a compatibility keyword; accepted and parsed:
+
+```rpgle
+EVAL(P) padStr = 'HELLO';
+```
+
+### (N) — No Lock
+
+Accepted on file operations and `EVAL`; treated as a no-op outside record-level
+access. Useful when porting code that uses `(N)` on READ/CHAIN:
+
+```rpgle
+EVAL(N) x = x + 1;
+```
+
+### EVALR with Extenders
+
+`EVALR` right-adjusts the result into the target. Extenders work the same way:
+
+```rpgle
+DCL-S target CHAR(10);
+DCL-S n PACKED(7:1) INZ(3.7);
+EVALR(H) target = n;   // rounds to 4, right-justified in 10 chars
+```
+
+---
+
+## Enumerations
+
+`DCL-ENUM` defines a named set of constants. Use `QUALIFIED` so each value is
+accessed with the enum name as a prefix.
+
+```rpgle
+DCL-ENUM Color QUALIFIED;
+  Red;       // 0
+  Green;     // 1
+  Blue;      // 2
+END-ENUM;
+
+DCL-S paint INT(10);
+paint = Color.Green;
+
+SELECT;
+  WHEN paint = Color.Red;
+    DSPLY 'Red';
+  WHEN paint = Color.Green;
+    DSPLY 'Green';
+  WHEN paint = Color.Blue;
+    DSPLY 'Blue';
+ENDSL;
+```
+
+### BOOLEAN Type
+
+`BOOLEAN` is a built-in type that holds `*ON` or `*OFF`:
+
+```rpgle
+DCL-S isReady BOOLEAN INZ(*OFF);
+DCL-S hasError BOOLEAN;
+
+isReady = *ON;
+
+IF isReady AND NOT hasError;
+  DSPLY 'Ready and no errors';
+ENDIF;
+```
+
+---
+
+## Program Status Data Structure
+
+The PSDS (`PSDS`) keyword on a `DCL-DS` declares the Program Status Data Structure.
+OpenRPG populates it at startup with process and environment information, mirroring
+the IBM i layout at the well-known POS offsets.
+
+```rpgle
+DCL-DS PgmInfo PSDS QUALIFIED;
+  PgmName CHAR(10) POS(81);    // program name (source file stem)
+  UserID  CHAR(10) POS(91);    // current OS user
+  JobNum  CHAR(8)  POS(101);   // process ID (zero-padded)
+  RunDate CHAR(8)  POS(109);   // YYYYMMDD
+  RunTime CHAR(6)  POS(119);   // HHMMSS
+END-DS;
+```
+
+| POS | Length | Content |
+|-----|--------|---------|
+| 1   | 10     | Current procedure name |
+| 11  | 5      | Current status code (PACKED 5,0) |
+| 81  | 10     | Program name |
+| 91  | 10     | User profile / OS username |
+| 101 | 8      | Job number (PID, zero-padded) |
+| 109 | 8      | Run date (YYYYMMDD) |
+| 119 | 6      | Run time (HHMMSS) |
+
+```rpgle
+IF %TRIM(PgmInfo.UserID) <> '';
+  DSPLY 'Running as: ' + PgmInfo.UserID;
+ENDIF;
+
+DSPLY 'Started: ' + PgmInfo.RunDate + ' ' + PgmInfo.RunTime;
+```
+
+The PSDS also syncs before every `ON-ERROR` handler fires, so you can read
+`StatusCode` inside `MONITOR` blocks to identify the error.
+
+---
+
+## Data Areas
+
+Data areas are persistent named storage outside of any single program. On IBM i
+they are system objects; in OpenRPG they are plain files on the local filesystem,
+stored in `$TMPDIR` (typically `/tmp`).
+
+### Declare a Data Area Variable
+
+Add `DTAARA` to a `DCL-S` or `DCL-DS`:
+
+```rpgle
+// *LDA — the Local Data Area (one per job/process)
+DCL-S LdaData CHAR(256) DTAARA(*LDA);
+
+// Named data area
+DCL-S Config CHAR(100) DTAARA(APPCONFIG);
+```
+
+### IN — Read from Data Area
+
+```rpgle
+IN LdaData;
+DSPLY %TRIM(LdaData);
+```
+
+### OUT — Write to Data Area
+
+```rpgle
+LdaData = 'SESSION_ID=ABC123';
+OUT LdaData;
+```
+
+### UNLOCK — Release the Lock
+
+`IN` acquires an exclusive lock on the data area. `UNLOCK` releases it when you
+are done reading so other programs can access it:
+
+```rpgle
+IN LdaData;
+// ... use LdaData ...
+UNLOCK LdaData;
+```
+
+### Round-Trip Example
+
+```rpgle
+DCL-S LdaData CHAR(20) DTAARA(*LDA);
+
+LdaData = 'HELLO DATA AREA     ';
+OUT LdaData;
+
+LdaData = '';      // clear local copy
+IN LdaData;        // read back from storage
+
+DSPLY %TRIM(LdaData);   // HELLO DATA AREA
+UNLOCK LdaData;
+```
+
+### Named Data Areas
+
+```rpgle
+DCL-S MyConfig CHAR(50) DTAARA(RPGCONFIG);
+
+MyConfig = 'VERSION=2.0';
+OUT MyConfig;
+
+MyConfig = '';
+IN MyConfig;
+DSPLY %SUBST(MyConfig: 1: 11);   // VERSION=2.0
+UNLOCK MyConfig;
+```
+
+> Data area files are created automatically on `OUT` if they do not exist.
+> On IBM i the equivalent would be `CRTDTAARA`.
+
+---
+
+## SND-MSG
+
+`SND-MSG` sends a message to the program message queue. In OpenRPG, `*INFO` and
+`*DIAG` messages are written to stderr. `*ESCAPE` raises a catchable exception.
+
+### Syntax
+
+```rpgle
+SND-MSG *INFO 'Informational message';
+SND-MSG *DIAG 'Diagnostic detail';
+SND-MSG *ESCAPE 'Fatal error text';
+
+// TYPE() keyword form
+SND-MSG TYPE(*INFO) 'Processing complete';
+
+// Bare form — defaults to *INFO
+SND-MSG 'Something happened';
+
+// Variable message
+DCL-S msg VARCHAR(100);
+msg = 'Row count: ' + %CHAR(rowCount);
+SND-MSG *DIAG msg;
+```
+
+### Catching \*ESCAPE with MONITOR
+
+`*ESCAPE` is the only message type that can interrupt normal flow. Wrap it in a
+`MONITOR` block to handle it gracefully:
+
+```rpgle
+MONITOR;
+  SND-MSG *ESCAPE 'Validation failed';
+ON-ERROR;
+  DSPLY 'Caught: ' + %CHAR(%STATUS);
+ENDMON;
+```
+
+---
+
+## Record-Level Access
+
+Record-Level Access (RLA) is RPG's native file I/O model. In OpenRPG, RLA is
+implemented over ODBC — the file is actually a database table, and the RLA opcodes
+translate to SQL operations transparently. Any ODBC-connected database works.
+
+### Declaring a File
+
+```rpgle
+DCL-F filename DISK KEYED EXTDESC('tablename');
+```
+
+| Keyword | Meaning |
+|---------|---------|
+| `DISK` | Disk (database) file |
+| `KEYED` | Key-based access (CHAIN, SETLL, READE) |
+| `EXTDESC('name')` | Maps to the SQL table named `name` |
+
+Omit `KEYED` for sequential-only access.
+
+The table's columns become program-scope variables with the same names as the
+column definitions. All names are uppercased to match RPG convention.
+
+### CHAIN — Random Read by Key
+
+```rpgle
+DCL-F CUSTFL DISK KEYED EXTDESC('customers');
+DCL-S key VARCHAR(10);
+
+key = 'C001';
+CHAIN key CUSTFL;
+IF %FOUND(CUSTFL);
+  DSPLY CUSTNO;
+  DSPLY CUSTNAME;
+ENDIF;
+```
+
+`%FOUND(filename)` is true when the last CHAIN found a record.
+
+### READ — Sequential Read
+
+```rpgle
+DCL-F CUSTFL DISK EXTDESC('customers');
+
+READ CUSTFL;
+DOW NOT %EOF(CUSTFL);
+  DSPLY CUSTNAME;
+  READ CUSTFL;
+ENDDO;
+```
+
+`%EOF(filename)` becomes true after a READ past the last record.
+
+### WRITE — Insert a New Record
+
+Assign values to the field variables, then WRITE:
+
+```rpgle
+CUSTNO   = 'C010';
+CUSTNAME = 'New Customer';
+CUSTBAL  = 0;
+WRITE CUSTFL;
+```
+
+### UPDATE — Modify the Current Record
+
+After a successful CHAIN or READ, modify fields and UPDATE:
+
+```rpgle
+key = 'C001';
+CHAIN key CUSTFL;
+IF %FOUND(CUSTFL);
+  CUSTBAL = CUSTBAL + 500;
+  UPDATE CUSTFL;
+ENDIF;
+```
+
+### DELETE — Remove the Current Record
+
+After a successful CHAIN or READ, DELETE removes that row:
+
+```rpgle
+key = 'C010';
+CHAIN key CUSTFL;
+IF %FOUND(CUSTFL);
+  DELETE CUSTFL;
+ENDIF;
+```
+
+### SETLL — Position to a Key
+
+`SETLL` positions the file cursor so the next READ starts at the first record
+with a key >= the argument:
+
+```rpgle
+DCL-F CUSTFL DISK KEYED EXTDESC('customers');
+DCL-S key VARCHAR(10);
+
+key = 'B000';
+SETLL key CUSTFL;
+
+READ CUSTFL;
+DOW NOT %EOF(CUSTFL) AND CUSTNO <= 'B999';
+  DSPLY CUSTNO + ' ' + CUSTNAME;
+  READ CUSTFL;
+ENDDO;
+```
+
+### READE — Read Equal Key
+
+`READE` reads the next record only if its key matches the argument:
+
+```rpgle
+key = 'B002';
+SETLL key CUSTFL;
+
+READE key CUSTFL;
+IF %FOUND(CUSTFL);
+  DSPLY CUSTNAME;
+ENDIF;
+```
+
+### Connection
+
+RLA uses the same ODBC connection as embedded SQL. You can connect explicitly or
+use `rpgc.conf` (see [Database Connections](#database-connections)):
+
+```rpgle
+DCL-F CUSTFL DISK KEYED EXTDESC('customers');
+DCL-S connStr VARCHAR(200);
+
+connStr = 'Driver={SQLite3};Database=myapp.db;';
+EXEC SQL CONNECT USING :connStr;
+
+key = 'C001';
+CHAIN key CUSTFL;
+```
+
+Or with `rpgc.conf` — no `EXEC SQL CONNECT` needed at all:
+
+```rpgle
+DCL-F CUSTFL DISK KEYED EXTDESC('customers');
+DCL-S key VARCHAR(10);
+
+key = 'B002';
+CHAIN key CUSTFL;
+IF %FOUND(CUSTFL);
+  DSPLY CUSTNAME;
+ENDIF;
+```
+
+### Complete RLA Example
+
+```rpgle
+**FREE
+
+DCL-F EMPFL DISK KEYED EXTDESC('employees');
+
+DCL-S connStr VARCHAR(200);
+DCL-S key     VARCHAR(10);
+
+connStr = 'Driver={SQLite3};Database=company.db;';
+EXEC SQL CONNECT USING :connStr;
+
+EXEC SQL CREATE TABLE employees (
+  EMPNO   VARCHAR(10) PRIMARY KEY,
+  EMPNAME VARCHAR(50),
+  SALARY  DECIMAL(9,2)
+);
+EXEC SQL INSERT INTO employees VALUES('E001','Alice',85000);
+EXEC SQL INSERT INTO employees VALUES('E002','Bob',72000);
+EXEC SQL INSERT INTO employees VALUES('E003','Carol',91000);
+
+// Random read
+key = 'E002';
+CHAIN key EMPFL;
+IF %FOUND(EMPFL);
+  DSPLY 'Found: ' + EMPNAME;
+ENDIF;
+
+// Sequential scan
+READ EMPFL;
+DOW NOT %EOF(EMPFL);
+  DSPLY EMPNO + ' ' + EMPNAME;
+  READ EMPFL;
+ENDDO;
+
+// Write a new record
+EMPNO   = 'E004';
+EMPNAME = 'David';
+SALARY  = 68000;
+WRITE EMPFL;
+
+// Update
+key = 'E001';
+CHAIN key EMPFL;
+IF %FOUND(EMPFL);
+  SALARY = SALARY + 5000;
+  UPDATE EMPFL;
+ENDIF;
+
+// Delete
+key = 'E004';
+CHAIN key EMPFL;
+IF %FOUND(EMPFL);
+  DELETE EMPFL;
+ENDIF;
+
+EXEC SQL DROP TABLE employees;
+EXEC SQL DISCONNECT;
+*INLR = *ON;
+```
+
+---
+
+## DATA-INTO and DATA-GEN
+
+`DATA-INTO` parses structured data (JSON) into a data structure.
+`DATA-GEN` serializes a data structure to structured data (JSON).
+
+### DATA-INTO — Parse JSON
+
+```rpgle
+DCL-DS person QUALIFIED;
+  name VARCHAR(40);
+  age  INT(10);
+  city VARCHAR(30);
+END-DS;
+
+DCL-S json VARCHAR(500);
+json = '{"name":"Alice","age":30,"city":"Boston"}';
+
+DATA-INTO person %DATA(json : 'doc=string case=any');
+
+DSPLY person.name;              // Alice
+DSPLY %CHAR(person.age);        // 30
+DSPLY person.city;              // Boston
+```
+
+The `%DATA` BIF takes the data source and an options string:
+
+| Option | Meaning |
+|--------|---------|
+| `doc=string` | The data is a string variable (not a file) |
+| `case=any` | Case-insensitive field name matching |
+
+Fields not present in the JSON default to zero (numeric) or blank (character).
+
+### DATA-GEN — Generate JSON
+
+```rpgle
+DCL-DS item QUALIFIED;
+  id    INT(10);
+  price PACKED(9:2);
+  label VARCHAR(30);
+END-DS;
+
+DCL-S json VARCHAR(300);
+
+item.id    = 42;
+item.price = 19.99;
+item.label = 'Widget';
+
+DATA-GEN item %DATA(json : 'doc=string');
+
+DSPLY json;   // {"id":42,"price":19.99,"label":"Widget"}
+```
+
+### Numeric Types
+
+PACKED, ZONED, INT, FLOAT, and UNS fields all round-trip correctly:
+
+```rpgle
+DCL-DS product QUALIFIED;
+  id    INT(10);
+  price PACKED(9:2);
+  qty   INT(10);
+END-DS;
+
+json = '{"id":99,"price":4.50,"qty":10}';
+DATA-INTO product %DATA(json : 'doc=string case=any');
+
+DSPLY %CHAR(product.price);   // 4.50
+```
+
+### Special Characters in Strings
+
+`DATA-GEN` escapes double-quotes and other JSON special characters automatically:
+
+```rpgle
+DCL-DS msg QUALIFIED;
+  text VARCHAR(100);
+END-DS;
+
+msg.text = 'Price < $10 & "sale"';
+DATA-GEN msg %DATA(json : 'doc=string');
+// {"text":"Price < $10 & \"sale\""}
+```
+
+---
+
+## XML-INTO
+
+`XML-INTO` parses an XML string into a data structure or array of data structures.
+It uses the `%XML` BIF to specify the data source and parsing options.
+
+### Basic Usage
+
+```rpgle
+DCL-DS order QUALIFIED;
+  id       INT(10);
+  customer VARCHAR(50);
+  qty      INT(10);
+END-DS;
+
+DCL-S xml VARCHAR(500);
+xml = '<order><id>1001</id><customer>Acme</customer><qty>25</qty></order>';
+
+XML-INTO order %XML(xml : 'case=any');
+
+DSPLY %CHAR(order.id);        // 1001
+DSPLY order.customer;          // Acme
+DSPLY %CHAR(order.qty);        // 25
+```
+
+### Options
+
+| Option | Meaning |
+|--------|---------|
+| `case=any` | Case-insensitive element-to-field matching |
+| `path=a/b/c` | Navigate into the XML tree before mapping |
+
+Missing elements default to zero or blank. Unknown elements are ignored.
+
+### PATH Option
+
+Use `path=` to navigate past wrapper elements:
+
+```rpgle
+DCL-DS rec QUALIFIED;
+  id   INT(10);
+  name VARCHAR(40);
+END-DS;
+
+xml = '<response><data><record><id>5</id><name>Alice</name></record></data></response>';
+
+XML-INTO rec %XML(xml : 'case=any path=response/data/record');
+
+DSPLY %CHAR(rec.id);    // 5
+DSPLY rec.name;          // Alice
+```
+
+### Array Target
+
+Map a repeating XML element into an array DS. Use `path=` to name the parent
+element, and the target DS array receives one element per child:
+
+```rpgle
+DCL-DS item QUALIFIED DIM(5);
+  name  VARCHAR(50);
+  qty   INT(10);
+  price PACKED(9:2);
+END-DS;
+
+xml = '<items>' +
+      '<item><name>Widget</name><qty>5</qty><price>19.99</price></item>' +
+      '<item><name>Gadget</name><qty>3</qty><price>29.50</price></item>' +
+      '</items>';
+
+XML-INTO item %XML(xml : 'case=any path=items');
+
+DSPLY item(1).name + ' qty=' + %CHAR(item(1).qty);   // Widget qty=5
+DSPLY item(2).name + ' qty=' + %CHAR(item(2).qty);   // Gadget qty=3
+```
+
+Use `DIM(*VAR: n)` to handle a variable number of elements:
+
+```rpgle
+DCL-DS emp QUALIFIED DIM(*VAR: 50);
+  id   INT(10);
+  name VARCHAR(40);
+END-DS;
+
+XML-INTO emp %XML(xml : 'case=any path=employees');
+
+DSPLY 'Count: ' + %CHAR(%ELEM(emp));
+```
+
+### Nested Data Structures with LIKEDS
+
+```rpgle
+DCL-DS address QUALIFIED;
+  street VARCHAR(50);
+  city   VARCHAR(30);
+  state  CHAR(2);
+END-DS;
+
+DCL-DS customer QUALIFIED;
+  name VARCHAR(50);
+  age  INT(10);
+  addr LIKEDS(address);
+END-DS;
+
+xml = '<customer>' +
+        '<name>Alice</name><age>30</age>' +
+        '<addr><street>123 Main</street><city>Boston</city><state>MA</state></addr>' +
+      '</customer>';
+
+XML-INTO customer %XML(xml : 'case=any');
+
+DSPLY customer.name;           // Alice
+DSPLY customer.addr.city;      // Boston
+DSPLY customer.addr.state;     // MA
+```
+
+---
+
+## Procedure Overloading
+
+`OVERLOAD` declares a generic procedure name that dispatches to one of several
+typed implementations based on argument types at call time.
+
+### Declaration
+
+```rpgle
+// Typed implementations
+DCL-PR absInt INT(10);
+  n INT(10) VALUE;
+END-PR;
+
+DCL-PR absFloat FLOAT(8);
+  n FLOAT(8) VALUE;
+END-PR;
+
+// Generic overloaded name
+DCL-PR abs OVERLOAD(absInt : absFloat);
+END-PR;
+```
+
+### Calling
+
+The compiler selects the implementation whose parameter types best match the
+argument types at the call site:
+
+```rpgle
+DCL-S i INT(10);
+DCL-S f FLOAT(8);
+
+i = abs(-7);      // calls absInt
+f = abs(-3.5);    // calls absFloat
+```
+
+### Full Example
+
+```rpgle
+**FREE
+
+CTL-OPT MAIN(main);
+
+DCL-PR formatInt   VARCHAR(30);
+  n INT(10) VALUE;
+END-PR;
+
+DCL-PR formatFloat VARCHAR(30);
+  n FLOAT(8) VALUE;
+END-PR;
+
+DCL-PR format OVERLOAD(formatInt : formatFloat);
+END-PR;
+
+DCL-PROC main;
+  DCL-PI main; END-PI;
+
+  DSPLY format(42);      // calls formatInt  → "INT:42"
+  DSPLY format(3.14);    // calls formatFloat → "FLT:3"
+END-PROC;
+
+DCL-PROC formatInt EXPORT;
+  DCL-PI formatInt VARCHAR(30);
+    n INT(10) VALUE;
+  END-PI;
+  RETURN 'INT:' + %CHAR(n);
+END-PROC;
+
+DCL-PROC formatFloat EXPORT;
+  DCL-PI formatFloat VARCHAR(30);
+    n FLOAT(8) VALUE;
+  END-PI;
+  RETURN 'FLT:' + %CHAR(%INT(n));
+END-PROC;
+```
 
 ---
 
