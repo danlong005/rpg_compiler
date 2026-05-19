@@ -29,6 +29,17 @@
 #define RPGC_VERSION "dev"
 #endif
 
+#ifdef _WIN32
+#  define RPGC_CXX      "g++"
+#  define RPGC_ODBC_FLAGS " -lodbc32"
+#elif defined(__APPLE__)
+#  define RPGC_CXX      "clang++"
+#  define RPGC_ODBC_FLAGS " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc"
+#else
+#  define RPGC_CXX      "clang++"
+#  define RPGC_ODBC_FLAGS " -lodbc"
+#endif
+
 extern FILE* yyin;
 extern rpg::Program* get_parsed_program();
 extern int get_parse_error_count();
@@ -213,7 +224,7 @@ int main(int argc, char* argv[]) {
             }
             out << cpp_code;
         }
-        std::string cmd = "clang++ -std=c++17 -I" + runtime_dir +
+        std::string cmd = std::string(RPGC_CXX) + " -std=c++17 -I" + runtime_dir +
                           " -c -o " + obj_path + " " + cpp_path;
         int rc = system(cmd.c_str());
         std::remove(cpp_path.c_str());
@@ -242,12 +253,12 @@ int main(int argc, char* argv[]) {
         out << cpp_code;
     }
 
-    std::string cmd = "clang++ -std=c++17 -I" + runtime_dir;
+    std::string cmd = std::string(RPGC_CXX) + " -std=c++17 -I" + runtime_dir;
     if (debug_mode) {
         cmd += " -g -O0";
     }
     if (is_sql) {
-        cmd += " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc";
+        cmd += RPGC_ODBC_FLAGS;
     }
     cmd += " -o " + exe_path + " " + cpp_path;
     for (const auto& obj : extra_objs) cmd += " " + obj;

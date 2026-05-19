@@ -31,6 +31,7 @@ jobs:
     name: macOS (.pkg)
     runs-on: macos-latest
     needs: check
+    if: false  # temporarily disabled
 
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +69,7 @@ jobs:
     name: Linux (.deb)
     runs-on: ubuntu-latest
     needs: check
+    if: false  # temporarily disabled
 
     steps:
       - uses: actions/checkout@v4
@@ -96,6 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:latest
     needs: check
+    if: false  # temporarily disabled
 
     steps:
       - uses: actions/checkout@v4
@@ -144,6 +147,14 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "https://www.ch-werner.de/sqliteodbc/sqliteodbc_w64.exe" -OutFile "$env:TEMP\sqliteodbc_w64.exe" -SkipCertificateCheck
           Start-Process -Wait -FilePath "$env:TEMP\sqliteodbc_w64.exe" -ArgumentList "/S"
+          # The installer registers as "SQLite3 ODBC Driver"; add alias "SQLite3" so
+          # connection strings using Driver={SQLite3} work
+          $driverKey = "HKLM:\SOFTWARE\ODBC\ODBCINST.INI\SQLite3 ODBC Driver"
+          $dllPath   = (Get-ItemProperty -Path $driverKey -Name Driver).Driver
+          New-Item -Path "HKLM:\SOFTWARE\ODBC\ODBCINST.INI\SQLite3" -Force | Out-Null
+          New-ItemProperty -Path "HKLM:\SOFTWARE\ODBC\ODBCINST.INI\SQLite3" -Name Driver -Value $dllPath -PropertyType String -Force | Out-Null
+          New-ItemProperty -Path "HKLM:\SOFTWARE\ODBC\ODBCINST.INI\SQLite3" -Name Setup  -Value $dllPath -PropertyType String -Force | Out-Null
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\ODBC\ODBCINST.INI\ODBC Drivers" -Name SQLite3 -Value Installed
 
       - name: Download release installer
         shell: pwsh

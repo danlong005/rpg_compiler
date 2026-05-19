@@ -12,6 +12,7 @@ jobs:
   # ── Linux: build .deb and .rpm ──────────────────────────────────────────
   build-linux:
     runs-on: ubuntu-latest
+    if: false  # temporarily disabled — focusing on Windows
 
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +70,7 @@ jobs:
   # ── macOS: build .dmg ───────────────────────────────────────────────────
   build-macos:
     runs-on: macos-latest
+    if: false  # temporarily disabled — focusing on Windows
 
     steps:
       - uses: actions/checkout@v4
