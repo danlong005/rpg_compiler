@@ -1,15 +1,17 @@
-<svg width="100%" viewBox="0 0 680 420" role="img" xmlns="http://www.w3.org/2000/svg">
-  <title>OpenRPG punch card logo</title>
-  <desc>A punch card styled logo for the OpenRPG RPG IV compiler project</desc>
+<svg width="100%" viewBox="0 0 680 480" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>OpenRPG punch card logo with Hollerith encoding</title>
+  <desc>A punch card logo for OpenRPG with OPENRPG encoded in real Hollerith punch card format</desc>
   <defs>
     <style>
       @media (prefers-color-scheme: dark) {
         .card-bg { fill: #e8e0cc; }
         .card-stroke { stroke: #c8b99a; }
         .hole { fill: #1a1a1a; }
+        .hole-empty { fill: none; stroke: #c8b99a; stroke-width: 0.5; }
         .notch { fill: #c8b99a; }
         .card-text { fill: #2a1f0a; }
         .card-text-muted { fill: #6b5a3a; }
+        .col-label { fill: #8a7050; }
         .wordmark { fill: #e8e0cc; }
         .tagline { fill: #a09080; }
         .rule { stroke: #c8b99a; }
@@ -18,9 +20,11 @@
         .card-bg { fill: #f5edd8; }
         .card-stroke { stroke: #c8aa70; }
         .hole { fill: #1a1205; }
+        .hole-empty { fill: none; stroke: #c8aa70; stroke-width: 0.5; }
         .notch { fill: #c8aa70; }
         .card-text { fill: #1a1205; }
         .card-text-muted { fill: #7a6030; }
+        .col-label { fill: #9a8060; }
         .wordmark { fill: #1a1205; }
         .tagline { fill: #8a7050; }
         .rule { stroke: #c8aa70; }
@@ -28,138 +32,130 @@
     </style>
   </defs>
 
-  <rect x="40" y="40" width="600" height="220" rx="5" class="card-bg card-stroke" stroke-width="1.5" />
-  <polygon points="40,40 72,40 40,72" class="notch" />
+  <rect x="30" y="30" width="620" height="300" rx="5" class="card-bg card-stroke" stroke-width="1.5"/>
+  <polygon points="30,30 62,30 30,62" class="notch"/>
 
-  <text x="58" y="62" font-family="monospace" font-size="6.5" class="card-text-muted" letter-spacing="7.15">0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5  6  7  8  9  0  1  2  3</text>
-  <line x1="52" y1="68" x2="628" y2="68" class="rule" stroke-width="0.5" />
+  <text x="42" y="63"  font-family="monospace" font-size="7" class="col-label">12</text>
+  <text x="42" y="81"  font-family="monospace" font-size="7" class="col-label">11</text>
+  <text x="44" y="99"  font-family="monospace" font-size="7" class="col-label">0</text>
+  <text x="44" y="117" font-family="monospace" font-size="7" class="col-label">1</text>
+  <text x="44" y="135" font-family="monospace" font-size="7" class="col-label">2</text>
+  <text x="44" y="153" font-family="monospace" font-size="7" class="col-label">3</text>
+  <text x="44" y="171" font-family="monospace" font-size="7" class="col-label">4</text>
+  <text x="44" y="189" font-family="monospace" font-size="7" class="col-label">5</text>
+  <text x="44" y="207" font-family="monospace" font-size="7" class="col-label">6</text>
+  <text x="44" y="225" font-family="monospace" font-size="7" class="col-label">7</text>
+  <text x="44" y="243" font-family="monospace" font-size="7" class="col-label">8</text>
+  <text x="44" y="261" font-family="monospace" font-size="7" class="col-label">9</text>
 
-  <rect x="56" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="80" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="116" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="164" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="200" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="248" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="284" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="320" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="368" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="404" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="452" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="500" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="548" y="76" width="7" height="5" rx="1" class="hole"/>
-  <rect x="596" y="76" width="7" height="5" rx="1" class="hole"/>
+  <line x1="56" y1="35" x2="56" y2="323" class="rule" stroke-width="0.5"/>
 
-  <rect x="68" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="104" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="140" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="188" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="236" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="272" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="308" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="356" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="416" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="464" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="512" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="560" y="87" width="7" height="5" rx="1" class="hole"/>
-  <rect x="608" y="87" width="7" height="5" rx="1" class="hole"/>
+  <!-- O: rows 12, 6 -->
+  <rect x="113" y="55"  width="14" height="10" rx="2" class="hole"/>
+  <rect x="113" y="73"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="91"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="109" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="127" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="145" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="163" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="181" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="199" width="14" height="10" rx="2" class="hole"/>
+  <rect x="113" y="217" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="235" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="113" y="253" width="14" height="10" rx="2" class="hole-empty"/>
 
-  <rect x="56" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="92" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="152" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="200" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="260" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="296" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="344" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="392" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="440" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="488" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="536" y="98" width="7" height="5" rx="1" class="hole"/>
-  <rect x="584" y="98" width="7" height="5" rx="1" class="hole"/>
+  <!-- P: rows 12, 7 -->
+  <rect x="193" y="55"  width="14" height="10" rx="2" class="hole"/>
+  <rect x="193" y="73"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="91"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="109" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="127" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="145" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="163" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="181" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="199" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="217" width="14" height="10" rx="2" class="hole"/>
+  <rect x="193" y="235" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="193" y="253" width="14" height="10" rx="2" class="hole-empty"/>
 
-  <rect x="80" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="128" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="176" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="224" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="272" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="320" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="380" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="428" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="476" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="524" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="572" y="109" width="7" height="5" rx="1" class="hole"/>
-  <rect x="608" y="109" width="7" height="5" rx="1" class="hole"/>
+  <!-- E: rows 12, 5 -->
+  <rect x="273" y="55"  width="14" height="10" rx="2" class="hole"/>
+  <rect x="273" y="73"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="91"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="109" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="127" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="145" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="163" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="181" width="14" height="10" rx="2" class="hole"/>
+  <rect x="273" y="199" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="217" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="235" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="273" y="253" width="14" height="10" rx="2" class="hole-empty"/>
 
-  <rect x="56" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="104" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="152" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="212" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="260" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="308" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="356" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="404" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="464" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="512" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="560" y="120" width="7" height="5" rx="1" class="hole"/>
-  <rect x="596" y="120" width="7" height="5" rx="1" class="hole"/>
+  <!-- N: rows 11, 5 -->
+  <rect x="353" y="55"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="73"  width="14" height="10" rx="2" class="hole"/>
+  <rect x="353" y="91"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="109" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="127" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="145" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="163" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="181" width="14" height="10" rx="2" class="hole"/>
+  <rect x="353" y="199" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="217" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="235" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="353" y="253" width="14" height="10" rx="2" class="hole-empty"/>
 
-  <rect x="68" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="116" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="164" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="224" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="284" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="332" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="380" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="428" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="488" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="536" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="584" y="131" width="7" height="5" rx="1" class="hole"/>
-  <rect x="620" y="131" width="7" height="5" rx="1" class="hole"/>
+  <!-- R: rows 11, 9 -->
+  <rect x="433" y="55"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="73"  width="14" height="10" rx="2" class="hole"/>
+  <rect x="433" y="91"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="109" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="127" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="145" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="163" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="181" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="199" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="217" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="235" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="433" y="253" width="14" height="10" rx="2" class="hole"/>
 
-  <rect x="56" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="92" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="140" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="200" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="248" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="308" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="356" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="416" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="464" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="512" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="572" y="142" width="7" height="5" rx="1" class="hole"/>
-  <rect x="608" y="142" width="7" height="5" rx="1" class="hole"/>
+  <!-- P: rows 12, 7 -->
+  <rect x="513" y="55"  width="14" height="10" rx="2" class="hole"/>
+  <rect x="513" y="73"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="91"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="109" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="127" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="145" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="163" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="181" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="199" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="217" width="14" height="10" rx="2" class="hole"/>
+  <rect x="513" y="235" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="513" y="253" width="14" height="10" rx="2" class="hole-empty"/>
 
-  <rect x="80" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="128" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="176" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="224" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="272" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="332" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="380" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="440" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="488" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="548" y="153" width="7" height="5" rx="1" class="hole"/>
-  <rect x="596" y="153" width="7" height="5" rx="1" class="hole"/>
+  <!-- G: rows 12, 4 -->
+  <rect x="593" y="55"  width="14" height="10" rx="2" class="hole"/>
+  <rect x="593" y="73"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="91"  width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="109" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="127" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="145" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="163" width="14" height="10" rx="2" class="hole"/>
+  <rect x="593" y="181" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="199" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="217" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="235" width="14" height="10" rx="2" class="hole-empty"/>
+  <rect x="593" y="253" width="14" height="10" rx="2" class="hole-empty"/>
 
-  <rect x="56" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="104" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="152" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="212" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="260" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="308" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="368" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="416" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="476" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="524" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="584" y="164" width="7" height="5" rx="1" class="hole"/>
-  <rect x="620" y="164" width="7" height="5" rx="1" class="hole"/>
+  <line x1="56" y1="278" x2="640" y2="278" class="rule" stroke-width="0.5"/>
 
-  <line x1="52" y1="182" x2="628" y2="182" class="rule" stroke-width="0.5"/>
+  <text x="70" y="298" font-family="monospace" font-size="18" font-weight="700" class="card-text" letter-spacing="7">OPENRPG</text>
+  <text x="70" y="318" font-family="monospace" font-size="9" class="card-text-muted" letter-spacing="1.5">RPG IV COMPILER  ·  DO NOT FOLD OR MUTILATE</text>
+  <text x="635" y="318" text-anchor="end" font-family="monospace" font-size="8" class="card-text-muted" letter-spacing="1">COL 001-080</text>
 
-  <text x="58" y="210" font-family="monospace" font-size="28" font-weight="700" class="card-text" letter-spacing="8">OPENRPG</text>
-  <text x="58" y="228" font-family="monospace" font-size="10" class="card-text-muted" letter-spacing="1">RPG IV COMPILER · DO NOT FOLD OR MUTILATE</text>
-  <text x="623" y="248" text-anchor="end" font-family="monospace" font-size="9" class="card-text-muted" letter-spacing="1">COL 001-080</text>
-
-  <text x="340" y="320" text-anchor="middle" font-family="monospace" font-size="64" font-weight="700" class="wordmark" letter-spacing="-2">OpenRPG</text>
-  <line x1="100" y1="334" x2="580" y2="334" class="rule" stroke-width="1"/>
-  <text x="340" y="354" text-anchor="middle" font-family="monospace" font-size="13" class="tagline" letter-spacing="3">RPG IV.  RUN ANYWHERE.</text>
+  <text x="340" y="390" text-anchor="middle" font-family="monospace" font-size="64" font-weight="700" class="wordmark" letter-spacing="-2">OpenRPG</text>
+  <line x1="100" y1="404" x2="580" y2="404" class="rule" stroke-width="1"/>
+  <text x="340" y="424" text-anchor="middle" font-family="monospace" font-size="13" class="tagline" letter-spacing="3">RPG IV.  RUN ANYWHERE.</text>
+  <text x="340" y="452" text-anchor="middle" font-family="monospace" font-size="8" class="card-text-muted" letter-spacing="1">HOLLERITH ENCODED · IBM 029 KEYPUNCH FORMAT</text>
 </svg>
