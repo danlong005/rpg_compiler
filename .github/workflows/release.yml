@@ -69,6 +69,7 @@ jobs:
   # ── macOS: build .dmg ───────────────────────────────────────────────────
   build-macos:
     runs-on: macos-latest
+    if: false  # temporarily disabled
 
     steps:
       - uses: actions/checkout@v4

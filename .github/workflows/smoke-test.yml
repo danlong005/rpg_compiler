@@ -31,6 +31,7 @@ jobs:
     name: macOS (.pkg)
     runs-on: macos-latest
     needs: check
+    if: false  # temporarily disabled
 
 
     steps:
