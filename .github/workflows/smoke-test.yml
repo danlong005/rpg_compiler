@@ -31,7 +31,7 @@ jobs:
     name: macOS (.pkg)
     runs-on: macos-latest
     needs: check
-    if: false  # temporarily disabled
+
 
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
     name: Linux (.deb)
     runs-on: ubuntu-latest
     needs: check
-    if: false  # temporarily disabled
+
 
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:latest
     needs: check
-    if: false  # temporarily disabled
+
 
     steps:
       - uses: actions/checkout@v4
