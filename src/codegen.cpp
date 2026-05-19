@@ -1060,6 +1060,7 @@ void CodeGen::visit(DclS& node) {
     var_types_[node.name] = node.type;
     var_lengths_[node.name] = node.length;
     var_digits_[node.name] = node.digits;
+    var_decimals_[node.name] = node.decimals;
     if (node.inz_value) has_inz_.insert(node.name);
     if (node.dim > 0) array_vars_.insert(node.name);
     if (!node.dtaara_name.empty()) dtaara_vars_[node.name] = node.dtaara_name;
@@ -1836,9 +1837,28 @@ void CodeGen::visit(BIFCall& node) {
             node.args[0]->accept(*this);
             expr_ << ", RPG_TIMFMT)";
         } else {
-            expr_ << "rpg_to_char(";
-            node.args[0]->accept(*this);
-            expr_ << ")";
+            // For PACKED/ZONED variables, emit the scale so formatting matches
+            // the RPG declaration (e.g. PACKED(9:2) → "91000.00", not "91000.000000")
+            bool is_packed = false;
+            int dec_places = 0;
+            if (arg_id) {
+                auto vit = var_types_.find(arg_id->name);
+                auto dit = var_decimals_.find(arg_id->name);
+                if (vit != var_types_.end() && dit != var_decimals_.end() &&
+                    (vit->second == RPGType::PACKED || vit->second == RPGType::ZONED)) {
+                    is_packed = true;
+                    dec_places = dit->second;
+                }
+            }
+            if (is_packed) {
+                expr_ << "rpg_to_char_packed(";
+                node.args[0]->accept(*this);
+                expr_ << ", " << dec_places << ")";
+            } else {
+                expr_ << "rpg_to_char(";
+                node.args[0]->accept(*this);
+                expr_ << ")";
+            }
         }
     } else if (node.name == "TRIM") {
         expr_ << "rpg_trim(";

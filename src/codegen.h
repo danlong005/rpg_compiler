@@ -155,7 +155,8 @@ private:
     // Track variable types and whether they have INZ for RESET/CLEAR
     std::map<std::string, RPGType> var_types_;
     std::map<std::string, int> var_lengths_; // for CHAR length
-    std::map<std::string, int> var_digits_;  // for PACKED/ZONED digit count
+    std::map<std::string, int> var_digits_;   // for PACKED/ZONED digit count
+    std::map<std::string, int> var_decimals_; // for PACKED/ZONED decimal places (scale)
     std::set<std::string> has_inz_; // variables with INZ values
     std::set<std::string> array_vars_; // DIM array variables
     std::set<std::string> nopass_procs_; // procs with *NOPASS params

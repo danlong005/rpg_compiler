@@ -377,6 +377,12 @@ inline std::string rpg_to_char(unsigned int v) { return std::to_string(v); }
 inline std::string rpg_to_char(double v) { return std::to_string(v); }
 inline std::string rpg_to_char(const std::string& v) { return v; }
 inline std::string rpg_to_char(bool v) { return v ? "1" : "0"; }
+// PACKED/ZONED: format with exactly the declared number of decimal places
+inline std::string rpg_to_char_packed(double v, int dec) {
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%.*f", dec, v);
+    return buf;
+}
 
 // --- Date/Time/Timestamp types ---
 

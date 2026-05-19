@@ -30,7 +30,7 @@ EXEC SQL SELECT COUNT(*), SUM(salary)
          WHERE  dept = 'Engineering';
 
 DSPLY ('Engineering headcount: ' + %CHAR(rowCount));
-DSPLY ('Total payroll:         $' + %CHAR(%INT(total)));
+DSPLY ('Total payroll:         $' + %CHAR(total));
 DSPLY '---';
 
 // Cursor over Engineering employees ordered by salary descending
@@ -45,7 +45,7 @@ EXEC SQL OPEN c1;
 DOW SQLCODE = 0;
   EXEC SQL FETCH c1 INTO :empName, :salary;
   IF SQLCODE = 0;
-    DSPLY (empName + '  $' + %CHAR(%INT(salary)));
+    DSPLY (empName + '  $' + %CHAR(salary));
   ENDIF;
 ENDDO;
 

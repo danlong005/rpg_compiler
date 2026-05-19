@@ -245,7 +245,7 @@ EXEC SQL SELECT COUNT(*), SUM(salary)
          WHERE  dept = 'Engineering';
 
 DSPLY ('Engineering headcount: ' + %CHAR(rowCount));
-DSPLY ('Total payroll:         $' + %CHAR(%INT(total)));
+DSPLY ('Total payroll:         $' + %CHAR(total));
 DSPLY '---';
 
 // Cursor: list Engineering employees, highest salary first
@@ -258,7 +258,7 @@ EXEC SQL OPEN c1;
 DOW SQLCODE = 0;
   EXEC SQL FETCH c1 INTO :empName, :salary;
   IF SQLCODE = 0;
-    DSPLY (empName + '  $' + %CHAR(%INT(salary)));
+    DSPLY (empName + '  $' + %CHAR(salary));
   ENDIF;
 ENDDO;
 EXEC SQL CLOSE c1;
@@ -278,10 +278,10 @@ rpgc pg_employees.sqlrpgle -o pg_employees
 
 ```
 Engineering headcount: 2
-Total payroll:         $176000
+Total payroll:         $176000.00
 ---
-Carol Smith  $91000
-Alice Johnson  $85000
+Carol Smith  $91000.00
+Alice Johnson  $85000.00
 ```
 
 The full source is in [`examples/pg_employees.sqlrpgle`](examples/pg_employees.sqlrpgle).
