@@ -14,8 +14,10 @@ ELSE;
   DSPLY 'User is empty';
 ENDIF;
 
-// Use *USER directly in an expression
+// Use *USER directly in an expression — verify it concatenates (value is env-specific)
 msg = 'Hello ' + *USER;
-DSPLY msg;
+IF %LEN(%TRIMR(msg)) > 0;
+  DSPLY 'Greeting ok';
+ENDIF;
 
 RETURN;

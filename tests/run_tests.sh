@@ -149,6 +149,13 @@ run_test() {
                 return
             fi
 
+            # On Windows (MSYS2), the ODBC driver uses native Windows paths, not MSYS2 /tmp.
+            # Translate the SQLite path in the generated .cpp so both the driver and cleanup agree.
+            if command -v cygpath >/dev/null 2>&1; then
+                WIN_TMP=$(cygpath -m /tmp)
+                sed -i "s|Database=/tmp/|Database=${WIN_TMP}/|g" "$TMPDIR/test${testnum}.cpp"
+            fi
+
             # Compile with ODBC flags
             if ! $CXX $CXXFLAGS_SQL -o "$TMPDIR/test${testnum}" "$TMPDIR/test${testnum}.cpp" $extra $ODBC_FLAGS 2>"$TMPDIR/test${testnum}_err.txt"; then
                 echo -e "${RED}FAIL${NC} (compile failed)"
@@ -189,7 +196,13 @@ run_test() {
         run-sql-conf)
             # Like run-sql, but injects DB_DSN via RPGC_DSN env var instead of EXEC SQL CONNECT
             rm -f "/tmp/rpgc_test${testnum}.sqlite"
-            local dsn="Driver={SQLite3};Database=/tmp/rpgc_test${testnum}.sqlite;"
+            # On Windows (MSYS2), convert the SQLite path to a native Windows path so the ODBC
+            # driver can open the same file that MSYS2's /tmp cleanup will remove.
+            local _db_path="/tmp/rpgc_test${testnum}.sqlite"
+            if command -v cygpath >/dev/null 2>&1; then
+                _db_path="$(cygpath -m /tmp)/rpgc_test${testnum}.sqlite"
+            fi
+            local dsn="Driver={SQLite3};Database=${_db_path};"
 
             if ! RPGC_DSN="$dsn" $RPGC -S "$src" -o "$TMPDIR/test${testnum}.cpp" 2>"$TMPDIR/test${testnum}_err.txt"; then
                 echo -e "${RED}FAIL${NC} (transpile failed)"
