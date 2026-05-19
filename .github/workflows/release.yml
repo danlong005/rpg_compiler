@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install build dependencies
         run: |
@@ -60,7 +60,7 @@ jobs:
               usr/
 
       - name: Upload packages to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             rpgc_*.deb
@@ -71,7 +71,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install build dependencies
         run: brew install flex bison unixodbc
@@ -105,7 +105,7 @@ jobs:
             "rpgc-${VERSION}.pkg"
 
       - name: Upload PKG to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: rpgc-*.pkg
 
@@ -114,9 +114,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@v2.31.1
         with:
           msystem: MINGW64
           update: true
@@ -147,6 +147,6 @@ jobs:
           & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$VERSION installer\openrpg.nsi
 
       - name: Upload installer
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: installer/openrpg-*-windows-x64.exe
