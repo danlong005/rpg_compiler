@@ -1,0 +1,3 @@
+# Customer source files are not committed — drop .rpgle/.sqlrpgle here to compile-test them
+*
+!.gitignore

@@ -435,6 +435,62 @@ run_test "110" "OVERLOAD procedures" "$TESTDIR/test110_overload.rpgle" "run"
 # 111: %ELEM(*ALLOC) / %ELEM(*KEEP) — varying array capacity control
 run_test "111" "%ELEM(*ALLOC)/%ELEM(*KEEP)" "$TESTDIR/test111_elem_alloc.rpgle" "run"
 
+# ── Customer / drop-in tests ─────────────────────────────────────────────
+# Drop any .rpgle or .sqlrpgle file into tests/customer/ and it will be
+# compile-tested automatically — no registration or expected output needed.
+CUSTOMER_DIR="$TESTDIR/customer"
+if [ -d "$CUSTOMER_DIR" ]; then
+    customer_found=false
+    for src in "$CUSTOMER_DIR"/*.rpgle "$CUSTOMER_DIR"/*.sqlrpgle; do
+        [ -f "$src" ] || continue
+        customer_found=true
+        base=$(basename "$src")
+        printf "Customer: %-35s " "$base"
+        if [[ "$src" == *.sqlrpgle ]]; then
+            _err="$TMPDIR/customer_${base}_err.txt"
+            if ! $RPGC -S "$src" -o "$TMPDIR/customer_${base}.cpp" 2>"$_err"; then
+                echo -e "${RED}FAIL${NC} (transpile failed)"
+                cat "$_err"
+                FAIL=$((FAIL + 1))
+                FAILURES="$FAILURES\n  Customer: $base"
+                continue
+            fi
+            if $CXX $CXXFLAGS_SQL -c -o "$TMPDIR/customer_${base}.o" \
+                    "$TMPDIR/customer_${base}.cpp" $ODBC_FLAGS 2>"$_err"; then
+                echo -e "${GREEN}PASS${NC}"
+                PASS=$((PASS + 1))
+            else
+                echo -e "${RED}FAIL${NC} (compile failed)"
+                cat "$_err"
+                FAIL=$((FAIL + 1))
+                FAILURES="$FAILURES\n  Customer: $base"
+            fi
+        else
+            _err="$TMPDIR/customer_${base}_err.txt"
+            if ! $RPGC -S "$src" -o "$TMPDIR/customer_${base}.cpp" 2>"$_err"; then
+                echo -e "${RED}FAIL${NC} (transpile failed)"
+                cat "$_err"
+                FAIL=$((FAIL + 1))
+                FAILURES="$FAILURES\n  Customer: $base"
+                continue
+            fi
+            if $CXX $CXXFLAGS -c -o "$TMPDIR/customer_${base}.o" \
+                    "$TMPDIR/customer_${base}.cpp" 2>"$_err"; then
+                echo -e "${GREEN}PASS${NC}"
+                PASS=$((PASS + 1))
+            else
+                echo -e "${RED}FAIL${NC} (compile failed)"
+                cat "$_err"
+                FAIL=$((FAIL + 1))
+                FAILURES="$FAILURES\n  Customer: $base"
+            fi
+        fi
+    done
+    if [ "$customer_found" = false ]; then
+        echo "(no files in tests/customer/)"
+    fi
+fi
+
 echo ""
 echo "========================================"
 echo -e "  Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"
