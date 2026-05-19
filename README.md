@@ -10,11 +10,13 @@ Pre-built packages are available on the [Releases](../../releases) page.
 
 ### macOS
 
-Download `rpgc-<version>.pkg` from the Releases page. Before installation, `unixodbc` must be installed:
+Download `rpgc-<version>.pkg` from the Releases page. The `unixodbc` library must be present before installing:
 
 ```bash
 brew install unixodbc
 ```
+
+If you plan to use SQL or RLA features, see [Database Connectivity — macOS](#macos) for the additional SQLite driver registration step.
 
 Because OpenRPG is not code-signed with an Apple Developer certificate, macOS Gatekeeper will block the installer. Clear the quarantine flag before opening it:
 
@@ -26,18 +28,17 @@ Then double-click the `.pkg` to install. This puts `rpgc` on your PATH system-wi
 
 ### Linux
 
-Download the `.deb` (Debian/Ubuntu) or `.rpm` (RHEL/Fedora) from the Releases page.
+Download the `.deb` (Debian/Ubuntu) or `.rpm` (RHEL/Fedora) from the Releases page. The packages declare their ODBC dependencies, so the package manager will pull them in automatically.
 
 **Debian/Ubuntu:**
 ```bash
-sudo apt install unixodbc
 sudo dpkg -i rpgc_*.deb
+sudo apt-get install -f     # resolves any missing dependencies
 ```
 
 **RHEL/Fedora:**
 ```bash
-sudo dnf install unixODBC
-sudo rpm -i rpgc-*.rpm
+sudo dnf install ./rpgc-*.rpm
 ```
 
 ### Windows
@@ -93,24 +94,139 @@ SQL programs (`.sqlrpgle`) are linked with ODBC automatically — no extra flags
 
 ## Database Connectivity
 
-For programs that use embedded SQL or record-level access (RLA), create an `rpgc.conf` file:
+SQL programs (`.sqlrpgle`) and RPG programs that use record-level access (RLA) connect to databases through ODBC. OpenRPG works with any database that has an ODBC driver — SQLite, PostgreSQL, MySQL, SQL Server, Db2, and more.
+
+### Platform Setup
+
+The steps below use SQLite as the example. Other database drivers follow the same install-and-register pattern.
+
+#### macOS
+
+Install the unixODBC runtime and the SQLite ODBC driver:
+
+```bash
+brew install unixodbc sqliteodbc
+```
+
+> **Important — manual driver registration required.**
+> Homebrew installs the SQLite driver library but does **not** register it with unixODBC.
+> Without this step `Driver={SQLite3}` silently fails — programs compile but produce no
+> output from SQL or RLA operations.
+
+Register the driver once after installation:
+
+```bash
+DRIVER=$(brew --prefix)/lib/libsqlite3odbc.dylib
+printf '[SQLite3]\nDescription=SQLite3 ODBC Driver\nDriver=%s\nSetup=%s\n' \
+  "$DRIVER" "$DRIVER" \
+  | ODBCSYSINI=/opt/homebrew/etc odbcinst -i -d -f /dev/stdin
+```
+
+Also add `ODBCSYSINI` to your shell profile so unixODBC can find its configuration whenever you run a compiled program:
+
+```bash
+# add to ~/.zshrc or ~/.bash_profile
+export ODBCSYSINI=/opt/homebrew/etc
+```
+
+Then reload your shell (`source ~/.zshrc`) or open a new terminal.
+
+#### Linux — Ubuntu / Debian
+
+```bash
+sudo apt install unixodbc unixodbc-dev libsqliteodbc
+```
+
+`libsqliteodbc` registers the driver automatically. `unixodbc-dev` provides the ODBC headers that `rpgc` needs when it compiles generated C++ for SQL programs.
+
+#### Linux — RHEL / Fedora
+
+```bash
+sudo dnf install unixODBC unixODBC-devel sqliteodbc
+```
+
+#### Windows
+
+Download and run the SQLite ODBC installer from [www.ch-werner.de/sqliteodbc](https://www.ch-werner.de/sqliteodbc/) (`sqliteodbc_w64.exe` for 64-bit).
+
+The installer registers the driver as `SQLite3 ODBC Driver`. To use the shorter `Driver={SQLite3}` form in connection strings (matching the examples in this guide), add a registry alias. Run the following in an **elevated PowerShell** prompt:
+
+```powershell
+$key     = "HKLM:\SOFTWARE\ODBC\ODBCINST.INI"
+$dllPath = (Get-ItemProperty "$key\SQLite3 ODBC Driver" -Name Driver).Driver
+New-Item         "$key\SQLite3"         -Force | Out-Null
+New-ItemProperty "$key\SQLite3" -Name Driver -Value $dllPath -PropertyType String -Force | Out-Null
+New-ItemProperty "$key\SQLite3" -Name Setup  -Value $dllPath -PropertyType String -Force | Out-Null
+Set-ItemProperty "$key\ODBC Drivers"    -Name SQLite3 -Value Installed
+```
+
+Alternatively, skip the alias and use the full name in your connection strings:
+`Driver={SQLite3 ODBC Driver}`.
+
+---
+
+### Connecting from RPG Source
+
+**Option 1 — explicit `EXEC SQL CONNECT` in the source file:**
+
+```rpgle
+DCL-S connStr VARCHAR(200);
+connStr = 'Driver={SQLite3};Database=/path/to/myapp.db;';
+EXEC SQL CONNECT USING :connStr;
+```
+
+**Option 2 — `rpgc.conf` (no `EXEC SQL CONNECT` needed):**
+
+Create a config file with your DSN and `rpgc` wires up the connection automatically at startup, exactly like an IBM i job environment:
 
 ```ini
-# ~/.rpgc.conf  (or ./rpgc.conf for a project-specific override)
+# ~/.rpgc.conf       — applies to all programs for your user
+# ./rpgc.conf        — project-specific, takes priority over ~/.rpgc.conf
+# /etc/rpgc.conf     — system-wide default
+
 DB_DSN=Driver={SQLite3};Database=/path/to/myapp.db;
 ```
 
-With a DSN configured, no `EXEC SQL CONNECT` statement is needed in the source — OpenRPG wires up the connection automatically, just like IBM i job environments. The `RPGC_DSN` environment variable takes highest priority over any conf file.
+**Option 3 — `RPGC_DSN` environment variable (highest priority, useful for CI):**
 
-OpenRPG uses ODBC, so it works with any database that has an ODBC driver:
+```bash
+RPGC_DSN="Driver={SQLite3};Database=./test.db;" rpgc myprog.sqlrpgle
+./myprog
+```
 
-| Database | Driver package | Example DSN |
-|----------|---------------|-------------|
-| **SQLite** | macOS: `brew install sqliteodbc`<br>Linux: `sudo apt install libsqliteodbc` | `Driver={SQLite3};Database=/path/to/file.db;` |
-| **PostgreSQL** | macOS: `brew install psqlodbc`<br>Linux: `sudo apt install odbc-postgresql` | `Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=mydb;Uid=user;Pwd=pass;` |
-| **MySQL / MariaDB** | macOS: `brew install mysql-connector-odbc`<br>Linux: `sudo apt install odbc-mariadb` | `Driver={MySQL ODBC 8.0 Unicode Driver};Server=localhost;Port=3306;Database=mydb;User=user;Password=pass;` |
-| **SQL Server** | [Microsoft ODBC Driver](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server) | `Driver={ODBC Driver 18 for SQL Server};Server=localhost;Database=mydb;Uid=user;Pwd=pass;` |
-| **IBM Db2** | [IBM Data Server Driver](https://www.ibm.com/support/pages/db2-odbc-cli-driver-download-and-installation-information) | `Driver={IBM DB2 ODBC DRIVER};Database=mydb;Hostname=localhost;Port=50000;Protocol=TCPIP;Uid=user;Pwd=pass;` |
+---
+
+### Supported Databases
+
+| Database | macOS | Linux (apt) | Windows | Example DSN |
+|----------|-------|-------------|---------|-------------|
+| **SQLite** | `brew install sqliteodbc` + register (see above) | `apt install libsqliteodbc` | [ch-werner.de/sqliteodbc](https://www.ch-werner.de/sqliteodbc/) | `Driver={SQLite3};Database=/path/to/file.db;` |
+| **PostgreSQL** | `brew install psqlodbc` | `apt install odbc-postgresql` | [psqlodbc.postgresql.org](https://psqlodbc.postgresql.org/) | `Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=mydb;Uid=user;Pwd=pass;` |
+| **MySQL / MariaDB** | `brew install mysql-connector-odbc` | `apt install odbc-mariadb` | [dev.mysql.com/downloads/connector/odbc](https://dev.mysql.com/downloads/connector/odbc/) | `Driver={MySQL ODBC 8.0 Unicode Driver};Server=localhost;Database=mydb;User=user;Password=pass;` |
+| **SQL Server** | — | [Microsoft ODBC Driver](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server) | [Microsoft ODBC Driver](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server) | `Driver={ODBC Driver 18 for SQL Server};Server=localhost;Database=mydb;Uid=user;Pwd=pass;` |
+| **IBM Db2** | — | [IBM Data Server Driver](https://www.ibm.com/support/pages/db2-odbc-cli-driver-download-and-installation-information) | [IBM Data Server Driver](https://www.ibm.com/support/pages/db2-odbc-cli-driver-download-and-installation-information) | `Driver={IBM DB2 ODBC DRIVER};Database=mydb;Hostname=localhost;Port=50000;Protocol=TCPIP;Uid=user;Pwd=pass;` |
+
+> For RHEL/Fedora, substitute the equivalent `dnf` package name (e.g. `psqlodbc` → `postgresql-odbc`).
+
+---
+
+### Compiling SQL Programs Manually
+
+If you generate `.cpp` files with `rpgc -S` and compile them yourself (e.g., in a `Makefile`), link with the platform ODBC library. The flags must appear **after** the source file:
+
+| Platform | Flags |
+|----------|-------|
+| macOS | `-I$(brew --prefix)/include -L$(brew --prefix)/lib -lodbc` |
+| Linux | `-lodbc` |
+| Windows (MinGW) | `-lodbc32` |
+
+```bash
+# macOS example
+clang++ -std=c++17 -I/usr/local/share/rpgc/runtime \
+  myprog.cpp \
+  -I$(brew --prefix)/include -L$(brew --prefix)/lib -lodbc \
+  -o myprog
+```
 
 ---
 
