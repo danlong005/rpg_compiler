@@ -196,6 +196,98 @@ RPGC_DSN="Driver={SQLite3};Database=./test.db;" rpgc myprog.sqlrpgle
 
 ---
 
+### PostgreSQL Example
+
+This complete example connects to PostgreSQL, runs an aggregate query, then iterates a cursor to print results. Save it as `pg_employees.sqlrpgle`.
+
+**Setup** (one time):
+
+```bash
+# macOS — install and register the driver
+brew install psqlodbc
+DRIVER=$(brew --prefix)/lib/psqlodbcw.so
+printf '[PostgreSQL Unicode]\nDescription=PostgreSQL ODBC Driver (Unicode)\nDriver=%s\nSetup=%s\n' \
+  "$DRIVER" "$DRIVER" \
+  | ODBCSYSINI=/opt/homebrew/etc odbcinst -i -d -f /dev/stdin
+
+# Create a demo database and populate it
+psql -U $USER postgres -c "CREATE DATABASE rpgdemo;"
+psql -U $USER rpgdemo -c "
+CREATE TABLE employees (
+  id SERIAL PRIMARY KEY, name VARCHAR(50),
+  dept VARCHAR(30), salary DECIMAL(9,2)
+);
+INSERT INTO employees (name, dept, salary) VALUES
+  ('Alice Johnson', 'Engineering', 85000),
+  ('Bob Martinez',  'Marketing',   62000),
+  ('Carol Smith',   'Engineering', 91000),
+  ('David Lee',     'HR',          58000);"
+```
+
+**pg_employees.sqlrpgle:**
+
+```rpgle
+**FREE
+
+DCL-S connStr  VARCHAR(200);
+DCL-S empName  VARCHAR(50);
+DCL-S salary   PACKED(9:2);
+DCL-S total    PACKED(11:2);
+DCL-S rowCount INT(10);
+
+connStr = 'Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=rpgdemo;Uid=dlong;Pwd=;';
+EXEC SQL CONNECT USING :connStr;
+
+// Aggregate: headcount and total payroll for Engineering
+EXEC SQL SELECT COUNT(*), SUM(salary)
+         INTO   :rowCount, :total
+         FROM   employees
+         WHERE  dept = 'Engineering';
+
+DSPLY ('Engineering headcount: ' + %CHAR(rowCount));
+DSPLY ('Total payroll:         $' + %CHAR(%INT(total)));
+DSPLY '---';
+
+// Cursor: list Engineering employees, highest salary first
+EXEC SQL DECLARE c1 CURSOR FOR
+  SELECT name, salary FROM employees
+  WHERE  dept = 'Engineering'
+  ORDER  BY salary DESC;
+
+EXEC SQL OPEN c1;
+DOW SQLCODE = 0;
+  EXEC SQL FETCH c1 INTO :empName, :salary;
+  IF SQLCODE = 0;
+    DSPLY (empName + '  $' + %CHAR(%INT(salary)));
+  ENDIF;
+ENDDO;
+EXEC SQL CLOSE c1;
+
+EXEC SQL DISCONNECT;
+*INLR = *ON;
+```
+
+**Compile and run:**
+
+```bash
+rpgc pg_employees.sqlrpgle -o pg_employees
+./pg_employees
+```
+
+**Output:**
+
+```
+Engineering headcount: 2
+Total payroll:         $176000
+---
+Carol Smith  $91000
+Alice Johnson  $85000
+```
+
+The full source is in [`examples/pg_employees.sqlrpgle`](examples/pg_employees.sqlrpgle).
+
+---
+
 ### Supported Databases
 
 | Database | macOS | Linux (apt) | Windows | Example DSN |
