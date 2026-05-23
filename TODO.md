@@ -93,6 +93,11 @@
 
 ### Figurative Constants
 - *BLANKS, *ZEROS, *HIVAL, *LOVAL, *ON, *OFF, *NULL, *INLR, *ALL'x', *OMIT
+- *USER — Current user profile (Test 101)
+
+### String Literals
+- Quoted strings: `'text'` with `''` escape for embedded apostrophe
+- Hex literals: `X'0A0D'` — converted to byte string at compile time (Test 112)
 
 ### Indicators
 - *IN01-*IN99 — Fully functional
@@ -119,18 +124,21 @@
 | 2 | DUMP opcode (debug) | Opcodes |
 | 3 | ~~COMMIT / ROLBK~~ — Moved to Embedded SQL Phase 2 | Opcodes |
 | 4 | ✅ IN / OUT — Data area operations | Opcodes |
-| 5 | *USER — Current user profile figurative constant | Constants |
+| 5 | ✅ *USER — Current user profile figurative constant | Constants |
 | 6 | ✅ PSDS — Program Status Data Structure | DS Keywords |
-| 7 | %ELEM(*ALLOC) / %ELEM(*KEEP) — Varying array control | BIFs |
-| 8 | SND-MSG / ON-EXCP — Message operations (7.5+) | Modern |
-| 9 | DATA-INTO / DATA-GEN (%DATA, %GEN, %PARSER) | Modern |
+| 7 | ✅ %ELEM(*ALLOC) / %ELEM(*KEEP) — Varying array control | BIFs |
+| 8 | ✅ SND-MSG — Message operations (7.5+) | Modern |
+| 9 | ✅ DATA-INTO / DATA-GEN (%DATA) | Modern |
 | 10 | ✅ OVERLOAD — Overloaded procedures (7.4+) | Modern |
 | 11 | ✅ Data area operations (IN/OUT/UNLOCK, DTAARA, *LDA/*GDA/*PDA) | Data Areas |
-| 12 | %DATA, %GEN, %PARSER, %HANDLER, %XML, %MSG, %TARGET — Companion BIFs | BIFs |
+| 12 | ✅ SQL indicator variables (`:var :ind`) | Embedded SQL |
 | 13 | ✅ RPG status codes (full %STATUS value set) | Error Handling |
 
-### ~~File I/O~~ — Not Planned (using SQL as data access path instead)
-~~Full DCL-F, CHAIN, READ, WRITE, UPDATE, DELETE, SETLL, SETGT, record formats, INFSR~~
+### Record Level Access (via ODBC) ✅
+DCL-F, CHAIN, READ, WRITE, UPDATE, DELETE, SETLL, SETGT, READE — implemented via ODBC (Tests 103-108)
+
+### ~~Fixed-Format File I/O~~ — Not Planned
+~~Native record format / INFSR / legacy PLIST-based file I/O~~
 
 ### Embedded SQL (via ODBC)
 
@@ -181,7 +189,7 @@
 #### Phase 6 — Advanced Features ✅
 | # | Feature | RPG Syntax | ODBC Mapping |
 |---|---------|-----------|-------------|
-| 40 | Indicator variables | `:var :ind` | `SQLLEN` indicator in bind calls |
+| 40 | ✅ Indicator variables | `:var :ind` | `SQLLEN` indicator in bind calls |
 | 41 | ✅ GET DIAGNOSTICS | `EXEC SQL GET DIAGNOSTICS :rc = ROW_COUNT;` | `SQLGetDiagRec` / `SQLGetDiagField` |
 | 42 | ✅ CALL procedures | `EXEC SQL CALL proc(:p1, :p2);` | `SQLPrepare("{CALL proc(?,?)}")` + bind |
 | 43 | ✅ SAVEPOINT | `EXEC SQL SAVEPOINT sp1;` | SQL passthrough (driver-dependent) |
@@ -361,3 +369,19 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 96 | DA Status 401 (not found) |
 | 97 | DA Status 415 (cannot read) |
 | 98 | DA Status 413 (cannot write) |
+| 99 | DATA-INTO JSON parsing |
+| 100 | DATA-GEN JSON generation |
+| 101 | *USER figurative constant |
+| 102 | SND-MSG |
+| 103 | RLA CHAIN / %FOUND |
+| 104 | RLA READ sequential |
+| 105 | RLA WRITE/UPDATE/DELETE |
+| 106 | RLA SETLL/READE |
+| 107 | SQL via rpgc.conf (no CONNECT) |
+| 108 | RLA via rpgc.conf (no CONNECT) |
+| 109 | SQL indicator variables |
+| 110 | OVERLOAD procedures |
+| 111 | %ELEM(*ALLOC)/%ELEM(*KEEP) |
+| 112 | DATA-INTO CSV parsing (%PARSER('CSV')) |
+| 113 | DATA-GEN CSV generation (%PARSER('CSV')) |
+| 114 | DATA-INTO/GEN explicit %PARSER('JSON') |

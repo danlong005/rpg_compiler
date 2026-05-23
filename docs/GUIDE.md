@@ -1691,8 +1691,11 @@ EXEC SQL DISCONNECT;
 
 ## DATA-INTO and DATA-GEN
 
-`DATA-INTO` parses structured data (JSON) into a data structure.
-`DATA-GEN` serializes a data structure to structured data (JSON).
+`DATA-INTO` parses structured data into a data structure.
+`DATA-GEN` serializes a data structure to structured data.
+
+The format is selected with the `%PARSER` BIF. Without `%PARSER`, JSON is the default.
+Use `%PARSER('CSV')` for comma-separated values.
 
 ### DATA-INTO — Parse JSON
 
@@ -1771,6 +1774,80 @@ END-DS;
 msg.text = 'Price < $10 & "sale"';
 DATA-GEN msg %DATA(json : 'doc=string');
 // {"text":"Price < $10 & \"sale\""}
+```
+
+---
+
+### CSV Format via %PARSER('CSV')
+
+Use `%PARSER('CSV')` to parse or generate comma-separated values. The first row
+is treated as a header row mapping column names to DS field names.
+
+#### DATA-INTO — Parse CSV
+
+```rpgle
+DCL-DS person QUALIFIED;
+  name VARCHAR(40);
+  age  INT(10);
+  city VARCHAR(30);
+END-DS;
+
+DCL-S csv VARCHAR(500);
+csv = 'NAME,AGE,CITY' + X'0A' + 'Alice,30,Boston';
+
+DATA-INTO person %DATA(csv : 'case=any') %PARSER('CSV');
+
+DSPLY person.name;   // Alice
+DSPLY %CHAR(person.age);   // 30
+```
+
+For array DS, each data row maps to one element:
+
+```rpgle
+DCL-DS emp DIM(*VAR:10) QUALIFIED;
+  name VARCHAR(40);
+  dept VARCHAR(20);
+END-DS;
+
+DCL-S csv VARCHAR(500);
+csv = 'NAME,DEPT' + X'0A' + 'Bob,Engineering' + X'0A' + 'Carol,Marketing';
+
+DATA-INTO emp %DATA(csv : 'case=any') %PARSER('CSV');
+// %ELEM(emp) = 2
+```
+
+#### DATA-GEN — Generate CSV
+
+```rpgle
+DCL-DS person QUALIFIED;
+  name VARCHAR(40);
+  age  INT(10);
+END-DS;
+
+DCL-S csv VARCHAR(300);
+person.name = 'Alice';
+person.age  = 30;
+
+DATA-GEN person %DATA(csv) %PARSER('CSV');
+// csv = "NAME,AGE\nAlice,30"
+```
+
+#### CSV Options
+
+| Option | Meaning |
+|--------|---------|
+| `case=any` | Case-insensitive header matching (DATA-INTO) |
+| `header=no` | Skip header row on input / omit header row on output |
+| `delimiter=<c>` | Use `<c>` as field delimiter instead of comma |
+
+#### Hex String Literals (`X'...'`)
+
+RPG does not have string escape sequences. Use hex literals to embed control
+characters such as newline (`X'0A'`) or carriage-return (`X'0D'`) in strings:
+
+```rpgle
+DCL-C LF X'0A';
+csv = 'NAME,AGE' + LF + 'Alice,30';
 ```
 
 ---

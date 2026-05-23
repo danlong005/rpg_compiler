@@ -1,10 +1,9 @@
 Name: Alice
 Age: 30
 City: Boston
-ID: 42
-Price: 19.990000
-Qty: 100
-Label: Widget
+Count: 2
+Bob / Engineering
+Carol / Marketing
 X: 7
 Y: 0
 Note: []

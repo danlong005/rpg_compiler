@@ -102,7 +102,8 @@ private:
 
     bool uses_sql_ = false;   // program contains EXEC SQL statements
     bool uses_xml_ = false;   // program contains XML-INTO statements
-    bool uses_json_ = false;  // program contains DATA-INTO / DATA-GEN statements
+    bool uses_json_ = false;  // program contains DATA-INTO / DATA-GEN statements (JSON)
+    bool uses_csv_ = false;   // program contains DATA-INTO / DATA-GEN with %PARSER('CSV')
     bool uses_psds_ = false;  // program declares a PSDS
     bool uses_rla_ = false;   // program uses file I/O opcodes or DCL-F DISK
 
@@ -124,9 +125,14 @@ private:
     // XML-INTO codegen helpers
     void emitXmlFieldAssignments(DclDS* ds, const std::string& target, const std::string& xml_src);
 
-    // DATA-INTO / DATA-GEN codegen helpers
+    // DATA-INTO / DATA-GEN codegen helpers (JSON)
     void emitJsonFieldAssignments(DclDS* ds, const std::string& target, const std::string& json_src);
     void emitJsonFieldGeneration(DclDS* ds, const std::string& source, const std::string& out_var, bool first);
+
+    // DATA-INTO / DATA-GEN codegen helpers (CSV)
+    void emitCsvFieldAssignments(DclDS* ds, const std::string& target,
+                                  const std::string& csv_doc, const std::string& row_idx);
+    void emitCsvFieldGeneration(DclDS* ds, const std::string& source, const std::string& out_var);
 
     // SQL codegen helpers
     void emitSqlBindParam(const std::string& var, int index, const std::string& handle = "__hstmt");

@@ -4,6 +4,17 @@
 
 namespace rpg {
 
+// Returns true if the expression is a string literal containing "CSV" (case-insensitive).
+// Used at codegen time to select the CSV code path for DATA-INTO / DATA-GEN.
+static bool isCsvParser(Expression* p) {
+    if (!p) return false;
+    auto* sl = dynamic_cast<StringLiteral*>(p);
+    if (!sl) return false;
+    std::string v = sl->value;
+    std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c){ return std::toupper(c); });
+    return v.find("CSV") != std::string::npos;
+}
+
 std::string CodeGen::generate(Program& program) {
     out_.str("");
     indent_ = 1;
@@ -578,8 +589,12 @@ void CodeGen::visit(Program& node) {
     for (auto& stmt : node.statements) {
         if (dynamic_cast<ExecSqlStmt*>(stmt.get())) uses_sql_ = true;
         if (dynamic_cast<XmlIntoStmt*>(stmt.get())) uses_xml_ = true;
-        if (dynamic_cast<DataIntoStmt*>(stmt.get())) uses_json_ = true;
-        if (dynamic_cast<DataGenStmt*>(stmt.get())) uses_json_ = true;
+        if (auto* di = dynamic_cast<DataIntoStmt*>(stmt.get())) {
+            if (isCsvParser(di->parser.get())) uses_csv_ = true; else uses_json_ = true;
+        }
+        if (auto* dg = dynamic_cast<DataGenStmt*>(stmt.get())) {
+            if (isCsvParser(dg->parser.get())) uses_csv_ = true; else uses_json_ = true;
+        }
         auto* ds = dynamic_cast<DclDS*>(stmt.get());
         if (ds && ds->is_psds) uses_psds_ = true;
         auto* dclf = dynamic_cast<DclF*>(stmt.get());
@@ -590,8 +605,12 @@ void CodeGen::visit(Program& node) {
             for (auto& s : proc->body) {
                 if (dynamic_cast<ExecSqlStmt*>(s.get())) uses_sql_ = true;
                 if (dynamic_cast<XmlIntoStmt*>(s.get())) uses_xml_ = true;
-                if (dynamic_cast<DataIntoStmt*>(s.get())) uses_json_ = true;
-                if (dynamic_cast<DataGenStmt*>(s.get())) uses_json_ = true;
+                if (auto* di = dynamic_cast<DataIntoStmt*>(s.get())) {
+                    if (isCsvParser(di->parser.get())) uses_csv_ = true; else uses_json_ = true;
+                }
+                if (auto* dg = dynamic_cast<DataGenStmt*>(s.get())) {
+                    if (isCsvParser(dg->parser.get())) uses_csv_ = true; else uses_json_ = true;
+                }
             }
         }
     }
@@ -618,6 +637,9 @@ void CodeGen::visit(Program& node) {
     }
     if (uses_json_) {
         out_ << "#include \"rpg_json_runtime.h\"\n";
+    }
+    if (uses_csv_) {
+        out_ << "#include \"rpg_csv_runtime.h\"\n";
     }
     out_ << "#include <algorithm>\n";
     out_ << "#include <array>\n";
@@ -1738,16 +1760,19 @@ void CodeGen::visit(FloatLiteral& node) {
 }
 
 void CodeGen::visit(StringLiteral& node) {
-    expr_ << "\"";
+    expr_ << "std::string(\"";
     for (unsigned char c : node.value) {
         if (c == '"')       expr_ << "\\\"";
         else if (c == '\\') expr_ << "\\\\";
         else if (c == '\n') expr_ << "\\n";
         else if (c == '\r') expr_ << "\\r";
         else if (c == '\t') expr_ << "\\t";
+        else if (c < 0x20 || c == 0x7f)
+            expr_ << "\\x" << std::hex << std::setw(2) << std::setfill('0')
+                  << static_cast<int>(c) << std::dec;
         else                expr_ << static_cast<char>(c);
     }
-    expr_ << "\"";
+    expr_ << "\")";
 }
 
 void CodeGen::visit(BinaryExpr& node) {
@@ -2728,57 +2753,98 @@ void CodeGen::visit(DataIntoStmt& node) {
 
     std::string opts_expr = node.options ? emitExpr(*node.options) : "\"\"";
     std::string data_expr = emitExpr(*node.data_source);
-
-    emitIndent();
-    out_ << "{\n";
-    indent_++;
-    emitIndent();
-    out_ << "RpgJsonNode __json_doc = rpg_json_parse(" << data_expr << ");\n";
-    emitIndent();
-    out_ << "std::string __json_opts = " << opts_expr << ";\n";
-    emitIndent();
-    out_ << "bool __json_case_any = (__json_opts.find(\"case=any\") != std::string::npos || "
-         << "__json_opts.find(\"case=upper\") != std::string::npos);\n";
-
     bool is_array = (ds->dim > 0 || ds->dim_type != 0);
-    if (is_array) {
-        bool is_vector = (ds->dim_type == 1 || ds->dim_type == 2);
+
+    if (isCsvParser(node.parser.get())) {
+        // --- CSV path ---
+        emitIndent(); out_ << "{\n"; indent_++;
+        emitIndent(); out_ << "std::string __csv_opts = " << opts_expr << ";\n";
+        emitIndent(); out_ << "bool __csv_case_any = (__csv_opts.find(\"case=any\") != std::string::npos || "
+                           << "__csv_opts.find(\"case=upper\") != std::string::npos);\n";
+        emitIndent(); out_ << "bool __csv_has_header = (__csv_opts.find(\"header=no\") == std::string::npos);\n";
+        emitIndent(); out_ << "char __csv_delim = ',';\n";
+        emitIndent(); out_ << "{ auto __dp = __csv_opts.find(\"delimiter=\");\n";
+        emitIndent(); out_ << "  if (__dp != std::string::npos && __dp + 10 < __csv_opts.size())\n";
+        emitIndent(); out_ << "      __csv_delim = __csv_opts[__dp + 10]; }\n";
+        emitIndent(); out_ << "RpgCsvDoc __csv_doc = rpg_csv_parse(" << data_expr
+                           << ", __csv_delim, __csv_has_header);\n";
+
+        if (is_array) {
+            bool is_vector = (ds->dim_type == 1 || ds->dim_type == 2);
+            if (is_vector) {
+                emitIndent();
+                out_ << "for (size_t __ci = 0; __ci < __csv_doc.rows.size() && static_cast<int>(__ci) < "
+                     << ds->dim << "; __ci++) {\n";
+                indent_++;
+                emitIndent(); out_ << node.target << ".push_back({});\n";
+                emitCsvFieldAssignments(ds, node.target + ".back()", "__csv_doc", "__ci");
+            } else {
+                emitIndent();
+                out_ << "for (size_t __ci = 0; __ci < __csv_doc.rows.size() && __ci < "
+                     << node.target << ".size(); __ci++) {\n";
+                indent_++;
+                emitCsvFieldAssignments(ds, node.target + "[__ci]", "__csv_doc", "__ci");
+            }
+            indent_--;
+            emitIndent(); out_ << "}\n";
+        } else {
+            emitCsvFieldAssignments(ds, node.target, "__csv_doc", "0");
+        }
+
+        indent_--;
+        emitIndent(); out_ << "}\n";
+    } else {
+        // --- JSON path (default) ---
         emitIndent();
-        out_ << "auto& __json_items = __json_doc.items;\n";
-        if (is_vector) {
+        out_ << "{\n";
+        indent_++;
+        emitIndent();
+        out_ << "RpgJsonNode __json_doc = rpg_json_parse(" << data_expr << ");\n";
+        emitIndent();
+        out_ << "std::string __json_opts = " << opts_expr << ";\n";
+        emitIndent();
+        out_ << "bool __json_case_any = (__json_opts.find(\"case=any\") != std::string::npos || "
+             << "__json_opts.find(\"case=upper\") != std::string::npos);\n";
+
+        if (is_array) {
+            bool is_vector = (ds->dim_type == 1 || ds->dim_type == 2);
             emitIndent();
-            out_ << "for (size_t __ji = 0; __ji < __json_items.size() && static_cast<int>(__ji) < "
-                 << ds->dim << "; __ji++) {\n";
-            indent_++;
+            out_ << "auto& __json_items = __json_doc.items;\n";
+            if (is_vector) {
+                emitIndent();
+                out_ << "for (size_t __ji = 0; __ji < __json_items.size() && static_cast<int>(__ji) < "
+                     << ds->dim << "; __ji++) {\n";
+                indent_++;
+                emitIndent();
+                out_ << "auto& __json_src = __json_items[__ji];\n";
+                emitIndent();
+                out_ << node.target << ".push_back({});\n";
+                emitIndent();
+                out_ << "auto& __json_tgt = " << node.target << ".back();\n";
+            } else {
+                emitIndent();
+                out_ << "for (size_t __ji = 0; __ji < __json_items.size() && __ji < "
+                     << node.target << ".size(); __ji++) {\n";
+                indent_++;
+                emitIndent();
+                out_ << "auto& __json_src = __json_items[__ji];\n";
+                emitIndent();
+                out_ << "auto& __json_tgt = " << node.target << "[__ji];\n";
+            }
+            emitJsonFieldAssignments(ds, "__json_tgt", "__json_src");
+            indent_--;
             emitIndent();
-            out_ << "auto& __json_src = __json_items[__ji];\n";
-            emitIndent();
-            out_ << node.target << ".push_back({});\n";
-            emitIndent();
-            out_ << "auto& __json_tgt = " << node.target << ".back();\n";
+            out_ << "}\n";
         } else {
             emitIndent();
-            out_ << "for (size_t __ji = 0; __ji < __json_items.size() && __ji < "
-                 << node.target << ".size(); __ji++) {\n";
-            indent_++;
-            emitIndent();
-            out_ << "auto& __json_src = __json_items[__ji];\n";
-            emitIndent();
-            out_ << "auto& __json_tgt = " << node.target << "[__ji];\n";
+            out_ << "auto& __json_src = __json_doc;\n";
+            emitJsonFieldAssignments(ds, node.target, "__json_src");
         }
-        emitJsonFieldAssignments(ds, "__json_tgt", "__json_src");
+
         indent_--;
         emitIndent();
         out_ << "}\n";
-    } else {
-        emitIndent();
-        out_ << "auto& __json_src = __json_doc;\n";
-        emitJsonFieldAssignments(ds, node.target, "__json_src");
     }
-
-    indent_--;
-    emitIndent();
-    out_ << "}\n";
 }
 
 void CodeGen::emitJsonFieldAssignments(DclDS* ds, const std::string& target, const std::string& json_src) {
@@ -2838,52 +2904,93 @@ void CodeGen::visit(DataGenStmt& node) {
     }
     DclDS* ds = it->second;
 
+    std::string opts_expr = node.options ? emitExpr(*node.options) : "\"\"";
     std::string output_expr = emitExpr(*node.output_var);
-
-    emitIndent();
-    out_ << "{\n";
-    indent_++;
-    emitIndent();
-    out_ << "std::string __json_out;\n";
-
     bool is_array = (ds->dim > 0 || ds->dim_type != 0);
-    if (is_array) {
-        bool is_vector = (ds->dim_type == 1 || ds->dim_type == 2);
-        emitIndent();
-        out_ << "__json_out = \"[\";\n";
-        if (is_vector) {
+
+    if (isCsvParser(node.parser.get())) {
+        // --- CSV path ---
+        emitIndent(); out_ << "{\n"; indent_++;
+        emitIndent(); out_ << "std::string __csv_opts = " << opts_expr << ";\n";
+        emitIndent(); out_ << "bool __csv_has_header = (__csv_opts.find(\"header=no\") == std::string::npos);\n";
+        emitIndent(); out_ << "char __csv_delim = ',';\n";
+        emitIndent(); out_ << "{ auto __dp = __csv_opts.find(\"delimiter=\");\n";
+        emitIndent(); out_ << "  if (__dp != std::string::npos && __dp + 10 < __csv_opts.size())\n";
+        emitIndent(); out_ << "      __csv_delim = __csv_opts[__dp + 10]; }\n";
+        emitIndent(); out_ << "std::string __csv_out;\n";
+
+        // Header row (compile-time field names, emitted as a runtime conditional)
+        emitIndent(); out_ << "if (__csv_has_header) {\n"; indent_++;
+        bool hdr_first = true;
+        for (auto& f : ds->fields) {
             emitIndent();
-            out_ << "for (size_t __gi = 0; __gi < " << node.source_ds << ".size(); __gi++) {\n";
-        } else {
+            if (!hdr_first) out_ << "__csv_out += std::string(1, __csv_delim);\n";
+            hdr_first = false;
             emitIndent();
-            out_ << "for (size_t __gi = 0; __gi < " << node.source_ds << ".size(); __gi++) {\n";
+            // Field names are always uppercase in RPG; quote them for safety
+            out_ << "__csv_out += rpg_csv_escape(\"" << f.name << "\", __csv_delim);\n";
         }
+        emitIndent(); out_ << "__csv_out += \"\\n\";\n";
+        indent_--; emitIndent(); out_ << "}\n";
+
+        // Data row(s): rows separated by \n, no trailing \n.
+        // The header row (if any) already ends with \n, so only add \n before rows
+        // after the first, or always for rows after the first in an array.
+        if (is_array) {
+            emitIndent();
+            out_ << "for (size_t __gi = 0; __gi < " << node.source_ds << ".size(); __gi++) {\n";
+            indent_++;
+            emitIndent(); out_ << "if (__gi > 0) __csv_out += \"\\n\";\n";
+            emitCsvFieldGeneration(ds, node.source_ds + "[__gi]", "__csv_out");
+            indent_--;
+            emitIndent(); out_ << "}\n";
+        } else {
+            emitCsvFieldGeneration(ds, node.source_ds, "__csv_out");
+        }
+
+        emitIndent(); out_ << output_expr << " = __csv_out;\n";
+        indent_--;
+        emitIndent(); out_ << "}\n";
+    } else {
+        // --- JSON path (default) ---
+        emitIndent();
+        out_ << "{\n";
         indent_++;
         emitIndent();
-        out_ << "if (__gi > 0) __json_out += \",\";\n";
+        out_ << "std::string __json_out;\n";
+
+        if (is_array) {
+            emitIndent();
+            out_ << "__json_out = \"[\";\n";
+            emitIndent();
+            out_ << "for (size_t __gi = 0; __gi < " << node.source_ds << ".size(); __gi++) {\n";
+            indent_++;
+            emitIndent();
+            out_ << "if (__gi > 0) __json_out += \",\";\n";
+            emitIndent();
+            out_ << "__json_out += \"{\";\n";
+            emitJsonFieldGeneration(ds, node.source_ds + "[__gi]", "__json_out", true);
+            emitIndent();
+            out_ << "__json_out += \"}\";\n";
+            indent_--;
+            emitIndent();
+            out_ << "}\n";
+            emitIndent();
+            out_ << "__json_out += \"]\";\n";
+        } else {
+            emitIndent();
+            out_ << "__json_out = \"{\";\n";
+            emitJsonFieldGeneration(ds, node.source_ds, "__json_out", true);
+            emitIndent();
+            out_ << "__json_out += \"}\";\n";
+        }
+
         emitIndent();
-        out_ << "__json_out += \"{\";\n";
-        emitJsonFieldGeneration(ds, node.source_ds + "[__gi]", "__json_out", true);
-        emitIndent();
-        out_ << "__json_out += \"}\";\n";
+        out_ << output_expr << " = __json_out;\n";
         indent_--;
         emitIndent();
         out_ << "}\n";
-        emitIndent();
-        out_ << "__json_out += \"]\";\n";
-    } else {
-        emitIndent();
-        out_ << "__json_out = \"{\";\n";
-        emitJsonFieldGeneration(ds, node.source_ds, "__json_out", true);
-        emitIndent();
-        out_ << "__json_out += \"}\";\n";
     }
-
-    emitIndent();
-    out_ << output_expr << " = __json_out;\n";
-    indent_--;
-    emitIndent();
-    out_ << "}\n";
 }
 
 void CodeGen::emitJsonFieldGeneration(DclDS* ds, const std::string& source,
@@ -2909,6 +3016,60 @@ void CodeGen::emitJsonFieldGeneration(DclDS* ds, const std::string& source,
                 break;
             default:
                 out_ << out_var << " += \"\\\"\" + rpg_json_escape(" << field_ref << ") + \"\\\"\";\n";
+                break;
+        }
+    }
+}
+
+void CodeGen::emitCsvFieldAssignments(DclDS* ds, const std::string& target,
+                                       const std::string& csv_doc, const std::string& row_idx) {
+    for (auto& f : ds->fields) {
+        emitIndent();
+        switch (f.type) {
+            case RPGType::INT10:
+            case RPGType::UNS:
+                out_ << target << "." << f.name << " = rpg_csv_get_int("
+                     << csv_doc << ", " << row_idx << ", \"" << f.name << "\", __csv_case_any);\n";
+                break;
+            case RPGType::PACKED:
+            case RPGType::ZONED:
+            case RPGType::FLOAT4:
+            case RPGType::FLOAT8:
+                out_ << target << "." << f.name << " = rpg_csv_get_double("
+                     << csv_doc << ", " << row_idx << ", \"" << f.name << "\", __csv_case_any);\n";
+                break;
+            default:
+                out_ << target << "." << f.name << " = rpg_csv_get_str("
+                     << csv_doc << ", " << row_idx << ", \"" << f.name << "\", __csv_case_any);\n";
+                break;
+        }
+    }
+}
+
+void CodeGen::emitCsvFieldGeneration(DclDS* ds, const std::string& source,
+                                      const std::string& out_var) {
+    bool first = true;
+    for (auto& f : ds->fields) {
+        std::string field_ref = source + "." + f.name;
+        if (!first) {
+            emitIndent();
+            out_ << out_var << " += std::string(1, __csv_delim);\n";
+        }
+        first = false;
+        emitIndent();
+        switch (f.type) {
+            case RPGType::INT10:
+            case RPGType::UNS:
+                out_ << out_var << " += std::to_string(" << field_ref << ");\n";
+                break;
+            case RPGType::PACKED:
+            case RPGType::ZONED:
+            case RPGType::FLOAT4:
+            case RPGType::FLOAT8:
+                out_ << out_var << " += std::to_string(" << field_ref << ");\n";
+                break;
+            default:
+                out_ << out_var << " += rpg_csv_escape(" << field_ref << ", __csv_delim);\n";
                 break;
         }
     }

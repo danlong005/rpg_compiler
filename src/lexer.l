@@ -22,6 +22,27 @@ static char* process_rpg_string(const char* text) {
     return result;
 }
 
+// Convert X'hex...' or x'hex...' literal to a byte string.
+static char* process_hex_string(const char* text) {
+    // text is like X'0A0D' — skip leading X/' and trailing '
+    const char* p = text + 2; // skip X'
+    size_t hex_len = strlen(p);
+    if (hex_len > 0 && p[hex_len - 1] == '\'') hex_len--;
+    size_t bytes = hex_len / 2;
+    char* result = (char*)malloc(bytes + 1);
+    for (size_t i = 0; i < bytes; i++) {
+        unsigned int val = 0;
+        char hi = p[i * 2], lo = p[i * 2 + 1];
+        if (hi >= '0' && hi <= '9') val = (hi - '0') << 4;
+        else val = (toupper((unsigned char)hi) - 'A' + 10) << 4;
+        if (lo >= '0' && lo <= '9') val |= (lo - '0');
+        else val |= (toupper((unsigned char)lo) - 'A' + 10);
+        result[i] = (char)val;
+    }
+    result[bytes] = '\0';
+    return result;
+}
+
 static char* strdup_upper(const char* text) {
     char* result = strdup(text);
     for (char* p = result; *p; p++) {
@@ -713,6 +734,7 @@ static void parse_ctlopt(const char* text) {
 [0-9]+\.[0-9]+      { yylval.fval = atof(yytext); return FLOAT_LITERAL; }
 [0-9]+              { yylval.ival = atoi(yytext); return INTEGER_LITERAL; }
 
+[Xx]'[0-9A-Fa-f]*'  { yylval.sval = process_hex_string(yytext); return STRING_LITERAL; }
 '([^']|'')*'        { yylval.sval = process_rpg_string(yytext); return STRING_LITERAL; }
 
 [a-zA-Z_][a-zA-Z0-9_]* {
