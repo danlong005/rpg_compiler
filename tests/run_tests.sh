@@ -444,6 +444,9 @@ run_test "113" "DATA-GEN CSV generation" "$TESTDIR/test113_data_gen_csv.rpgle" "
 # 114: DATA-INTO / DATA-GEN with explicit %PARSER('JSON')
 run_test "114" "DATA-INTO/GEN %PARSER('JSON')" "$TESTDIR/test114_data_into_json_parser.rpgle" "run"
 
+# 115: DUMP opcode
+run_test "115" "DUMP opcode" "$TESTDIR/test115_dump.rpgle" "run"
+
 # ── Customer / drop-in tests ─────────────────────────────────────────────
 # Drop any .rpgle or .sqlrpgle file into tests/customer/ and it will be
 # compile-tested automatically — no registration or expected output needed.

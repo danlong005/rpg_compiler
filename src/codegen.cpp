@@ -1700,6 +1700,58 @@ void CodeGen::visit(ClearStmt& node) {
     }
 }
 
+void CodeGen::visit(DumpStmt& node) {
+    (void)node;
+    emitIndent();
+    out_ << "{\n";
+    indent_++;
+    emitIndent();
+    out_ << "std::cout << \"** DUMP **\\n\";\n";
+    for (auto& [vname, vtype] : var_types_) {
+        if (array_vars_.count(vname)) continue;
+        emitIndent();
+        switch (vtype) {
+            case RPGType::CHAR:
+            case RPGType::VARCHAR:
+            case RPGType::UCS2:
+                out_ << "std::cout << \"   " << vname << " = '\" << " << vname << " << \"'\\n\";\n";
+                break;
+            case RPGType::DATE:
+                out_ << "std::cout << \"   " << vname << " = '\" << " << vname << ".value << \"'\\n\";\n";
+                break;
+            case RPGType::TIME:
+                out_ << "std::cout << \"   " << vname << " = '\" << " << vname << ".value << \"'\\n\";\n";
+                break;
+            case RPGType::TIMESTAMP:
+                out_ << "std::cout << \"   " << vname << " = '\" << " << vname << ".value << \"'\\n\";\n";
+                break;
+            case RPGType::IND:
+                out_ << "std::cout << \"   " << vname << " = '\" << (" << vname << " ? '1' : '0') << \"'\\n\";\n";
+                break;
+            case RPGType::PACKED:
+            case RPGType::ZONED: {
+                int dec = var_decimals_.count(vname) ? var_decimals_.at(vname) : 0;
+                out_ << "{ auto __df = std::cout.flags(); auto __dp = std::cout.precision();\n";
+                emitIndent();
+                out_ << "  std::cout << \"   " << vname << " = \" << std::fixed << std::setprecision(" << dec << ") << " << vname << " << \"\\n\";\n";
+                emitIndent();
+                out_ << "  std::cout.flags(__df); std::cout.precision(__dp); }\n";
+                break;
+            }
+            case RPGType::POINTER:
+            case RPGType::OBJECT:
+                out_ << "std::cout << \"   " << vname << " = \" << static_cast<void*>(" << vname << ") << \"\\n\";\n";
+                break;
+            default:
+                out_ << "std::cout << \"   " << vname << " = \" << " << vname << " << \"\\n\";\n";
+                break;
+        }
+    }
+    indent_--;
+    emitIndent();
+    out_ << "}\n";
+}
+
 void CodeGen::visit(IndicatorExpr& node) {
     uses_indicators_ = true;
     expr_ << "rpg_indicators[" << node.number << "]";

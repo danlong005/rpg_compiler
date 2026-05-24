@@ -56,6 +56,7 @@ public:
     void visit(SortAStmt& node) override;
     void visit(ResetStmt& node) override;
     void visit(ClearStmt& node) override;
+    void visit(DumpStmt& node) override;
     void visit(IndicatorExpr& node) override;
     void visit(EvalCorrStmt& node) override;
     void visit(EvalRStmt& node) override;
@@ -84,6 +85,7 @@ public:
     void visit(DeleteStmt& node) override;
     void visit(SetllStmt& node) override;
     void visit(SetgtStmt& node) override;
+    void visit(ExfmtStmt& node) override;
     void visit(Program& node) override;
 
 private:

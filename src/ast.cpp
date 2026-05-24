@@ -108,6 +108,9 @@ void ResetStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 ClearStmt::ClearStmt(std::string name) : var_name(std::move(name)) {}
 void ClearStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
+DumpStmt::DumpStmt(bool always_a) : always_(always_a) {}
+void DumpStmt::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
 IndicatorExpr::IndicatorExpr(int number) : number(number) {}
 void IndicatorExpr::accept(ASTVisitor& visitor) { visitor.visit(*this); }
 
@@ -223,6 +226,10 @@ void UpdateStmt::accept(ASTVisitor& v) { v.visit(*this); }
 DeleteStmt::DeleteStmt(std::string f, std::string e)
     : filename(std::move(f)), extender(std::move(e)) {}
 void DeleteStmt::accept(ASTVisitor& v) { v.visit(*this); }
+
+ExfmtStmt::ExfmtStmt(std::string fname, std::string fmt, std::string ext)
+    : filename(std::move(fname)), format(std::move(fmt)), extender(std::move(ext)) {}
+void ExfmtStmt::accept(ASTVisitor& v) { v.visit(*this); }
 
 SetllStmt::SetllStmt(std::vector<std::unique_ptr<Expression>> k, std::string f)
     : keys(std::move(k)), filename(std::move(f)) {}

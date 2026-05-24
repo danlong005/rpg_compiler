@@ -128,7 +128,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_ITER KW_LEAVE
 %token KW_MONITOR KW_ON_ERROR KW_ENDMON
 %token KW_BEGSR KW_ENDSR KW_EXSR
-%token KW_OFF KW_RESET KW_CLEAR KW_SORTA
+%token KW_OFF KW_RESET KW_CLEAR KW_SORTA KW_DUMP KW_DUMP_A
 %token <ival> INDICATOR
 %token KW_AND KW_OR KW_NOT
 %token KW_DCL_PROC KW_END_PROC
@@ -168,7 +168,7 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token KW_FOR_EACH KW_IN KW_XML_INTO KW_DATA_INTO KW_DATA_GEN KW_SND_MSG
 %token KW_STAR_INFO KW_STAR_DIAG KW_STAR_ESCAPE KW_TYPE
 %token KW_STAR_ALLOC KW_STAR_KEEP
-%token KW_READ KW_READE KW_READP KW_READPE KW_CHAIN KW_WRITE KW_UPDATE KW_DELETE KW_SETLL KW_SETGT
+%token KW_READ KW_READE KW_READP KW_READPE KW_CHAIN KW_WRITE KW_UPDATE KW_DELETE KW_SETLL KW_SETGT KW_EXFMT
 %token <sval> KW_READ_EXT KW_READE_EXT KW_READP_EXT KW_READPE_EXT KW_CHAIN_EXT
 %token <sval> KW_WRITE_EXT KW_UPDATE_EXT KW_DELETE_EXT
 %token <sval> IDENTIFIER
@@ -181,13 +181,13 @@ static rpg::FuncCall* make_func(const char* name, std::vector<rpg::Expression*>*
 %token NE LE GE LT GT
 
 %type <program> program
-%type <stmt> statement dcl_f_stmt dcl_s_stmt dcl_c_stmt eval_stmt eval_corr_stmt evalr_stmt dsply_stmt inlr_stmt return_stmt expr_stmt reset_stmt clear_stmt sorta_stmt callp_stmt leavesr_stmt dealloc_stmt test_stmt
+%type <stmt> statement dcl_f_stmt dcl_s_stmt dcl_c_stmt eval_stmt eval_corr_stmt evalr_stmt dsply_stmt inlr_stmt return_stmt expr_stmt reset_stmt clear_stmt sorta_stmt dump_stmt callp_stmt leavesr_stmt dealloc_stmt test_stmt
 %type <stmt> if_stmt dow_stmt dou_stmt for_stmt for_each_stmt select_stmt iter_stmt leave_stmt
 %type <stmt> dcl_proc_stmt dcl_pr_stmt dcl_ds_stmt dcl_enum_stmt
 %type <stmt> monitor_stmt begsr_stmt exsr_stmt exec_sql_stmt xml_into_stmt
 %type <stmt> in_da_stmt out_da_stmt unlock_da_stmt data_into_stmt data_gen_stmt snd_msg_stmt
 %type <stmt> chain_stmt read_stmt reade_stmt readp_stmt readpe_stmt
-%type <stmt> write_stmt update_stmt delete_stmt setll_stmt setgt_stmt
+%type <stmt> write_stmt update_stmt delete_stmt setll_stmt setgt_stmt exfmt_stmt
 %type <expr> expression or_expr and_expr not_expr comparison_expr additive_expr multiplicative_expr power_expr unary_expr postfix_expr primary_expr eval_target
 %type <expr_list> arg_list call_arg_list call_args_opt rla_keys rla_key_list
 %type <stmt_list> statement_list
@@ -273,6 +273,7 @@ statement:
     | reset_stmt    { $$ = $1; SET_LINE($$); }
     | clear_stmt    { $$ = $1; SET_LINE($$); }
     | sorta_stmt    { $$ = $1; SET_LINE($$); }
+    | dump_stmt     { $$ = $1; SET_LINE($$); }
     | evalr_stmt    { $$ = $1; SET_LINE($$); }
     | callp_stmt    { $$ = $1; SET_LINE($$); }
     | leavesr_stmt  { $$ = $1; SET_LINE($$); }
@@ -296,6 +297,7 @@ statement:
     | delete_stmt  { $$ = $1; SET_LINE($$); }
     | setll_stmt   { $$ = $1; SET_LINE($$); }
     | setgt_stmt   { $$ = $1; SET_LINE($$); }
+    | exfmt_stmt   { $$ = $1; SET_LINE($$); }
     | expr_stmt   { $$ = $1; SET_LINE($$); }
     | error SEMICOLON { $$ = nullptr; yyerrok; }
     ;
@@ -321,9 +323,13 @@ dcl_f_stmt:
         $$ = new rpg::DclF($2, "PRINTER");
         free($2);
     }
-    | KW_DCL_F IDENTIFIER KW_WORKSTN SEMICOLON {
-        $$ = new rpg::DclF($2, "WORKSTN");
+    | KW_DCL_F IDENTIFIER KW_WORKSTN dclf_opts SEMICOLON {
+        auto* n = new rpg::DclF($2, "WORKSTN");
         free($2);
+        n->prefix  = g_dclf_prefix ? g_dclf_prefix : "";
+        if (g_dclf_prefix) { free(g_dclf_prefix); g_dclf_prefix = nullptr; }
+        g_dclf_keyed = false; g_dclf_usropn = false;
+        $$ = n;
     }
     ;
 
@@ -503,6 +509,19 @@ setgt_stmt:
         delete $2;
         $$ = new rpg::SetgtStmt(std::move(keys), $3);
         free($3);
+    }
+    ;
+
+exfmt_stmt:
+    KW_EXFMT IDENTIFIER SEMICOLON {
+        // EXFMT RECFMT; — format name and file name are the same (single-record file)
+        $$ = new rpg::ExfmtStmt($2, $2);
+        free($2);
+    }
+    | KW_EXFMT IDENTIFIER COLON IDENTIFIER SEMICOLON {
+        // EXFMT FILE:RECFMT; — explicit file:format
+        $$ = new rpg::ExfmtStmt($2, $4);
+        free($2); free($4);
     }
     ;
 
@@ -1575,6 +1594,16 @@ clear_stmt:
         free($2);
     }
     ;
+
+/* DUMP */
+dump_stmt:
+    KW_DUMP SEMICOLON {
+        $$ = new rpg::DumpStmt(false);
+    }
+  | KW_DUMP_A SEMICOLON {
+        $$ = new rpg::DumpStmt(true);
+    }
+  ;
 
 /* DEALLOC */
 dealloc_stmt:

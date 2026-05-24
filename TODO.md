@@ -121,7 +121,7 @@
 | # | Feature | Section |
 |---|---------|---------|
 | 1 | ✅ Operation extenders (E), (H), (N), (M), (R), (P) | Opcodes |
-| 2 | DUMP opcode (debug) | Opcodes |
+| 2 | ✅ DUMP opcode (debug) | Opcodes |
 | 3 | ~~COMMIT / ROLBK~~ — Moved to Embedded SQL Phase 2 | Opcodes |
 | 4 | ✅ IN / OUT — Data area operations | Opcodes |
 | 5 | ✅ *USER — Current user profile figurative constant | Constants |
@@ -385,3 +385,4 @@ These features are IBM i-specific, legacy, or otherwise not applicable:
 | 112 | DATA-INTO CSV parsing (%PARSER('CSV')) |
 | 113 | DATA-GEN CSV generation (%PARSER('CSV')) |
 | 114 | DATA-INTO/GEN explicit %PARSER('JSON') |
+| 115 | DUMP opcode |

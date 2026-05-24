@@ -251,6 +251,7 @@ static void parse_ctlopt(const char* text) {
     yylval.sval = strdup(ext);
     return KW_READ_EXT;
 }
+"EXFMT"             { return KW_EXFMT; }
 "READ"              { return KW_READ; }
 "CHAIN("[EHMNRP]+")" {
     char *p = strchr(yytext, '(') + 1;
@@ -407,6 +408,8 @@ static void parse_ctlopt(const char* text) {
 "RESET"             { return KW_RESET; }
 "SORTA"             { return KW_SORTA; }
 "CLEAR"             { return KW_CLEAR; }
+"DUMP("[Aa]")"      { return KW_DUMP_A; }
+"DUMP"              { return KW_DUMP; }
 "AND"               { return KW_AND; }
 "OR"                { return KW_OR; }
 "NOT"               { return KW_NOT; }

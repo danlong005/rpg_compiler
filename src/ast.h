@@ -218,6 +218,16 @@ public:
     void accept(ASTVisitor& visitor) override;
 };
 
+// EXFMT — write record format to display file then wait for user input
+class ExfmtStmt : public Statement {
+public:
+    std::string filename;  // DCL-F file name
+    std::string format;    // record format name
+    std::string extender;  // E = error handling
+    ExfmtStmt(std::string filename, std::string format, std::string extender = "");
+    void accept(ASTVisitor& visitor) override;
+};
+
 // Named constant (DCL-C)
 class DclC : public Statement {
 public:
@@ -464,6 +474,14 @@ class ClearStmt : public Statement {
 public:
     std::string var_name;
     explicit ClearStmt(std::string name);
+    void accept(ASTVisitor& visitor) override;
+};
+
+// DUMP statement
+class DumpStmt : public Statement {
+public:
+    bool always_; // true if (A) extender — dump regardless of DEBUG setting
+    explicit DumpStmt(bool always_a = false);
     void accept(ASTVisitor& visitor) override;
 };
 
@@ -751,6 +769,7 @@ public:
     virtual void visit(SortAStmt& node) = 0;
     virtual void visit(ResetStmt& node) = 0;
     virtual void visit(ClearStmt& node) = 0;
+    virtual void visit(DumpStmt& node) = 0;
     virtual void visit(IndicatorExpr& node) = 0;
     virtual void visit(EvalCorrStmt& node) = 0;
     virtual void visit(EvalRStmt& node) = 0;
@@ -779,6 +798,7 @@ public:
     virtual void visit(DeleteStmt& node) = 0;
     virtual void visit(SetllStmt& node) = 0;
     virtual void visit(SetgtStmt& node) = 0;
+    virtual void visit(ExfmtStmt& node) = 0;
     virtual void visit(Program& node) = 0;
 };
 
