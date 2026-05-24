@@ -1,7 +1,9 @@
 #include <cstdio>
 #include <cstring>
+#include <cctype>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
@@ -11,6 +13,136 @@
 #include "codegen.h"
 #include "conf.h"
 #include "extdesc.h"
+
+// ---------------------------------------------------------------------------
+// Minimal .dspfd JSON loader for the WORKSTN pre-pass
+// ---------------------------------------------------------------------------
+static std::string dspfd_str(const std::string& src, const std::string& key) {
+    // Find "key": "value" in the (pretty-printed) JSON
+    std::string pat = "\"" + key + "\": \"";
+    auto pos = src.find(pat);
+    if (pos == std::string::npos) return "";
+    pos += pat.size();
+    auto end = src.find('"', pos);
+    if (end == std::string::npos) return "";
+    return src.substr(pos, end - pos);
+}
+
+static int dspfd_int(const std::string& src, const std::string& key, size_t fromPos = 0) {
+    std::string pat = "\"" + key + "\": ";
+    auto pos = src.find(pat, fromPos);
+    if (pos == std::string::npos) return 0;
+    pos += pat.size();
+    bool neg = (pos < src.size() && src[pos] == '-');
+    if (neg) pos++;
+    int v = 0;
+    while (pos < src.size() && isdigit((unsigned char)src[pos])) v = v * 10 + (src[pos++] - '0');
+    return neg ? -v : v;
+}
+
+static rpg::DspfFileInfo loadDspfDesc(const std::string& path, const std::string& filename) {
+    rpg::DspfFileInfo info;
+    info.filename = filename;
+
+    std::ifstream f(path);
+    if (!f.is_open()) return info;
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    std::string src = ss.str();
+
+    // Find each record block by scanning for "name": "RECNAME" patterns at record level
+    // Simple approach: find all occurrences of \"name\" within records[] array
+    size_t recsPos = src.find("\"records\":");
+    if (recsPos == std::string::npos) return info;
+
+    // Iterate over record objects between the outer "[" and "]"
+    size_t arrOpen = src.find('[', recsPos);
+    if (arrOpen == std::string::npos) return info;
+
+    size_t pos = arrOpen + 1;
+    while (pos < src.size()) {
+        // Find next record object "{"
+        size_t recOpen = src.find('{', pos);
+        if (recOpen == std::string::npos) break;
+
+        // Find matching "}"  — skip nested braces
+        int depth = 0;
+        size_t recClose = recOpen;
+        for (size_t i = recOpen; i < src.size(); i++) {
+            if (src[i] == '{') depth++;
+            else if (src[i] == '}') { if (--depth == 0) { recClose = i; break; } }
+        }
+        if (recClose == recOpen) break;
+
+        std::string recSrc = src.substr(recOpen, recClose - recOpen + 1);
+        rpg::DspfRecInfo rec;
+        rec.name = dspfd_str(recSrc, "name");
+        if (rec.name.empty()) { pos = recClose + 1; continue; }
+
+        // Find fields array within this record
+        size_t fieldsPos = recSrc.find("\"fields\":");
+        if (fieldsPos != std::string::npos) {
+            size_t fArrOpen = recSrc.find('[', fieldsPos);
+            size_t fPos = fArrOpen + 1;
+            while (fPos < recSrc.size()) {
+                size_t fOpen = recSrc.find('{', fPos);
+                if (fOpen == std::string::npos) break;
+                int fd = 0; size_t fClose = fOpen;
+                for (size_t i = fOpen; i < recSrc.size(); i++) {
+                    if (recSrc[i] == '{') fd++;
+                    else if (recSrc[i] == '}') { if (--fd == 0) { fClose = i; break; } }
+                }
+                if (fClose == fOpen) break;
+                std::string fSrc = recSrc.substr(fOpen, fClose - fOpen + 1);
+                rpg::DspfFldInfo fld;
+                fld.name  = dspfd_str(fSrc, "name");
+                std::string type = dspfd_str(fSrc, "type");
+                fld.dtype = type.empty() ? 'A' : (char)toupper((unsigned char)type[0]);
+                fld.len   = dspfd_int(fSrc, "len");
+                fld.dec   = dspfd_int(fSrc, "dec");
+                std::string io = dspfd_str(fSrc, "io");
+                fld.io    = io.empty() ? 'O' : (char)toupper((unsigned char)io[0]);
+                if (fld.len == 0) fld.len = 1;
+                if (!fld.name.empty()) rec.fields.push_back(fld);
+                fPos = fClose + 1;
+            }
+        }
+
+        info.recIdx[rec.name] = info.records.size();
+        info.records.push_back(std::move(rec));
+        pos = recClose + 1;
+    }
+    return info;
+}
+
+// Scan RPG source for DCL-F X WORKSTN and load their .dspfd descriptors
+static std::map<std::string, rpg::DspfFileInfo>
+queryDspfDescs(const std::string& src_text, const std::string& src_dir) {
+    std::map<std::string, rpg::DspfFileInfo> result;
+    // Case-insensitive scan for DCL-F <name> WORKSTN
+    static const std::regex re(R"(DCL-F\s+([A-Za-z_][A-Za-z0-9_]*)\s+WORKSTN)",
+                                std::regex_constants::icase);
+    auto begin = std::sregex_iterator(src_text.begin(), src_text.end(), re);
+    auto end   = std::sregex_iterator();
+    for (auto it = begin; it != end; ++it) {
+        std::string fname = (*it)[1].str();
+        // Uppercase
+        for (auto& c : fname) c = (char)toupper((unsigned char)c);
+        if (result.count(fname)) continue;
+        // Look for FNAME.dspfd in source directory
+        std::string dspfdPath = src_dir + "/" + fname + ".dspfd";
+        struct stat st;
+        if (stat(dspfdPath.c_str(), &st) != 0) {
+            // Also try lowercase
+            std::string lower = fname;
+            for (auto& c : lower) c = (char)tolower((unsigned char)c);
+            dspfdPath = src_dir + "/" + lower + ".dspfd";
+            if (stat(dspfdPath.c_str(), &st) != 0) continue;
+        }
+        result[fname] = loadDspfDesc(dspfdPath, fname);
+    }
+    return result;
+}
 
 #ifdef _WIN32
 #  include <direct.h>
@@ -30,14 +162,17 @@
 #endif
 
 #ifdef _WIN32
-#  define RPGC_CXX      "g++"
+#  define RPGC_CXX       "g++"
 #  define RPGC_ODBC_FLAGS " -lodbc32"
+#  define RPGC_DSPF_FLAGS ""
 #elif defined(__APPLE__)
-#  define RPGC_CXX      "clang++"
+#  define RPGC_CXX       "clang++"
 #  define RPGC_ODBC_FLAGS " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc"
+#  define RPGC_DSPF_FLAGS " -framework WebKit -framework Cocoa"
 #else
-#  define RPGC_CXX      "clang++"
+#  define RPGC_CXX       "g++"
 #  define RPGC_ODBC_FLAGS " -lodbc"
+#  define RPGC_DSPF_FLAGS " $(pkg-config --cflags --libs webkit2gtk-4.1 2>/dev/null)"
 #endif
 
 extern FILE* yyin;
@@ -125,6 +260,9 @@ int main(int argc, char* argv[]) {
     // Preemptive EXTDESC pass: query DB schema (or read cache)
     auto ext_descs = queryExternalDescs(src_text, src_dir, conf);
 
+    // Preemptive DSPF pass: load .dspfd descriptor for each DCL-F WORKSTN file
+    auto dspf_descs = queryDspfDescs(src_text, src_dir);
+
     yyin = fopen(input_file, "r");
     if (!yyin) {
         std::cerr << "Error: cannot open " << input_file << "\n";
@@ -154,6 +292,7 @@ int main(int argc, char* argv[]) {
     rpg::CodeGen codegen;
     if (debug_mode) codegen.setDebugMode(true, abs_source);
     codegen.setExtFileDescs(std::move(ext_descs));
+    codegen.setDspfDescs(std::move(dspf_descs));
     if (!conf.db_dsn.empty()) codegen.setConfDsn(conf.db_dsn);
     std::string cpp_code = codegen.generate(*program);
 
@@ -259,6 +398,10 @@ int main(int argc, char* argv[]) {
     }
     if (is_sql) {
         cmd += RPGC_ODBC_FLAGS;
+    }
+    bool is_dspf = !dspf_descs.empty();
+    if (is_dspf) {
+        cmd += RPGC_DSPF_FLAGS;
     }
     cmd += " -o " + exe_path + " " + cpp_path;
     for (const auto& obj : extra_objs) cmd += " " + obj;

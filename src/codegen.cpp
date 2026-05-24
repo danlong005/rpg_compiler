@@ -599,6 +599,7 @@ void CodeGen::visit(Program& node) {
         if (ds && ds->is_psds) uses_psds_ = true;
         auto* dclf = dynamic_cast<DclF*>(stmt.get());
         if (dclf && dclf->usage == "DISK") uses_rla_ = true;
+        if (dclf && dclf->usage == "WORKSTN") uses_dspf_ = true;
         // Also check inside procedures
         auto* proc = dynamic_cast<DclProc*>(stmt.get());
         if (proc) {
@@ -629,6 +630,9 @@ void CodeGen::visit(Program& node) {
     if (uses_rla_) uses_sql_ = true; // RLA piggybacks on SQL runtime
 
     out_ << "#include \"rpg_runtime.h\"\n";
+    if (uses_dspf_) {
+        out_ << "#include \"rpg_dspf_runtime.h\"\n";
+    }
     if (uses_sql_) {
         out_ << "#include \"rpg_sql_runtime.h\"\n";
     }
@@ -802,6 +806,18 @@ void CodeGen::visit(Program& node) {
     if (uses_sql_) {
         emitIndent();
         out_ << "struct __SqlGuard { ~__SqlGuard() { __sql_env.disconnect(); } } __sql_guard;\n";
+    }
+
+    // dspf_init: open display file descriptor(s) for each WORKSTN file
+    if (uses_dspf_) {
+        for (auto& [fname, df] : file_defs_) {
+            if (df->usage != "WORKSTN") continue;
+            if (!dspf_descs_.count(fname)) continue;
+            emitIndent();
+            out_ << "dspf_init(\"" << fname << ".dspfd\");\n";
+        }
+        emitIndent();
+        out_ << "struct __DspfGuard { ~__DspfGuard() { dspf_close(); } } __dspf_guard;\n";
     }
 
     // 2. Emit subroutine lambdas (so they can be called later)
@@ -1020,6 +1036,43 @@ void CodeGen::visit(ExprStmt& node) {
 }
 
 void CodeGen::visit(DclF& node) {
+    if (node.usage == "WORKSTN") {
+        file_defs_[node.name] = &node;
+        emitIndent();
+        out_ << "// --- WORKSTN file: " << node.name << " ---\n";
+
+        auto dit = dspf_descs_.find(node.name);
+        if (dit == dspf_descs_.end()) {
+            emitIndent();
+            out_ << "// No .dspfd descriptor found for " << node.name
+                 << " — run: dspfc " << node.name << ".dspf\n";
+            return;
+        }
+        const DspfFileInfo& dfi = dit->second;
+
+        // Include the generated header (struct types for each record format)
+        out_ << "#include \"" << node.name << "_dspf.h\"\n";
+
+        // Emit struct instances and flat RPG field variables
+        for (const DspfRecInfo& rec : dfi.records) {
+            emitIndent();
+            out_ << rec.name << "_buf " << rec.name << "_buf_ = {}; "
+                 << "// record format buffer\n";
+            for (const DspfFldInfo& f : rec.fields) {
+                if (f.io == 'H') continue;
+                emitIndent();
+                if (f.dtype == 'A') {
+                    out_ << "std::string " << f.name << "; "
+                         << "// " << rec.name << "." << f.name << "\n";
+                } else if (f.dtype == 'B') {
+                    out_ << "long " << f.name << " = 0;\n";
+                } else {
+                    out_ << "double " << f.name << " = 0.0;\n";
+                }
+            }
+        }
+        return;
+    }
     if (node.usage != "DISK") {
         emitIndent();
         out_ << "// DCL-F " << node.name << " " << node.usage << "\n";
@@ -3641,6 +3694,93 @@ void CodeGen::visit(SetgtStmt& node) {
     emitIndent(); out_ << node.filename << "_found = false;\n";
     indent_--; emitIndent(); out_ << "}\n";
     (void)dclf;
+}
+
+// ---------------------------------------------------------------------------
+// EXFMT — display file write+read
+// ---------------------------------------------------------------------------
+void CodeGen::visit(ExfmtStmt& node) {
+    // Resolve which DCL-F this EXFMT belongs to.
+    // The format name may equal the file name (single-record files) or differ.
+    DclF* dclf = nullptr;
+    std::string fname;
+    if (file_defs_.count(node.filename) && file_defs_[node.filename]->usage == "WORKSTN") {
+        dclf = file_defs_[node.filename]; fname = node.filename;
+    } else if (file_defs_.count(node.format) && file_defs_[node.format]->usage == "WORKSTN") {
+        dclf = file_defs_[node.format]; fname = node.format;
+    } else {
+        // Search: find a WORKSTN file that has this record format
+        for (auto& [fn, df] : file_defs_) {
+            if (df->usage != "WORKSTN") continue;
+            auto dit = dspf_descs_.find(fn);
+            if (dit == dspf_descs_.end()) continue;
+            if (dit->second.recIdx.count(node.format)) { dclf = df; fname = fn; break; }
+        }
+    }
+    if (!dclf) {
+        emitIndent();
+        out_ << "// EXFMT " << node.format << " — WORKSTN file not declared\n";
+        return;
+    }
+
+    // Get descriptor for the specific record format
+    const DspfFileInfo* dfi = dspf_descs_.count(fname) ? &dspf_descs_[fname] : nullptr;
+    const DspfRecInfo*  rci = nullptr;
+    if (dfi) {
+        auto rit = dfi->recIdx.find(node.format);
+        if (rit != dfi->recIdx.end()) rci = &dfi->records[rit->second];
+    }
+
+    std::string bufName = node.format + "_buf_";
+    std::string recBuf  = node.format + "_buf";
+
+    emitIndent(); out_ << "{\n"; indent_++;
+
+    // Copy flat RPG variables → buffer struct (output and both fields)
+    if (rci) {
+        for (const DspfFldInfo& f : rci->fields) {
+            if (f.io == 'H') continue;
+            emitIndent();
+            if (f.dtype == 'A') {
+                // string → char buf
+                out_ << "strncpy(" << bufName << "." << f.name << ", "
+                     << f.name << ".c_str(), " << f.len << "); "
+                     << bufName << "." << f.name << "[" << f.len << "] = '\\0';\n";
+            } else if (f.dtype == 'B') {
+                out_ << bufName << "." << f.name << " = " << f.name << ";\n";
+            } else {
+                out_ << bufName << "." << f.name << " = " << f.name << ";\n";
+            }
+        }
+    }
+
+    // Call dspf_exfmt
+    emitIndent(); out_ << "int __dspf_key = dspf_exfmt(\""
+                       << node.format << "\", &" << bufName << ");\n";
+
+    // Copy buffer struct → flat RPG variables (input and both fields)
+    if (rci) {
+        for (const DspfFldInfo& f : rci->fields) {
+            if (f.io == 'H' || f.io == 'O') continue; // only copy back input/both
+            emitIndent();
+            if (f.dtype == 'A') {
+                out_ << f.name << " = std::string(" << bufName << "." << f.name
+                     << ", strnlen(" << bufName << "." << f.name << ", " << f.len << "));\n";
+            } else if (f.dtype == 'B') {
+                out_ << f.name << " = " << bufName << "." << f.name << ";\n";
+            } else {
+                out_ << f.name << " = " << bufName << "." << f.name << ";\n";
+            }
+        }
+    }
+
+    // Clear F-key indicators 01-24, then set the returned one
+    emitIndent(); out_ << "for (int __i = 1; __i <= 24; ++__i) rpg_in[__i] = false;\n";
+    emitIndent(); out_ << "if (__dspf_key >= 1 && __dspf_key <= 99) "
+                       << "rpg_in[__dspf_key] = true;\n";
+    uses_indicators_ = true;
+
+    indent_--; emitIndent(); out_ << "}\n";
 }
 
 } // namespace rpg

@@ -8,8 +8,30 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace rpg {
+
+// DSPF field descriptor (loaded from .dspfd at compile time)
+struct DspfFldInfo {
+    std::string name;
+    char  dtype = 'A'; // A=char, S=zoned, P=packed, B=binary, F=float
+    int   len   = 1;
+    int   dec   = 0;
+    char  io    = 'O'; // I=input, O=output, B=both, H=hidden
+};
+
+struct DspfRecInfo {
+    std::string name;
+    std::vector<DspfFldInfo> fields;
+};
+
+struct DspfFileInfo {
+    std::string filename;
+    std::vector<DspfRecInfo> records;
+    // record name → index for fast lookup
+    std::map<std::string, size_t> recIdx;
+};
 
 class CodeGen : public ASTVisitor {
 public:
@@ -20,6 +42,9 @@ public:
     }
     void setExtFileDescs(std::map<std::string, ExternalFileDesc> descs) {
         ext_file_descs_ = std::move(descs);
+    }
+    void setDspfDescs(std::map<std::string, DspfFileInfo> descs) {
+        dspf_descs_ = std::move(descs);
     }
     void setConfDsn(std::string dsn) { conf_dsn_ = std::move(dsn); }
 
@@ -107,9 +132,11 @@ private:
     bool uses_json_ = false;  // program contains DATA-INTO / DATA-GEN statements (JSON)
     bool uses_csv_ = false;   // program contains DATA-INTO / DATA-GEN with %PARSER('CSV')
     bool uses_psds_ = false;  // program declares a PSDS
-    bool uses_rla_ = false;   // program uses file I/O opcodes or DCL-F DISK
+    bool uses_rla_  = false;   // program uses file I/O opcodes or DCL-F DISK
+    bool uses_dspf_ = false;   // program uses DCL-F WORKSTN
 
     std::map<std::string, ExternalFileDesc> ext_file_descs_; // from pre-pass
+    std::map<std::string, DspfFileInfo>     dspf_descs_;      // from .dspfd pre-pass
     std::map<std::string, DclF*> file_defs_;  // DCL-F nodes by name
     std::string conf_dsn_;    // from rpgc.conf, for auto-connect
 
