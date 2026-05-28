@@ -3452,6 +3452,66 @@ void CodeGen::emitRlaCopyBack(const std::string& fname, const ExternalFileDesc& 
 // ============================================================
 
 void CodeGen::visit(ReadStmt& node) {
+    // Check if this is a READ from a WORKSTN (display file) record format
+    {
+        DclF* dclf = nullptr;
+        std::string fname;
+        if (file_defs_.count(node.filename) && file_defs_[node.filename]->usage == "WORKSTN") {
+            dclf = file_defs_[node.filename]; fname = node.filename;
+        } else {
+            for (auto& [fn, df] : file_defs_) {
+                if (df->usage != "WORKSTN") continue;
+                auto dit = dspf_descs_.find(fn);
+                if (dit == dspf_descs_.end()) continue;
+                if (dit->second.recIdx.count(node.filename)) { dclf = df; fname = fn; break; }
+            }
+        }
+        if (dclf) {
+            const DspfFileInfo* dfi = dspf_descs_.count(fname) ? &dspf_descs_[fname] : nullptr;
+            const DspfRecInfo*  rci = nullptr;
+            if (dfi) {
+                auto rit = dfi->recIdx.find(node.filename);
+                if (rit != dfi->recIdx.end()) rci = &dfi->records[rit->second];
+            }
+            std::string bufName = node.filename + "_buf_";
+            emitIndent(); out_ << "{\n"; indent_++;
+            if (rci) {
+                for (const DspfFldInfo& f : rci->fields) {
+                    if (f.io == 'H') continue;
+                    emitIndent();
+                    if (f.dtype == 'A') {
+                        out_ << "strncpy(" << bufName << "." << f.name << ", "
+                             << f.name << ".c_str(), " << f.len << "); "
+                             << bufName << "." << f.name << "[" << f.len << "] = '\\0';\n";
+                    } else {
+                        out_ << bufName << "." << f.name << " = " << f.name << ";\n";
+                    }
+                }
+            }
+            emitIndent(); out_ << "dspf_set_indicators(rpg_indicators, 100);\n";
+            emitIndent(); out_ << "int __dspf_key = dspf_read(\""
+                               << node.filename << "\", &" << bufName << ");\n";
+            if (rci) {
+                for (const DspfFldInfo& f : rci->fields) {
+                    if (f.io == 'H' || f.io == 'O') continue;
+                    emitIndent();
+                    if (f.dtype == 'A') {
+                        out_ << f.name << " = std::string(" << bufName << "." << f.name
+                             << ", strnlen(" << bufName << "." << f.name << ", " << f.len << "));\n";
+                    } else {
+                        out_ << f.name << " = " << bufName << "." << f.name << ";\n";
+                    }
+                }
+            }
+            emitIndent(); out_ << "for (int __i = 1; __i <= 24; ++__i) rpg_indicators[__i] = false;\n";
+            emitIndent(); out_ << "if (__dspf_key >= 1 && __dspf_key <= 99) rpg_indicators[__dspf_key] = true;\n";
+            uses_indicators_ = true;
+            indent_--; emitIndent(); out_ << "}\n";
+            return;
+        }
+    }
+
+    // Disk / RLA READ
     auto it = ext_file_descs_.find(node.filename);
     if (it == ext_file_descs_.end()) {
         emitIndent(); out_ << "// READ " << node.filename << " — no schema\n"; return;
@@ -3573,6 +3633,51 @@ void CodeGen::visit(ChainStmt& node) {
 }
 
 void CodeGen::visit(WriteStmt& node) {
+    // Check if this is a WRITE to a WORKSTN (display file) record format
+    {
+        DclF* dclf = nullptr;
+        std::string fname;
+        if (file_defs_.count(node.filename) && file_defs_[node.filename]->usage == "WORKSTN") {
+            dclf = file_defs_[node.filename]; fname = node.filename;
+        } else {
+            for (auto& [fn, df] : file_defs_) {
+                if (df->usage != "WORKSTN") continue;
+                auto dit = dspf_descs_.find(fn);
+                if (dit == dspf_descs_.end()) continue;
+                if (dit->second.recIdx.count(node.filename)) { dclf = df; fname = fn; break; }
+            }
+        }
+        if (dclf) {
+            const DspfFileInfo* dfi = dspf_descs_.count(fname) ? &dspf_descs_[fname] : nullptr;
+            const DspfRecInfo*  rci = nullptr;
+            if (dfi) {
+                auto rit = dfi->recIdx.find(node.filename);
+                if (rit != dfi->recIdx.end()) rci = &dfi->records[rit->second];
+            }
+            std::string bufName = node.filename + "_buf_";
+            emitIndent(); out_ << "{\n"; indent_++;
+            if (rci) {
+                for (const DspfFldInfo& f : rci->fields) {
+                    if (f.io == 'H') continue;
+                    emitIndent();
+                    if (f.dtype == 'A') {
+                        out_ << "strncpy(" << bufName << "." << f.name << ", "
+                             << f.name << ".c_str(), " << f.len << "); "
+                             << bufName << "." << f.name << "[" << f.len << "] = '\\0';\n";
+                    } else {
+                        out_ << bufName << "." << f.name << " = " << f.name << ";\n";
+                    }
+                }
+            }
+            emitIndent(); out_ << "dspf_set_indicators(rpg_indicators, 100);\n";
+            emitIndent(); out_ << "dspf_write(\"" << node.filename << "\", &" << bufName << ");\n";
+            uses_indicators_ = true;
+            indent_--; emitIndent(); out_ << "}\n";
+            return;
+        }
+    }
+
+    // Disk / RLA WRITE
     auto it = ext_file_descs_.find(node.filename);
     if (it == ext_file_descs_.end()) {
         emitIndent(); out_ << "// WRITE " << node.filename << " — no schema\n"; return;
@@ -3754,7 +3859,8 @@ void CodeGen::visit(ExfmtStmt& node) {
         }
     }
 
-    // Call dspf_exfmt
+    // Pass current indicators then call dspf_exfmt
+    emitIndent(); out_ << "dspf_set_indicators(rpg_indicators, 100);\n";
     emitIndent(); out_ << "int __dspf_key = dspf_exfmt(\""
                        << node.format << "\", &" << bufName << ");\n";
 
