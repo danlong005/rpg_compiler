@@ -243,6 +243,41 @@ static bool dspf__condPass(const DspfJVal& item) {
     return true;
 }
 
+// Check if a record has any keyword whose text starts with `prefix`.
+static bool dspf__hasRecKw(const DspfJVal& rec, const std::string& prefix) {
+    const DspfJVal& kw = rec["keywords"];
+    for (size_t i = 0; i < kw.size(); i++) {
+        if (kw[i].str().rfind(prefix, 0) == 0) return true;
+    }
+    return false;
+}
+
+// Returns true when PROTECT is present and its indicator condition (if any) is met.
+static bool dspf__isProtected(const DspfJVal& rec) {
+    const DspfJVal& kw = rec["keywords"];
+    for (size_t i = 0; i < kw.size(); i++) {
+        const std::string& k = kw[i].str();
+        if (k == "PROTECT") return true;
+        if (k.rfind("PROTECT(", 0) == 0) {
+            std::string inner = k.substr(8, k.size() > 9 ? k.size() - 9 : 0);
+            bool neg = (!inner.empty() && (inner[0]=='N' || inner[0]=='n'));
+            if (neg) inner = inner.substr(1);
+            int ind = 0;
+            if (inner.rfind("*IN", 0) == 0) {
+                try { ind = std::stoi(inner.substr(3)); } catch (...) {}
+            } else {
+                try { ind = std::stoi(inner); } catch (...) {}
+            }
+            if (ind >= 0 && ind < 100) {
+                bool on = g_dspf_indicators[ind];
+                return neg ? !on : on;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 // =============================================================================
 // Edit code / edit word formatting
 // =============================================================================
@@ -450,7 +485,7 @@ static std::string dspf__formatField(const DspfJVal& field, const std::string& r
 
 static void dspf__renderScreen(const DspfJVal& rec,
                                 const std::map<std::string,std::string>& vals) {
-    clear();
+    if (!dspf__hasRecKw(rec, "OVERLAY") && !dspf__hasRecKw(rec, "NOCLEAR")) clear();
 
     // Literals
     const DspfJVal& lits = rec["literals"];
@@ -483,8 +518,13 @@ static void dspf__renderScreen(const DspfJVal& rec,
         attr_t ext = dspf__fieldAttrs(fields[i]);
 
         if (io == "O") {
+            std::string ftype = fields[i]["type"].str();
             attron(COLOR_PAIR(pair) | ext);
-            mvprintw(row, col, "%-*s", len, val.c_str());
+            if (ftype != "A") {
+                mvprintw(row, col, "%*s", len, val.c_str());   // right-align numeric
+            } else {
+                mvprintw(row, col, "%-*s", len, val.c_str());  // left-align char
+            }
             attroff(COLOR_PAIR(pair) | ext);
         } else {
             attron(COLOR_PAIR(pair) | ext | A_REVERSE);
@@ -528,24 +568,31 @@ struct DspfEditField {
 
 static int dspf__inputLoop(const DspfJVal& rec,
                             std::map<std::string,std::string>& vals) {
+    // NOINPUT: screen is display-only; no field editing allowed.
+    // PROTECT: same effect — all I/B fields become read-only.
+    bool noinput = dspf__hasRecKw(rec, "NOINPUT") || dspf__isProtected(rec);
+
     std::vector<DspfEditField> ef;
-    const DspfJVal& fields = rec["fields"];
-    for (size_t i = 0; i < fields.size(); i++) {
-        std::string io = fields[i]["io"].str();
-        if (io != "I" && io != "B") continue;
-        if (!dspf__condPass(fields[i])) continue;
-        DspfEditField f;
-        f.recIdx = (int)i;
-        f.row    = fields[i]["row"].num() - 1;
-        f.col    = fields[i]["col"].num() - 1;
-        f.len    = fields[i]["len"].num(); if (f.len == 0) f.len = 1;
-        f.name   = fields[i]["name"].str();
-        auto it  = vals.find(f.name);
-        f.val    = (it != vals.end()) ? it->second : "";
-        if ((int)f.val.size() > f.len) f.val.resize(f.len);
-        ef.push_back(f);
+    if (!noinput) {
+        const DspfJVal& fields = rec["fields"];
+        for (size_t i = 0; i < fields.size(); i++) {
+            std::string io = fields[i]["io"].str();
+            if (io != "I" && io != "B") continue;
+            if (!dspf__condPass(fields[i])) continue;
+            DspfEditField f;
+            f.recIdx = (int)i;
+            f.row    = fields[i]["row"].num() - 1;
+            f.col    = fields[i]["col"].num() - 1;
+            f.len    = fields[i]["len"].num(); if (f.len == 0) f.len = 1;
+            f.name   = fields[i]["name"].str();
+            auto it  = vals.find(f.name);
+            f.val    = (it != vals.end()) ? it->second : "";
+            if ((int)f.val.size() > f.len) f.val.resize(f.len);
+            ef.push_back(f);
+        }
     }
 
+    const DspfJVal& fields = rec["fields"];
     int cur = 0;
 
     while (true) {
@@ -579,12 +626,14 @@ static int dspf__inputLoop(const DspfJVal& rec,
 
         DspfEditField& f = ef[cur];
 
-        if (ch == '\t') {
+        if (ch == '\t' || ch == KEY_DOWN) {
             cur = (cur + 1) % (int)ef.size(); continue;
         }
-        if (ch == KEY_BTAB) {
+        if (ch == KEY_BTAB || ch == KEY_UP) {
             cur = (cur - 1 + (int)ef.size()) % (int)ef.size(); continue;
         }
+        if (ch == KEY_HOME) { cur = 0; continue; }
+        if (ch == KEY_END)  { cur = (int)ef.size() - 1; continue; }
 
         if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
             if (!f.val.empty()) {
@@ -605,8 +654,11 @@ static int dspf__inputLoop(const DspfJVal& rec,
             attron(COLOR_PAIR(pair) | ext | A_REVERSE);
             mvprintw(f.row, f.col, "%-*s", f.len, f.val.c_str());
             attroff(COLOR_PAIR(pair) | ext | A_REVERSE);
-            if ((int)f.val.size() >= f.len)
+            // Auto-advance: when field fills, move focus to next field
+            if ((int)f.val.size() >= f.len) {
                 cur = (cur + 1) % (int)ef.size();
+                refresh();
+            }
         }
     }
 }
@@ -833,6 +885,7 @@ inline void dspf_init(const char* descriptor_path) {
 inline int dspf_exfmt(const char* recname, void* recbuf) {
     const DspfJVal* rec = dspf__findRec(recname);
     if (!rec) return 0;
+    if (dspf__hasRecKw(*rec, "ALARM")) beep();
     std::string recType = (*rec)["type"].str();
     if (recType == "sflctl") return dspf__sflExfmt(recname, *rec, recbuf);
     auto vals = dspf__extractFields(*rec, recbuf);
