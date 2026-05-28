@@ -140,6 +140,7 @@ static DspfJVal dspf__parseJSON(const std::string& src) {
 static std::map<std::string,std::string>
 dspf__extractFields(const DspfJVal& rec, const void* buf) {
     std::map<std::string,std::string> m;
+    std::map<std::string,bool> seen; // tracks fields already mapped to a buffer slot
     const char* p = (const char*)buf;
     const DspfJVal& fields = rec["fields"];
     for (size_t i = 0; i < fields.size(); i++) {
@@ -154,6 +155,10 @@ dspf__extractFields(const DspfJVal& rec, const void* buf) {
             else p += sizeof(double);
             continue;
         }
+        // Duplicate display entries (same field, different conditioning/attributes)
+        // share one buffer slot — only the first occurrence advances the pointer.
+        if (seen.count(name)) continue;
+        seen[name] = true;
         if (type == "A") {
             std::string val(p, strnlen(p, (size_t)len));
             while (!val.empty() && val.back() == ' ') val.pop_back();
@@ -176,6 +181,7 @@ static void dspf__applyFields(const DspfJVal& rec,
                                const std::map<std::string,std::string>& vals,
                                void* buf) {
     char* p = (char*)buf;
+    std::map<std::string,bool> seen;
     const DspfJVal& fields = rec["fields"];
     for (size_t i = 0; i < fields.size(); i++) {
         std::string name = fields[i]["name"].str();
@@ -188,6 +194,8 @@ static void dspf__applyFields(const DspfJVal& rec,
             else p += sizeof(double);
             continue;
         }
+        if (seen.count(name)) continue; // duplicate display entry — shares first slot
+        seen[name] = true;
         if (type == "A") {
             auto it = vals.find(name);
             if (it != vals.end()) {
@@ -476,7 +484,15 @@ static std::string dspf__formatField(const DspfJVal& field, const std::string& r
             return dspf__applyEditWord(numVal, len, dec, mask);
         }
     }
-    return raw;
+    // No edit code: format with zero-fill, decimal point at correct position.
+    // A ZONED/PACKED len=9 dec=2 field occupies 10 display chars (9 digits + '.').
+    char buf[64];
+    if (dec > 0) {
+        snprintf(buf, sizeof(buf), "%0*.*f", len + 1, dec, numVal);
+    } else {
+        snprintf(buf, sizeof(buf), "%0*.*f", len, 0, numVal);
+    }
+    return std::string(buf);
 }
 
 // =============================================================================
@@ -574,17 +590,21 @@ static int dspf__inputLoop(const DspfJVal& rec,
 
     std::vector<DspfEditField> ef;
     if (!noinput) {
+        std::map<std::string,bool> efSeen;
         const DspfJVal& fields = rec["fields"];
         for (size_t i = 0; i < fields.size(); i++) {
             std::string io = fields[i]["io"].str();
             if (io != "I" && io != "B") continue;
             if (!dspf__condPass(fields[i])) continue;
+            std::string fname = fields[i]["name"].str();
+            if (efSeen.count(fname)) continue; // first condPass-visible entry wins
+            efSeen[fname] = true;
             DspfEditField f;
             f.recIdx = (int)i;
             f.row    = fields[i]["row"].num() - 1;
             f.col    = fields[i]["col"].num() - 1;
             f.len    = fields[i]["len"].num(); if (f.len == 0) f.len = 1;
-            f.name   = fields[i]["name"].str();
+            f.name   = fname;
             auto it  = vals.find(f.name);
             f.val    = (it != vals.end()) ? it->second : "";
             if ((int)f.val.size() > f.len) f.val.resize(f.len);
