@@ -3775,9 +3775,9 @@ void CodeGen::visit(ExfmtStmt& node) {
     }
 
     // Clear F-key indicators 01-24, then set the returned one
-    emitIndent(); out_ << "for (int __i = 1; __i <= 24; ++__i) rpg_in[__i] = false;\n";
+    emitIndent(); out_ << "for (int __i = 1; __i <= 24; ++__i) rpg_indicators[__i] = false;\n";
     emitIndent(); out_ << "if (__dspf_key >= 1 && __dspf_key <= 99) "
-                       << "rpg_in[__dspf_key] = true;\n";
+                       << "rpg_indicators[__dspf_key] = true;\n";
     uses_indicators_ = true;
 
     indent_--; emitIndent(); out_ << "}\n";

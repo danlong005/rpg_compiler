@@ -7,7 +7,6 @@
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
-#include <climits>
 #include <cstdlib>
 #include "ast.h"
 #include "codegen.h"
@@ -164,15 +163,15 @@ queryDspfDescs(const std::string& src_text, const std::string& src_dir) {
 #ifdef _WIN32
 #  define RPGC_CXX       "g++"
 #  define RPGC_ODBC_FLAGS " -lodbc32"
-#  define RPGC_DSPF_FLAGS ""
+#  define RPGC_DSPF_FLAGS " -lpdcurses"
 #elif defined(__APPLE__)
 #  define RPGC_CXX       "clang++"
 #  define RPGC_ODBC_FLAGS " -I/opt/homebrew/include -L/opt/homebrew/lib -lodbc"
-#  define RPGC_DSPF_FLAGS " -framework WebKit -framework Cocoa"
+#  define RPGC_DSPF_FLAGS " -lncurses"
 #else
 #  define RPGC_CXX       "g++"
 #  define RPGC_ODBC_FLAGS " -lodbc"
-#  define RPGC_DSPF_FLAGS " $(pkg-config --cflags --libs webkit2gtk-4.1 2>/dev/null)"
+#  define RPGC_DSPF_FLAGS " -lncurses"
 #endif
 
 extern FILE* yyin;
@@ -289,6 +288,8 @@ int main(int argc, char* argv[]) {
 
     bool has_rla = !ext_descs.empty();
 
+    bool is_dspf = !dspf_descs.empty();
+
     rpg::CodeGen codegen;
     if (debug_mode) codegen.setDebugMode(true, abs_source);
     codegen.setExtFileDescs(std::move(ext_descs));
@@ -363,7 +364,7 @@ int main(int argc, char* argv[]) {
             }
             out << cpp_code;
         }
-        std::string cmd = std::string(RPGC_CXX) + " -std=c++17 -I" + runtime_dir +
+        std::string cmd = std::string(RPGC_CXX) + " -std=c++17 -I" + runtime_dir + " -I" + src_dir +
                           " -c -o " + obj_path + " " + cpp_path;
         int rc = system(cmd.c_str());
         std::remove(cpp_path.c_str());
@@ -392,14 +393,13 @@ int main(int argc, char* argv[]) {
         out << cpp_code;
     }
 
-    std::string cmd = std::string(RPGC_CXX) + " -std=c++17 -I" + runtime_dir;
+    std::string cmd = std::string(RPGC_CXX) + " -std=c++17 -I" + runtime_dir + " -I" + src_dir;
     if (debug_mode) {
         cmd += " -g -O0";
     }
     if (is_sql) {
         cmd += RPGC_ODBC_FLAGS;
     }
-    bool is_dspf = !dspf_descs.empty();
     if (is_dspf) {
         cmd += RPGC_DSPF_FLAGS;
     }

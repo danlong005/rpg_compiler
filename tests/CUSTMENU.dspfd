@@ -1,0 +1,94 @@
+{
+  "name": "CUSTMENU",
+  "records": [
+    {
+      "name": "MAINMENU",
+      "title": "Customer Information System",
+      "screen": { "rows": 24, "cols": 80 },
+      "literals": [
+        { "row": 1, "col": 25, "text": "CUSTOMER INFORMATION SYSTEM" },
+        { "row": 3, "col": 2, "text": "Select one of the following:" },
+        { "row": 5, "col": 5, "text": "1. Customer Inquiry" },
+        { "row": 6, "col": 5, "text": "2. Add Customer" },
+        { "row": 7, "col": 5, "text": "3. Delete Customer" },
+        { "row": 9, "col": 2, "text": "Option . . ." },
+        { "row": 24, "col": 2, "text": "F3=Exit   F12=Cancel" }
+      ],
+      "fields": [
+        {
+          "name": "OPTION",
+          "type": "A",
+          "len": 1,
+          "dec": 0,
+          "io": "I",
+          "row": 9,
+          "col": 16,
+          "keywords": []
+        }
+      ],
+      "keys": [
+        { "key": "F3", "indicator": 3 },
+        { "key": "F12", "indicator": 12 }
+      ]
+    },
+    {
+      "name": "CUSTDSP",
+      "title": "Customer Display",
+      "screen": { "rows": 24, "cols": 80 },
+      "literals": [
+        { "row": 1, "col": 30, "text": "CUSTOMER DISPLAY" },
+        { "row": 3, "col": 2, "text": "Customer Number:" },
+        { "row": 4, "col": 2, "text": "Name . . . . :" },
+        { "row": 5, "col": 2, "text": "Balance  . . :" },
+        { "row": 23, "col": 2, "text": "F3=Exit   F6=Save   F12=Cancel" }
+      ],
+      "fields": [
+        {
+          "name": "CUSTNO",
+          "type": "A",
+          "len": 10,
+          "dec": 0,
+          "io": "B",
+          "row": 3,
+          "col": 20,
+          "keywords": []
+        },
+        {
+          "name": "CUSTNAME",
+          "type": "A",
+          "len": 50,
+          "dec": 0,
+          "io": "B",
+          "row": 4,
+          "col": 20,
+          "keywords": []
+        },
+        {
+          "name": "CUSTBAL",
+          "type": "S",
+          "len": 9,
+          "dec": 2,
+          "io": "B",
+          "row": 5,
+          "col": 20,
+          "keywords": []
+        },
+        {
+          "name": "ERRMSG",
+          "type": "A",
+          "len": 78,
+          "dec": 0,
+          "io": "O",
+          "row": 24,
+          "col": 2,
+          "keywords": ["COLOR(RED)"]
+        }
+      ],
+      "keys": [
+        { "key": "F3", "indicator": 3 },
+        { "key": "F6", "indicator": 6 },
+        { "key": "F12", "indicator": 12 }
+      ]
+    }
+  ]
+}
