@@ -80,7 +80,6 @@ jobs:
               --url "https://github.com/${{ github.repository }}" \
               --maintainer "${{ github.repository_owner }}" \
               --license MIT \
-              --recommends rpgc \
               -C /tmp/dspfc-root \
               usr/
 
@@ -93,7 +92,6 @@ jobs:
               --url "https://github.com/${{ github.repository }}" \
               --maintainer "${{ github.repository_owner }}" \
               --license MIT \
-              --recommends rpgc \
               -C /tmp/dspfc-root \
               usr/
 
