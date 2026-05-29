@@ -16,4 +16,8 @@ struct CUSTDSP_buf {
     char ERRMSG[79] = {};
 };
 
+struct CONFIRM_buf {
+    char ANSWER[2] = {};
+};
+
 #endif // CUSTMENU_DSPF_H

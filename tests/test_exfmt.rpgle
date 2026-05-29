@@ -34,6 +34,19 @@ ELSE;
     ELSEIF *IN12;
       DSPLY 'Cancelled';
     ENDIF;
+
+  ELSEIF choice = '3';
+    // Show delete confirmation popup (WINDOW record over the menu)
+    ANSWER = ' ';
+    EXFMT CONFIRM;
+
+    IF *IN12;
+      DSPLY 'Delete cancelled';
+    ELSEIF ANSWER = 'Y' OR ANSWER = 'y';
+      DSPLY 'Customer deleted';
+    ELSE;
+      DSPLY 'Delete cancelled';
+    ENDIF;
   ENDIF;
 ENDIF;
 

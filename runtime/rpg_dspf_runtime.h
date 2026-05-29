@@ -286,6 +286,16 @@ static bool dspf__isProtected(const DspfJVal& rec) {
     return false;
 }
 
+// Extract WINDOW parameters from a record. Returns true if the record is a window record.
+static bool dspf__isWindow(const DspfJVal& rec, int& winRow, int& winCol, int& winH, int& winW) {
+    if (!rec.has("window")) return false;
+    winRow = rec["window"]["row"].num();
+    winCol = rec["window"]["col"].num();
+    winH   = rec["window"]["height"].num();
+    winW   = rec["window"]["width"].num();
+    return winRow > 0 && winH > 0 && winW > 0;
+}
+
 // =============================================================================
 // Edit code / edit word formatting
 // =============================================================================
@@ -434,6 +444,14 @@ enum {
     DSPF_PAIR_YELLOW  = 5,
     DSPF_PAIR_MAGENTA = 6,
     DSPF_PAIR_CYAN    = 7,
+    // Background pairs — used for window borders
+    DSPF_PAIR_BG_RED     = 8,
+    DSPF_PAIR_BG_BLUE    = 9,
+    DSPF_PAIR_BG_GREEN   = 10,
+    DSPF_PAIR_BG_YELLOW  = 11,
+    DSPF_PAIR_BG_MAGENTA = 12,
+    DSPF_PAIR_BG_CYAN    = 13,
+    DSPF_PAIR_BG_WHITE   = 14,
 };
 
 static int dspf__colorPair(const DspfJVal& field) {
@@ -496,20 +514,75 @@ static std::string dspf__formatField(const DspfJVal& field, const std::string& r
 }
 
 // =============================================================================
+// Window border rendering (WDWBORDER keyword)
+// =============================================================================
+
+static void dspf__drawWindowBorder(WINDOW* win, const DspfJVal& rec) {
+    if (!rec.has("wdwborder")) {
+        box(win, 0, 0);
+        return;
+    }
+
+    const DspfJVal& wb  = rec["wdwborder"];
+    std::string chars   = wb["chars"].str();
+    std::string color   = wb["color"].str();
+    std::string dspatr  = wb["dspatr"].str();
+
+    // Map color name to background color pair
+    int pair = 0;
+    if      (color == "RED")    pair = DSPF_PAIR_BG_RED;
+    else if (color == "BLUE")   pair = DSPF_PAIR_BG_BLUE;
+    else if (color == "GREEN")  pair = DSPF_PAIR_BG_GREEN;
+    else if (color == "YELLOW") pair = DSPF_PAIR_BG_YELLOW;
+    else if (color == "PINK")   pair = DSPF_PAIR_BG_MAGENTA;
+    else if (color == "TURQ")   pair = DSPF_PAIR_BG_CYAN;
+    else if (color == "WHITE")  pair = DSPF_PAIR_BG_WHITE;
+
+    // Map display attribute
+    attr_t attrs = A_NORMAL;
+    if      (dspatr == "HI") attrs = A_BOLD;
+    else if (dspatr == "BL") attrs = A_BLINK;
+    else if (dspatr == "RI") attrs = A_REVERSE;
+    else if (dspatr == "UL") attrs = A_UNDERLINE;
+
+    attr_t on = (pair ? COLOR_PAIR(pair) : 0) | attrs;
+    if (on) wattron(win, on);
+
+    if (chars.size() >= 8) {
+        // IBM i char order: tl, top, tr, left, right, bl, bottom, br
+        // ncurses wborder:  ls,  rs,  ts,   bs,   tl,  tr,     bl,     br
+        wborder(win,
+            (chtype)(unsigned char)chars[3], (chtype)(unsigned char)chars[4],
+            (chtype)(unsigned char)chars[1], (chtype)(unsigned char)chars[6],
+            (chtype)(unsigned char)chars[0], (chtype)(unsigned char)chars[2],
+            (chtype)(unsigned char)chars[5], (chtype)(unsigned char)chars[7]);
+    } else {
+        box(win, 0, 0);
+    }
+
+    if (on) wattroff(win, on);
+}
+
+// =============================================================================
 // Screen rendering
 // =============================================================================
 
 static void dspf__renderScreen(const DspfJVal& rec,
-                                const std::map<std::string,std::string>& vals) {
-    if (!dspf__hasRecKw(rec, "OVERLAY") && !dspf__hasRecKw(rec, "NOCLEAR")) clear();
+                                const std::map<std::string,std::string>& vals,
+                                WINDOW* win, int rowOff, int colOff) {
+    if (!dspf__hasRecKw(rec, "OVERLAY") && !dspf__hasRecKw(rec, "NOCLEAR")) {
+        if (win == stdscr) clear();
+        else werase(win);
+    }
+    if (win != stdscr) dspf__drawWindowBorder(win, rec);
 
     // Literals
     const DspfJVal& lits = rec["literals"];
     for (size_t i = 0; i < lits.size(); i++) {
         if (!dspf__condPass(lits[i])) continue;
-        int row = lits[i]["row"].num() - 1;
-        int col = lits[i]["col"].num() - 1;
-        mvprintw(row, col, "%s", lits[i]["text"].str().c_str());
+        int row = lits[i]["row"].num() - 1 - rowOff;
+        int col = lits[i]["col"].num() - 1 - colOff;
+        mvwprintw(win, row, col, "%s", lits[i]["text"].str().c_str());
     }
 
     // Fields
@@ -519,8 +592,8 @@ static void dspf__renderScreen(const DspfJVal& rec,
         if (io == "H") continue;
         if (!dspf__condPass(fields[i])) continue;
 
-        int row = fields[i]["row"].num() - 1;
-        int col = fields[i]["col"].num() - 1;
+        int row = fields[i]["row"].num() - 1 - rowOff;
+        int col = fields[i]["col"].num() - 1 - colOff;
         int len = fields[i]["len"].num(); if (len == 0) len = 1;
 
         std::string name = fields[i]["name"].str();
@@ -535,22 +608,22 @@ static void dspf__renderScreen(const DspfJVal& rec,
 
         if (io == "O") {
             std::string ftype = fields[i]["type"].str();
-            attron(COLOR_PAIR(pair) | ext);
+            wattron(win, COLOR_PAIR(pair) | ext);
             if (ftype != "A") {
-                mvprintw(row, col, "%*s", len, val.c_str());   // right-align numeric
+                mvwprintw(win, row, col, "%*s", len, val.c_str());   // right-align numeric
             } else {
-                mvprintw(row, col, "%-*s", len, val.c_str());  // left-align char
+                mvwprintw(win, row, col, "%-*s", len, val.c_str());  // left-align char
             }
-            attroff(COLOR_PAIR(pair) | ext);
+            wattroff(win, COLOR_PAIR(pair) | ext);
         } else {
-            attron(COLOR_PAIR(pair) | ext | A_REVERSE);
-            mvprintw(row, col, "%-*s", len, val.c_str());
-            attroff(COLOR_PAIR(pair) | ext | A_REVERSE);
+            wattron(win, COLOR_PAIR(pair) | ext | A_REVERSE);
+            mvwprintw(win, row, col, "%-*s", len, val.c_str());
+            wattroff(win, COLOR_PAIR(pair) | ext | A_REVERSE);
         }
     }
 
-    // F-key legend on line 25 (0-indexed 24) when terminal is tall enough
-    if (LINES > 24) {
+    // F-key legend on line 25 (0-indexed 24) — only on stdscr
+    if (win == stdscr && LINES > 24) {
         const DspfJVal& keys = rec["keys"];
         std::string legend = " Enter=Submit";
         for (size_t i = 0; i < keys.size(); i++) {
@@ -568,7 +641,7 @@ static void dspf__renderScreen(const DspfJVal& rec,
         attroff(A_REVERSE);
     }
 
-    refresh();
+    wrefresh(win);
 }
 
 // =============================================================================
@@ -583,9 +656,8 @@ struct DspfEditField {
 };
 
 static int dspf__inputLoop(const DspfJVal& rec,
-                            std::map<std::string,std::string>& vals) {
-    // NOINPUT: screen is display-only; no field editing allowed.
-    // PROTECT: same effect — all I/B fields become read-only.
+                            std::map<std::string,std::string>& vals,
+                            WINDOW* win, int rowOff, int colOff) {
     bool noinput = dspf__hasRecKw(rec, "NOINPUT") || dspf__isProtected(rec);
 
     std::vector<DspfEditField> ef;
@@ -597,12 +669,12 @@ static int dspf__inputLoop(const DspfJVal& rec,
             if (io != "I" && io != "B") continue;
             if (!dspf__condPass(fields[i])) continue;
             std::string fname = fields[i]["name"].str();
-            if (efSeen.count(fname)) continue; // first condPass-visible entry wins
+            if (efSeen.count(fname)) continue;
             efSeen[fname] = true;
             DspfEditField f;
             f.recIdx = (int)i;
-            f.row    = fields[i]["row"].num() - 1;
-            f.col    = fields[i]["col"].num() - 1;
+            f.row    = fields[i]["row"].num() - 1 - rowOff;
+            f.col    = fields[i]["col"].num() - 1 - colOff;
             f.len    = fields[i]["len"].num(); if (f.len == 0) f.len = 1;
             f.name   = fname;
             auto it  = vals.find(f.name);
@@ -619,11 +691,11 @@ static int dspf__inputLoop(const DspfJVal& rec,
         if (!ef.empty()) {
             int cx = ef[cur].col + (int)ef[cur].val.size();
             if (cx >= ef[cur].col + ef[cur].len) cx = ef[cur].col + ef[cur].len - 1;
-            move(ef[cur].row, cx);
-            refresh();
+            wmove(win, ef[cur].row, cx);
+            wrefresh(win);
         }
 
-        int ch = getch();
+        int ch = wgetch(win);
 
         if (ch >= KEY_F(1) && ch <= KEY_F(24)) {
             int fnum = ch - KEY_F(0);
@@ -660,9 +732,9 @@ static int dspf__inputLoop(const DspfJVal& rec,
                 f.val.pop_back();
                 int pair = dspf__colorPair(fields[f.recIdx]);
                 attr_t ext = dspf__fieldAttrs(fields[f.recIdx]);
-                attron(COLOR_PAIR(pair) | ext | A_REVERSE);
-                mvprintw(f.row, f.col, "%-*s", f.len, f.val.c_str());
-                attroff(COLOR_PAIR(pair) | ext | A_REVERSE);
+                wattron(win, COLOR_PAIR(pair) | ext | A_REVERSE);
+                mvwprintw(win, f.row, f.col, "%-*s", f.len, f.val.c_str());
+                wattroff(win, COLOR_PAIR(pair) | ext | A_REVERSE);
             }
             continue;
         }
@@ -671,13 +743,12 @@ static int dspf__inputLoop(const DspfJVal& rec,
             f.val += (char)ch;
             int pair = dspf__colorPair(fields[f.recIdx]);
             attr_t ext = dspf__fieldAttrs(fields[f.recIdx]);
-            attron(COLOR_PAIR(pair) | ext | A_REVERSE);
-            mvprintw(f.row, f.col, "%-*s", f.len, f.val.c_str());
-            attroff(COLOR_PAIR(pair) | ext | A_REVERSE);
-            // Auto-advance: when field fills, move focus to next field
+            wattron(win, COLOR_PAIR(pair) | ext | A_REVERSE);
+            mvwprintw(win, f.row, f.col, "%-*s", f.len, f.val.c_str());
+            wattroff(win, COLOR_PAIR(pair) | ext | A_REVERSE);
             if ((int)f.val.size() >= f.len) {
                 cur = (cur + 1) % (int)ef.size();
-                refresh();
+                wrefresh(win);
             }
         }
     }
@@ -752,7 +823,7 @@ static int dspf__sflExfmt(const char* ctlName, const DspfJVal& ctl, void* ctlBuf
 
     // Render everything (control record + subfile rows)
     auto render = [&]() {
-        dspf__renderScreen(ctl, ctlVals);
+        dspf__renderScreen(ctl, ctlVals, stdscr, 0, 0);
 
         if (!sflRec) { refresh(); return; }
         const DspfJVal& sf = (*sflRec)["fields"];
@@ -898,6 +969,13 @@ inline void dspf_init(const char* descriptor_path) {
         init_pair(DSPF_PAIR_YELLOW,  COLOR_YELLOW,  -1);
         init_pair(DSPF_PAIR_MAGENTA, COLOR_MAGENTA, -1);
         init_pair(DSPF_PAIR_CYAN,    COLOR_CYAN,    -1);
+        init_pair(DSPF_PAIR_BG_RED,     COLOR_BLACK, COLOR_RED);
+        init_pair(DSPF_PAIR_BG_BLUE,    COLOR_WHITE, COLOR_BLUE);
+        init_pair(DSPF_PAIR_BG_GREEN,   COLOR_BLACK, COLOR_GREEN);
+        init_pair(DSPF_PAIR_BG_YELLOW,  COLOR_BLACK, COLOR_YELLOW);
+        init_pair(DSPF_PAIR_BG_MAGENTA, COLOR_BLACK, COLOR_MAGENTA);
+        init_pair(DSPF_PAIR_BG_CYAN,    COLOR_BLACK, COLOR_CYAN);
+        init_pair(DSPF_PAIR_BG_WHITE,   COLOR_BLACK, COLOR_WHITE);
     }
     g_dspfActive = true;
 }
@@ -908,10 +986,29 @@ inline int dspf_exfmt(const char* recname, void* recbuf) {
     if (dspf__hasRecKw(*rec, "ALARM")) beep();
     std::string recType = (*rec)["type"].str();
     if (recType == "sflctl") return dspf__sflExfmt(recname, *rec, recbuf);
+
+    int winRow = 0, winCol = 0, winH = 0, winW = 0;
+    bool isWin = dspf__isWindow(*rec, winRow, winCol, winH, winW);
+    WINDOW* win  = stdscr;
+    int rowOff = 0, colOff = 0;
+    if (isWin) {
+        win = newwin(winH, winW, winRow - 1, winCol - 1);
+        keypad(win, TRUE);
+        rowOff = winRow - 1;
+        colOff = winCol - 1;
+    }
+
     auto vals = dspf__extractFields(*rec, recbuf);
-    dspf__renderScreen(*rec, vals);
-    int indicator = dspf__inputLoop(*rec, vals);
+    dspf__renderScreen(*rec, vals, win, rowOff, colOff);
+    int indicator = dspf__inputLoop(*rec, vals, win, rowOff, colOff);
     dspf__applyFields(*rec, vals, recbuf);
+
+    if (isWin) {
+        delwin(win);
+        touchwin(stdscr);
+        refresh();
+    }
+
     return indicator;
 }
 
@@ -939,7 +1036,7 @@ inline void dspf_write(const char* recname, const void* recbuf) {
 
     // Normal record: render immediately (no input wait)
     auto vals = dspf__extractFields(*rec, recbuf);
-    dspf__renderScreen(*rec, vals);
+    dspf__renderScreen(*rec, vals, stdscr, 0, 0);
 }
 
 inline int dspf_read(const char* recname, void* recbuf) {

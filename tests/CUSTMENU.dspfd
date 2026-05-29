@@ -3,16 +3,18 @@
   "records": [
     {
       "name": "MAINMENU",
+      "type": "normal",
       "title": "Customer Information System",
       "screen": { "rows": 24, "cols": 80 },
+      "keywords": [],
       "literals": [
-        { "row": 1, "col": 25, "text": "CUSTOMER INFORMATION SYSTEM" },
-        { "row": 3, "col": 2, "text": "Select one of the following:" },
-        { "row": 5, "col": 5, "text": "1. Customer Inquiry" },
-        { "row": 6, "col": 5, "text": "2. Add Customer" },
-        { "row": 7, "col": 5, "text": "3. Delete Customer" },
-        { "row": 9, "col": 2, "text": "Option . . ." },
-        { "row": 24, "col": 2, "text": "F3=Exit   F12=Cancel" }
+        { "row": 1, "col": 25, "text": "CUSTOMER INFORMATION SYSTEM", "keywords": [] },
+        { "row": 3, "col": 2, "text": "Select one of the following:", "keywords": [] },
+        { "row": 5, "col": 5, "text": "1. Customer Inquiry", "keywords": [] },
+        { "row": 6, "col": 5, "text": "2. Add Customer", "keywords": [] },
+        { "row": 7, "col": 5, "text": "3. Delete Customer", "keywords": [] },
+        { "row": 9, "col": 2, "text": "Option . . .", "keywords": [] },
+        { "row": 24, "col": 2, "text": "F3=Exit   F12=Cancel", "keywords": [] }
       ],
       "fields": [
         {
@@ -33,14 +35,16 @@
     },
     {
       "name": "CUSTDSP",
+      "type": "normal",
       "title": "Customer Display",
       "screen": { "rows": 24, "cols": 80 },
+      "keywords": [],
       "literals": [
-        { "row": 1, "col": 30, "text": "CUSTOMER DISPLAY" },
-        { "row": 3, "col": 2, "text": "Customer Number:" },
-        { "row": 4, "col": 2, "text": "Name . . . . :" },
-        { "row": 5, "col": 2, "text": "Balance  . . :" },
-        { "row": 23, "col": 2, "text": "F3=Exit   F6=Save   F12=Cancel" }
+        { "row": 1, "col": 30, "text": "CUSTOMER DISPLAY", "keywords": [] },
+        { "row": 3, "col": 2, "text": "Customer Number:", "keywords": [] },
+        { "row": 4, "col": 2, "text": "Name . . . . :", "keywords": [] },
+        { "row": 5, "col": 2, "text": "Balance  . . :", "keywords": [] },
+        { "row": 23, "col": 2, "text": "F3=Exit   F6=Save   F12=Cancel", "keywords": [] }
       ],
       "fields": [
         {
@@ -87,6 +91,35 @@
       "keys": [
         { "key": "F3", "indicator": 3 },
         { "key": "F6", "indicator": 6 },
+        { "key": "F12", "indicator": 12 }
+      ]
+    },
+    {
+      "name": "CONFIRM",
+      "type": "normal",
+      "title": "CONFIRM",
+      "screen": { "rows": 24, "cols": 80 },
+      "window": { "row": 9, "col": 21, "height": 7, "width": 40 },
+      "wdwborder": { "chars": "        ", "color": "GREEN", "dspatr": "" },
+      "keywords": ["OVERLAY"],
+      "literals": [
+        { "row": 10, "col": 28, "text": "--- Delete Customer ---", "keywords": [] },
+        { "row": 12, "col": 23, "text": "Are you sure? (Y/N) :", "keywords": [] },
+        { "row": 14, "col": 23, "text": "Enter=Yes   F12=Cancel", "keywords": [] }
+      ],
+      "fields": [
+        {
+          "name": "ANSWER",
+          "type": "A",
+          "len": 1,
+          "dec": 0,
+          "io": "I",
+          "row": 12,
+          "col": 45,
+          "keywords": []
+        }
+      ],
+      "keys": [
         { "key": "F12", "indicator": 12 }
       ]
     }
