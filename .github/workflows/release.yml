@@ -16,6 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Checkout OpenDSPF
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/OpenDSPF
+          path: OpenDSPF
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -28,8 +34,14 @@ jobs:
       - name: Build
         run: make PREFIX=/usr
 
+      - name: Build OpenDSPF
+        run: make -C OpenDSPF
+
       - name: Stage install
         run: sudo make install PREFIX=/usr DESTDIR=/tmp/rpgc-root
+
+      - name: Stage OpenDSPF install
+        run: sudo make -C OpenDSPF install PREFIX=/usr DESTDIR=/tmp/dspfc-root
 
       - name: Package .deb
         run: |
@@ -59,12 +71,40 @@ jobs:
               -C /tmp/rpgc-root \
               usr/
 
+      - name: Package dspfc .deb
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          fpm -s dir -t deb \
+              -n dspfc -v "$VERSION" \
+              --description "Display file compiler for OpenRPG interactive screen programs" \
+              --url "https://github.com/${{ github.repository }}" \
+              --maintainer "${{ github.repository_owner }}" \
+              --license MIT \
+              --recommends rpgc \
+              -C /tmp/dspfc-root \
+              usr/
+
+      - name: Package dspfc .rpm
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          fpm -s dir -t rpm \
+              -n dspfc -v "$VERSION" \
+              --description "Display file compiler for OpenRPG interactive screen programs" \
+              --url "https://github.com/${{ github.repository }}" \
+              --maintainer "${{ github.repository_owner }}" \
+              --license MIT \
+              --recommends rpgc \
+              -C /tmp/dspfc-root \
+              usr/
+
       - name: Upload packages to release
         uses: softprops/action-gh-release@v3
         with:
           files: |
             rpgc_*.deb
             rpgc-*.rpm
+            dspfc_*.deb
+            dspfc-*.rpm
 
   # ── macOS: build .dmg ───────────────────────────────────────────────────
   build-macos:
@@ -73,11 +113,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Checkout OpenDSPF
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/OpenDSPF
+          path: OpenDSPF
+
       - name: Install build dependencies
         run: brew install flex bison unixodbc
 
       - name: Build
         run: make
+
+      - name: Build OpenDSPF
+        run: make -C OpenDSPF
 
       - name: Stage install
         run: sudo make install DESTDIR=/tmp/rpgc-root
@@ -85,29 +134,71 @@ jobs:
       - name: Build .pkg installer
         run: |
           VERSION=${GITHUB_REF_NAME#v}
+
+          # Pre-install script: check for unixodbc
           mkdir -p /tmp/rpgc-scripts
           cat > /tmp/rpgc-scripts/preinstall << 'EOF'
           #!/bin/bash
           if [ ! -f /opt/homebrew/lib/libodbc.dylib ] && [ ! -f /usr/local/lib/libodbc.dylib ]; then
-              echo "Error: unixodbc is required but not installed."
-              echo "Install it with: brew install unixodbc"
+              echo "Error: unixodbc is required. Install with: brew install unixodbc"
               exit 1
           fi
           exit 0
           EOF
           chmod +x /tmp/rpgc-scripts/preinstall
+
+          # Component 1: rpgc (required)
           pkgbuild \
             --root /tmp/rpgc-root \
             --identifier com.rpgc.compiler \
             --version "$VERSION" \
             --install-location / \
             --scripts /tmp/rpgc-scripts \
-            "rpgc-${VERSION}.pkg"
+            /tmp/rpgc-component.pkg
+
+          # Component 2: dspfc (optional)
+          sudo make -C OpenDSPF install DESTDIR=/tmp/dspfc-root
+          pkgbuild \
+            --root /tmp/dspfc-root \
+            --identifier com.rpgc.dspfc \
+            --version "$VERSION" \
+            --install-location / \
+            /tmp/dspfc-component.pkg
+
+          # Product archive: rpgc required, dspfc optional
+          cat > /tmp/Distribution.xml << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <installer-gui-script minSpecVersion="2">
+              <title>OpenRPG $VERSION</title>
+              <options customize="allow" require-scripts="false"/>
+              <choices-outline>
+                  <line choice="com.rpgc.compiler"/>
+                  <line choice="com.rpgc.dspfc"/>
+              </choices-outline>
+              <choice id="com.rpgc.compiler" title="OpenRPG Compiler (rpgc)"
+                      description="The RPG IV compiler. Required."
+                      visible="true" enabled="false" selected="true">
+                  <pkg-ref id="com.rpgc.compiler"/>
+              </choice>
+              <choice id="com.rpgc.dspfc" title="OpenDSPF Display File Compiler (dspfc)"
+                      description="Compiles display file source into descriptors for interactive screen programs."
+                      visible="true" enabled="true" selected="false">
+                  <pkg-ref id="com.rpgc.dspfc"/>
+              </choice>
+              <pkg-ref id="com.rpgc.compiler" version="$VERSION">/tmp/rpgc-component.pkg</pkg-ref>
+              <pkg-ref id="com.rpgc.dspfc" version="$VERSION">/tmp/dspfc-component.pkg</pkg-ref>
+          </installer-gui-script>
+          EOF
+
+          productbuild \
+            --distribution /tmp/Distribution.xml \
+            --package-path /tmp \
+            "openrpg-${VERSION}.pkg"
 
       - name: Upload PKG to release
         uses: softprops/action-gh-release@v3
         with:
-          files: rpgc-*.pkg
+          files: openrpg-*.pkg
 
   # ── Windows: build NSIS installer ──────────────────────────────────────
   build-windows:
@@ -115,6 +206,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Checkout OpenDSPF
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/OpenDSPF
+          path: OpenDSPF
 
       - uses: msys2/setup-msys2@v2.31.1
         with:
@@ -128,7 +225,7 @@ jobs:
 
       - name: Build
         shell: msys2 {0}
-        run: make
+        run: make && make -C OpenDSPF
 
       - name: Install NSIS
         shell: pwsh
@@ -139,6 +236,8 @@ jobs:
         run: |
           Copy-Item rpgc.exe installer\ -ErrorAction Stop
           Copy-Item runtime\*.h installer\ -ErrorAction Stop
+          Copy-Item OpenDSPF\dspfc.exe installer\ -ErrorAction Stop
+          Copy-Item OpenDSPF\runtime\rpg_dspf_runtime.h installer\ -ErrorAction Stop
 
       - name: Build installer
         shell: pwsh

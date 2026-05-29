@@ -98,6 +98,8 @@ $(TARGET): $(OBJS)
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 
+DSPF_DIR ?= ../OpenDSPF
+
 install: $(TARGET)
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 755 $(TARGET) $(DESTDIR)$(BINDIR)/$(TARGET)
@@ -108,9 +110,20 @@ install: $(TARGET)
 	install -m 644 runtime/rpg_json_runtime.h $(DESTDIR)$(DATADIR)/
 	install -m 644 runtime/rpg_csv_runtime.h $(DESTDIR)$(DATADIR)/
 
+install-dspf:
+	install -m 755 $(DSPF_DIR)/dspfc $(DESTDIR)$(BINDIR)/dspfc
+	install -d $(DESTDIR)$(DATADIR)
+	install -m 644 $(DSPF_DIR)/runtime/rpg_dspf_runtime.h $(DESTDIR)$(DATADIR)/
+
+install-all: install install-dspf
+
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(TARGET)
 	rm -rf $(DESTDIR)$(DATADIR)
+
+uninstall-dspf:
+	rm -f $(DESTDIR)$(BINDIR)/dspfc
+	rm -f $(DESTDIR)$(DATADIR)/rpg_dspf_runtime.h
 
 test: $(TARGET)
 	@bash tests/run_tests.sh
@@ -118,4 +131,4 @@ test: $(TARGET)
 update-expected: $(TARGET)
 	@bash tests/run_tests.sh --update
 
-.PHONY: all clean install uninstall test update-expected
+.PHONY: all clean install install-dspf install-all uninstall uninstall-dspf test update-expected
